@@ -192,3 +192,4 @@ file/
 *.png
 *.jpg
 *.jpeg
+.streamlit/*
