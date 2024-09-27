@@ -1,9 +1,22 @@
 import pandas as pd
 import streamlit as st
+from PIL import Image
 
 def set_data_settings():
-    st.title('Data LTDBB PJP LR JKT Visualization')
     pd.set_option('display.float_format', '{:,.2f}'.format)
+
+def set_page_settings():
+    st.set_page_config(
+        page_title="Tools Analisa Data LTDBB",
+        page_icon="./static/favicon.png",
+        layout="wide",
+        initial_sidebar_state="expanded")
+    st.title('Data LTDBB PJP LR JKT Visualization')
+    with st.sidebar:
+        st.image("./static/Logo.png")
+        st.title('Data Analytics')
+        color_theme_list = ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis']
+        selected_color_theme = st.selectbox('Select a color theme', color_theme_list)
 
 def preprocess_data(df):
     df = df.drop(columns=['Nama PJP Conv Final'])
