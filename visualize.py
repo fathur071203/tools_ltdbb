@@ -16,3 +16,6 @@ def make_pie_chart(df, top_n):
     )
 
     st.plotly_chart(fig)
+
+def make_bar_chart(df):
+    pass
