@@ -22,13 +22,35 @@ def filter_data_time(df, selected_year, selected_quarter, selected_month):
 
 def set_data_settings():
     pd.set_option('display.float_format', '{:,.2f}'.format)
+    return
 
 def set_page_settings():
+    summary_page = st.Page(
+        page="views/summary.py",
+        title="Summary",
+        default=True
+    )
+    growth_page = st.Page(
+        page="views/growth.py",
+        title="Growth",
+    )
+    profile_page = st.Page(
+        page="views/profile.py",
+        title="Profile",
+    )
+    market_share_page = st.Page(
+        page="views/market_share.py",
+        title="Market Share",
+    )
+    pg = st.navigation(pages=[summary_page,growth_page,profile_page,market_share_page])
     st.set_page_config(
         page_title="Tools Analisa Data LTDBB",
         page_icon="./static/favicon.png",
         layout="wide",
         initial_sidebar_state="expanded")
+    pg.run()
+
+def set_page_visuals():
     st.title('Data LTDBB PJP LR JKT Visualization')
     col = st.columns((1.5, 4.5, 2), gap='medium')
     with st.sidebar:
