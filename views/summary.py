@@ -21,7 +21,7 @@ df = None
 if st.session_state['uploaded_file'] is not None:
     df = load_data(st.session_state['uploaded_file'])
 
-    time_option = st.sidebar.selectbox("Choose Time Period", ("Month", "Quarter"))
+    time_option = st.sidebar.selectbox("Choose Time Period:", ("Month", "Quarter"))
 
     years = ['All'] + list(df['Year'].unique())
     selected_year = st.sidebar.selectbox('Select Year:', years)
@@ -49,7 +49,15 @@ if st.session_state['uploaded_file'] is not None:
             (df_sum_time['Sum of Fin Jumlah Out'] != 0) & (df_sum_time['Sum of Fin Nilai Out'] != 0) &
             (df_sum_time['Sum of Fin Jumlah Dom'] != 0) & (df_sum_time['Sum of Fin Nilai Dom'] != 0)]
     
-    grand_total = int(df_sum_time['Sum of Total Nom'].sum())
+    grand_total_inc_nominal = int(df_sum_time['Sum of Fin Nilai Inc'].sum())
+    grand_total_inc_jumlah = int(df_sum_time['Sum of Fin Jumlah Inc'].sum())
+    grand_total_out_nominal = int(df_sum_time['Sum of Fin Nilai Out'].sum())
+    grand_total_out_jumlah = int(df_sum_time['Sum of Fin Jumlah Out'].sum())
+    grand_total_dom_nominal = int(df_sum_time['Sum of Fin Nilai Out'].sum())
+    grand_total_dom_jumlah = int(df_sum_time['Sum of Fin Jumlah Out'].sum())
+
+    grand_total_nominal = int(df_sum_time['Sum of Total Nom'].sum())
+    grand_total_frequency = int(df_sum_time['Sum of Fin Jumlah Inc'].sum() + df_sum_time['Sum of Fin Jumlah Out'].sum() + df_sum_time['Sum of Fin Jumlah Dom'].sum() )
 
     col1 = st.columns(1)
     with col1[0]:
@@ -61,6 +69,11 @@ if st.session_state['uploaded_file'] is not None:
     with col3:
         make_grouped_bar_chart(df_sum_time, "Nilai", isMonth)
     st.dataframe(df_sum_time)
-    st.write(f"**Grand Total: {format_to_rupiah(grand_total)}**")
+    df_grand_totals = pd.DataFrame({
+        'Category': ['Incoming', 'Outgoing', 'Domestic', 'All'],
+        'Grand Total Jumlah': [grand_total_inc_jumlah, grand_total_out_jumlah, grand_total_dom_jumlah, grand_total_frequency],
+        'Grand Total Nominal': [grand_total_inc_nominal, grand_total_out_nominal, grand_total_dom_nominal, grand_total_nominal]
+    })
+    st.dataframe(df_grand_totals.set_index(df_grand_totals.columns[0]))
 else:
     st.warning("You Must Upload a CSV or Excel File")

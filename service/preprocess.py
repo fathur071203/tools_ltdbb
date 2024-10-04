@@ -92,14 +92,33 @@ def preprocess_data_time(df):
 
     df['Sum of Total Nom'] = df['Sum of Fin Nilai Inc'] + df['Sum of Fin Nilai Out'] + df['Sum of Fin Nilai Dom']
     
-    total_sum_of_nom = df.groupby(['Year', 'Quarter', 'Month'])['Sum of Total Nom'].transform('sum')
+    total_sum_of_nom = df.groupby(['Year', 'Quarter', 'Month'], observed=False)['Sum of Total Nom'].transform('sum')
     
     df['Market Share (%)'] = ((df['Sum of Total Nom'] / total_sum_of_nom) * 100).round(2)
     return df
 
+def preprocess_data_growth(df):
+    df['%YoY'] = pd.NA
+    df['%QtQ'] = pd.NA
+    df['%MtM'] = pd.NA
+
+    first_year = df['Year'].min()
+    df.loc[df['Year'] == first_year, ['%YoY', '%QtQ', '%MtM']] = pd.NA
+
+    #TODO: Logic calculations for %YoY, %QtQ, and %MtM
+
+    df_jumlah_inc = df[['Year', 'Quarter', 'Sum of Fin Jumlah Inc', '%YoY', '%QtQ', '%MtM']].copy()
+    df_jumlah_out = df[['Year', 'Quarter', 'Sum of Fin Jumlah Out', '%YoY', '%QtQ', '%MtM']].copy()
+    df_jumlah_dom = df[['Year', 'Quarter', 'Sum of Fin Jumlah Dom', '%YoY', '%QtQ', '%MtM']].copy()
+    df_freq_inc = df[['Year', 'Quarter', 'Sum of Fin Nilai Inc', '%YoY', '%QtQ', '%MtM']].copy()
+    df_freq_out = df[['Year', 'Quarter', 'Sum of Fin Nilai Out', '%YoY', '%QtQ', '%MtM']].copy()
+    df_freq_dom = df[['Year', 'Quarter', 'Sum of Fin Nilai Dom', '%YoY', '%QtQ', '%MtM']].copy()
+
+    return df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_freq_inc, df_freq_out, df_freq_dom
+
 def sum_data_time(df, isMonth):
     if isMonth:
-        df_sum = df.groupby(['Year', 'Month']).agg({
+        df_sum = df.groupby(['Year', 'Month'], observed=False).agg({
             'Sum of Fin Jumlah Inc': 'sum',
             'Sum of Fin Nilai Inc': 'sum',
             'Sum of Fin Jumlah Out': 'sum',

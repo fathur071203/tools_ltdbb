@@ -34,9 +34,9 @@ def make_grouped_bar_chart(df, mode, isMonth):
                         value_vars=value_vars, 
                         var_name='Financial Metric', value_name='Value')
 
-    df_grouped = df_melted.groupby([time_label, 'Financial Metric'], as_index=False).sum()
+    df_grouped = df_melted.groupby([time_label, 'Financial Metric'], as_index=False, observed=False).sum()
     
-    df_filtered = df_grouped.groupby(time_label).filter(lambda x: x['Value'].sum() != 0)
+    df_filtered = df_grouped.groupby(time_label, observed=False).filter(lambda x: x['Value'].sum() != 0)
     
     if mode == "Jumlah":
         label = "Frequency"
