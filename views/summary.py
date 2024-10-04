@@ -53,8 +53,8 @@ if st.session_state['uploaded_file'] is not None:
     grand_total_inc_jumlah = int(df_sum_time['Sum of Fin Jumlah Inc'].sum())
     grand_total_out_nominal = int(df_sum_time['Sum of Fin Nilai Out'].sum())
     grand_total_out_jumlah = int(df_sum_time['Sum of Fin Jumlah Out'].sum())
-    grand_total_dom_nominal = int(df_sum_time['Sum of Fin Nilai Out'].sum())
-    grand_total_dom_jumlah = int(df_sum_time['Sum of Fin Jumlah Out'].sum())
+    grand_total_dom_nominal = int(df_sum_time['Sum of Fin Nilai Dom'].sum())
+    grand_total_dom_jumlah = int(df_sum_time['Sum of Fin Jumlah Dom'].sum())
 
     grand_total_nominal = int(df_sum_time['Sum of Total Nom'].sum())
     grand_total_frequency = int(df_sum_time['Sum of Fin Jumlah Inc'].sum() + df_sum_time['Sum of Fin Jumlah Out'].sum() + df_sum_time['Sum of Fin Jumlah Dom'].sum() )
