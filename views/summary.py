@@ -34,32 +34,34 @@ if st.session_state['uploaded_file'] is not None:
         with st.expander("Filter Transactions", True):
             time_option = st.selectbox("Choose Time Period:", ("Month", "Quarter"))
             selected_year = st.selectbox('Select Year:', years, key="key_year_trx")
+
+            if time_option == 'Month':
+                selected_month = st.selectbox('Select Month:', months, key="key_month_trx")
+            else:
+                selected_quarter = st.selectbox('Select Quarter:', quarters, key="key_quarter_trx")
         
     df_preprocessed = preprocess_data(df)
-    df_preprocessed_time = preprocess_data_time(df)
+    df_preprocessed_time = preprocess_data(df, True)
 
-    filtered_df = filter_data_pjp(df=df_preprocessed,
+    filtered_df = filter_data(df=df_preprocessed,
                                 selected_pjp=selected_pjp,
                                 selected_quarter=selected_quarter_pjp,
-                                selected_year=selected_year_pjp)
+                                selected_year=selected_year_pjp,
+                                group_by_pjp=True)
     if time_option == "Month":
-        with st.sidebar:
-            selected_month = st.selectbox('Select Month:', months, key="key_month_trx")
-        filtered_df_time = filter_data_month(df=df_preprocessed_time,
+        filtered_df_time = filter_data(df=df_preprocessed_time,
                                         selected_year=selected_year,
                                         selected_month=selected_month)
         isMonth = True
     else:
-        with st.sidebar:
-            with st.expander("Filter Transactions", True):
-                selected_quarter = st.selectbox('Select Quarter:', quarters, key="key_quarter_trx")
-        filtered_df_time = filter_data_quarter(df=df_preprocessed_time,
+        filtered_df_time = filter_data(df=df_preprocessed_time,
                                         selected_year=selected_year,
                                         selected_quarter=selected_quarter)
         isMonth = False
     df_sum_time = sum_data_time(filtered_df_time, isMonth)
 
-    df_with_market_share = calculate_market_share(filtered_df)
+    total_sum_of_nom = filtered_df['Sum of Total Nom'].sum()
+    df_with_market_share = calculate_market_share(filtered_df, total_sum_of_nom)
     df_sum_time = df_sum_time[(df_sum_time['Sum of Fin Jumlah Inc'] != 0) & (df_sum_time['Sum of Fin Nilai Inc'] != 0) & 
             (df_sum_time['Sum of Fin Jumlah Out'] != 0) & (df_sum_time['Sum of Fin Nilai Out'] != 0) &
             (df_sum_time['Sum of Fin Jumlah Dom'] != 0) & (df_sum_time['Sum of Fin Nilai Dom'] != 0)]
@@ -72,7 +74,9 @@ if st.session_state['uploaded_file'] is not None:
     grand_total_dom_jumlah = int(df_sum_time['Sum of Fin Jumlah Dom'].sum())
 
     grand_total_nominal = int(df_sum_time['Sum of Total Nom'].sum())
-    grand_total_frequency = int(df_sum_time['Sum of Fin Jumlah Inc'].sum() + df_sum_time['Sum of Fin Jumlah Out'].sum() + df_sum_time['Sum of Fin Jumlah Dom'].sum() )
+    grand_total_frequency = int(df_sum_time['Sum of Fin Jumlah Inc'].sum() + 
+                                df_sum_time['Sum of Fin Jumlah Out'].sum() + 
+                                df_sum_time['Sum of Fin Jumlah Dom'].sum() )
 
     col1 = st.columns(1)
     with col1[0]:

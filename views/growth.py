@@ -21,8 +21,8 @@ if st.session_state['uploaded_file'] is not None:
         jenis_transaksi = ['All', 'Incoming', 'Outgoing', 'Domestik']
         selected_jenis_transaksi = st.sidebar.selectbox('Select Jenis Transaksi:', jenis_transaksi)
 
-    df_preprocessed_time = preprocess_data_time(df)
-    filtered_df_time = filter_data_quarter(df=df_preprocessed_time,
+    df_preprocessed_time = preprocess_data(df, True)
+    filtered_df_time = filter_data(df=df_preprocessed_time,
                                         selected_year='All',
                                         selected_quarter='All')
     df_sum_time = sum_data_time(filtered_df_time, False)
