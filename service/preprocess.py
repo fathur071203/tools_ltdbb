@@ -12,6 +12,27 @@ def load_data(uploaded_file):
 def format_to_rupiah(amount):
     return "Rp {:,}".format(amount)
 
+def filter_data_pjp(df, selected_pjp, selected_year, selected_quarter):
+    if selected_year != 'All':
+        df = df[df['Year'] == selected_year]
+    if selected_quarter != 'All':
+        df = df[df['Quarter'] == selected_quarter]
+    if selected_pjp != 'All':
+        df = df[df['Nama PJP'] == selected_pjp]
+
+    df = df.groupby('Nama PJP').agg({
+        'Sum of Fin Nilai Out': 'sum',
+        'Sum of Fin Nilai Inc': 'sum',
+        'Sum of Fin Nilai Dom': 'sum',
+        'Sum of Fin Jumlah Out': 'sum',
+        'Sum of Fin Jumlah Inc': 'sum',
+        'Sum of Fin Jumlah Dom': 'sum',
+    }).reset_index()
+
+    df['Sum of Total Nominal'] = df['Sum of Fin Nilai Inc'] + df['Sum of Fin Nilai Out'] + df['Sum of Fin Nilai Dom']
+    df.insert(1, 'Sum of Total Nominal', df.pop('Sum of Total Nominal'))
+    return df
+
 def filter_data_month(df, selected_year, selected_month):
     if selected_year != 'All':
         df = df[df['Year'] == selected_year]
@@ -63,14 +84,15 @@ def set_page_visuals():
 
 def preprocess_data(df):
     df = df.drop(columns=['Nama PJP Conv Final'])
-    df = df.groupby('Nama PJP').agg({'Fin Jumlah Inc':'sum', 'Fin Nilai Inc':'sum',
+    df = df.groupby(['Nama PJP', 'Year', 'Quarter']).agg({'Fin Jumlah Inc':'sum', 'Fin Nilai Inc':'sum',
                                 'Fin Jumlah Out':'sum', 'Fin Nilai Out':'sum',
                                 'Fin Jumlah Dom':'sum', 'Fin Nilai Dom':'sum',})
     df = df.rename(columns=lambda x: 'Sum of ' + x)
     df = df.reset_index()
     df['Sum of Total Nom'] = df['Sum of Fin Nilai Inc'] + df['Sum of Fin Nilai Out'] + df['Sum of Fin Nilai Dom']
 
-    total_sum_of_nom = df['Sum of Total Nom'].sum()
+    total_sum_of_nom = df.groupby(['Year', 'Quarter'])['Sum of Total Nom'].transform('sum')
+    
     df['Market Share (%)'] = ((df['Sum of Total Nom'] / total_sum_of_nom) * 100).round(2)
     return df
 
@@ -138,3 +160,9 @@ def sum_data_time(df, isMonth):
             'Sum of Total Nom': 'sum',
         }).reset_index()
     return df_sum
+
+def calculate_market_share(df):
+    total_sum_of_nom = df['Sum of Total Nominal'].sum()
+    df['Market Share (%)'] = ((df['Sum of Total Nominal'] / total_sum_of_nom) * 100).round(2)
+
+    return df
