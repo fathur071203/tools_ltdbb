@@ -41,7 +41,7 @@ if st.session_state['uploaded_file'] is not None:
                 selected_quarter = st.selectbox('Select Quarter:', quarters, key="key_quarter_trx")
         
     df_preprocessed = preprocess_data(df)
-    df_preprocessed_time = preprocess_data(df, True)
+    df_preprocessed_time = preprocess_data(df, isTrx=True)
 
     filtered_df = filter_data(df=df_preprocessed,
                                 selected_pjp=selected_pjp,

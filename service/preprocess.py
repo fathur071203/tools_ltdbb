@@ -36,7 +36,9 @@ def filter_data(df, selected_pjp=None, selected_year=None,
         }).reset_index()
 
         df['Sum of Total Nom'] = df[['Sum of Fin Nilai Inc', 'Sum of Fin Nilai Out', 'Sum of Fin Nilai Dom']].sum(axis=1)
+        df['Sum of Total Jumlah'] = df[['Sum of Fin Jumlah Inc', 'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom']].sum(axis=1)
         df.insert(1, 'Sum of Total Nom', df.pop('Sum of Total Nom'))
+        df.insert(1, 'Sum of Total Jumlah', df.pop('Sum of Total Jumlah'))
 
     return df
 
