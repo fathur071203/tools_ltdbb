@@ -1,11 +1,7 @@
 import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
 import plotly.express as px
-import calendar
 
-import plotly.express as px
-import streamlit as st
 
 def make_pie_chart(df, top_n):
     df_sorted = df.sort_values('Market Share (%)', ascending=False)
@@ -32,9 +28,9 @@ def make_pie_chart(df, top_n):
 
     st.plotly_chart(fig)
 
-def make_grouped_bar_chart(df, mode, isMonth):
+def make_grouped_bar_chart(df, mode, is_month):
     time_label = 'Quarter'
-    if isMonth:
+    if is_month:
         time_label = 'Month'
 
     value_vars = (['Sum of Fin Jumlah Inc', 'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom'] 
@@ -65,3 +61,28 @@ def make_grouped_bar_chart(df, mode, isMonth):
     
     st.plotly_chart(fig)
 
+def make_bar_chart_growth(df, mode="Jumlah"):
+    df_copy = df.copy()
+
+    df_copy['Year-Quarter'] = df_copy['Year'].astype(str) + ' Q-' + df_copy['Quarter'].astype(str)
+
+    if mode == "Jumlah":
+        bar_col = 'Sum of Fin Jumlah Inc'
+        title = "Incoming Transactions - Volume & Growth"
+        bar_yaxis_title = "Jutaan"
+    else:
+        bar_col = 'Sum of Fin Nilai Inc'
+        title = "Incoming Transactions - Value & Growth"
+        bar_yaxis_title = "Rp Triliun"
+
+    fig = px.bar(df_copy, x='Year-Quarter', y=bar_col, title=title, labels={
+        bar_col: bar_yaxis_title
+    })
+
+    fig.update_yaxes(
+        tickprefix="",
+        tickformat=",",
+        title_text=bar_yaxis_title
+    )
+
+    st.plotly_chart(fig)

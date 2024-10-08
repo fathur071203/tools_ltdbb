@@ -42,6 +42,10 @@ def filter_data(df, selected_pjp=None, selected_year=None,
 
     return df
 
+def filter_data_start_end_year(df, selected_start_year, selected_end_year):
+    df = df[(df['Year'] >= selected_start_year) & (df['Year'] <= selected_end_year)]
+    return df
+
 
 def set_data_settings():
     pd.set_option('display.float_format', '{:,.2f}'.format)
