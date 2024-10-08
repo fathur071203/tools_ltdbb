@@ -7,8 +7,8 @@ from service.visualize import *
 # Initial Page Setup
 set_page_visuals()
 
-if st.session_state['uploaded_file'] is not None:
-    df = load_data(st.session_state['uploaded_file'])
+if st.session_state['df'] is not None:
+    df = st.session_state['df']
     with st.sidebar:
         unique_years = df['Year'].unique().tolist()
 
@@ -27,24 +27,24 @@ if st.session_state['uploaded_file'] is not None:
                                         selected_quarter='All')
     df_sum_time = sum_data_time(filtered_df_time, False)
     df_tuple = preprocess_data_growth(df_sum_time)
-    df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_freq_inc, df_freq_out, df_freq_dom = df_tuple
+    df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_nom_inc, df_nom_out, df_nom_dom = df_tuple
 
     col1, col2, col3 = st.columns(3)
     
     with col1:
         st.write("Jumlah Incoming Transactions")
         st.dataframe(df_jumlah_inc)
-        st.write("Frequency of Incoming Transactions")
-        st.dataframe(df_freq_inc)
+        st.write("Nominal of Incoming Transactions")
+        st.dataframe(df_nom_inc)
     
     with col2:
         st.write("Jumlah Outgoing Transactions")
         st.dataframe(df_jumlah_out)
-        st.write("Frequency of Outgoing Transactions")
-        st.dataframe(df_freq_out)
+        st.write("Nominal of Outgoing Transactions")
+        st.dataframe(df_nom_out)
     
     with col3:
         st.write("Jumlah Domestic Transactions")
         st.dataframe(df_jumlah_dom)
-        st.write("Frequency of Domestic Transactions")
-        st.dataframe(df_freq_dom)
+        st.write("Nominal of Domestic Transactions")
+        st.dataframe(df_nom_dom)

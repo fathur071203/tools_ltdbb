@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 import calendar
 
-from PIL import Image
+
 
 @st.cache_data
 def load_data(uploaded_file):
@@ -67,8 +67,8 @@ def set_page_visuals():
     with st.sidebar:
         st.image("./static/Logo.png")
 
-def aggregate_data(df, isTrx=False):
-    if isTrx:
+def aggregate_data(df, is_trx=False):
+    if is_trx:
         group_cols = ['Nama PJP', 'Year', 'Quarter', 'Month']
     else:
         group_cols = ['Nama PJP', 'Year', 'Quarter']
@@ -82,9 +82,9 @@ def aggregate_data(df, isTrx=False):
     return df
 
 
-def preprocess_data(df_non_agg, isTrx=False):
-    if isTrx:
-        df = aggregate_data(df_non_agg, isTrx=isTrx)
+def preprocess_data(df_non_agg, is_trx=False):
+    if is_trx:
+        df = aggregate_data(df_non_agg, is_trx=is_trx)
         df['Month'] = df['Month'].apply(lambda x: calendar.month_name[x])
 
         months = ["January", "February", "March", "April", "May", "June", 
@@ -111,17 +111,28 @@ def preprocess_data_growth(df):
     df.loc[df['Year'] == first_year, ['%YoY', '%QtQ', '%MtM']] = pd.NA
 
     #TODO: Logic calculations for %YoY, %QtQ, and %MtM
-    df_jumlah_inc = df[['Year', 'Quarter', 'Sum of Fin Jumlah Inc', '%YoY', '%QtQ', '%MtM']].copy()
-    df_jumlah_out = df[['Year', 'Quarter', 'Sum of Fin Jumlah Out', '%YoY', '%QtQ', '%MtM']].copy()
-    df_jumlah_dom = df[['Year', 'Quarter', 'Sum of Fin Jumlah Dom', '%YoY', '%QtQ', '%MtM']].copy()
-    df_freq_inc = df[['Year', 'Quarter', 'Sum of Fin Nilai Inc', '%YoY', '%QtQ', '%MtM']].copy()
-    df_freq_out = df[['Year', 'Quarter', 'Sum of Fin Nilai Out', '%YoY', '%QtQ', '%MtM']].copy()
-    df_freq_dom = df[['Year', 'Quarter', 'Sum of Fin Nilai Dom', '%YoY', '%QtQ', '%MtM']].copy()
+    df_jumlah_inc = df[['Year', 'Quarter', 'Sum of Fin Jumlah Inc', '%YoY', '%QtQ']].copy()
+    df_jumlah_inc = calculate_growth(df_jumlah_inc, first_year, 'Jumlah', 'Inc')
 
-    return df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_freq_inc, df_freq_out, df_freq_dom
+    df_jumlah_out = df[['Year', 'Quarter', 'Sum of Fin Jumlah Out', '%YoY', '%QtQ']].copy()
+    df_jumlah_out = calculate_growth(df_jumlah_out, first_year, 'Jumlah', 'Out')
 
-def sum_data_time(df, isMonth):
-    if isMonth:
+    df_jumlah_dom = df[['Year', 'Quarter', 'Sum of Fin Jumlah Dom', '%YoY', '%QtQ']].copy()
+    df_jumlah_dom = calculate_growth(df_jumlah_dom, first_year, 'Jumlah', 'Dom')
+
+    df_nom_inc = df[['Year', 'Quarter', 'Sum of Fin Nilai Inc', '%YoY', '%QtQ']].copy()
+    df_nom_inc = calculate_growth(df_nom_inc, first_year, 'Nilai', 'Inc')
+
+    df_nom_out = df[['Year', 'Quarter', 'Sum of Fin Nilai Out', '%YoY', '%QtQ']].copy()
+    df_nom_out = calculate_growth(df_nom_out, first_year, 'Nilai', 'Out')
+
+    df_nom_dom = df[['Year', 'Quarter', 'Sum of Fin Nilai Dom', '%YoY', '%QtQ']].copy()
+    df_nom_dom = calculate_growth(df_nom_dom, first_year, 'Nilai', 'Dom')
+
+    return df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_nom_inc, df_nom_out, df_nom_dom
+
+def sum_data_time(df, is_month):
+    if is_month:
         group_cols = ['Year', 'Month']
     else:
         group_cols = ['Year', 'Quarter']
@@ -138,4 +149,31 @@ def sum_data_time(df, isMonth):
 
 def calculate_market_share(df, total_sum_of_nom):
     df['Market Share (%)'] = ((df['Sum of Total Nom'] / total_sum_of_nom) * 100).round(2)
+    return df
+
+def calculate_growth(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
+    df = calculate_year_on_year(df, first_year, sum_trx_type, trx_type)
+    df = calculate_quarter_to_quarter(df, first_year, sum_trx_type, trx_type)
+    return df
+
+def calculate_year_on_year(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
+    for i in range(4, len(df)):
+        if df.iloc[i]['Year'] > first_year:
+            current_value = df.iloc[i][f'Sum of Fin {sum_trx_type} {trx_type}']
+            previous_year_value = df[(df['Year'] == df.iloc[i]['Year'] - 1) &
+                                                (df['Quarter'] == df.iloc[i]['Quarter'])][
+                f'Sum of Fin {sum_trx_type} {trx_type}']
+
+            if not previous_year_value.empty:
+                previous_year_value = previous_year_value.values[0]
+                df.at[i, '%YoY'] = (((current_value - previous_year_value) / previous_year_value) * 100).round(2)
+    return df
+
+def calculate_quarter_to_quarter(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
+    for i in range(4, len(df)):
+        if df.iloc[i]['Year'] > first_year:
+            current_value = df.iloc[i][f'Sum of Fin {sum_trx_type} {trx_type}']
+            previous_year_value = df.iloc[i-1][f'Sum of Fin {sum_trx_type} {trx_type}']
+            if not previous_year_value is None:
+                df.at[i, '%QtQ'] = (((current_value - previous_year_value) / previous_year_value) * 100).round(2)
     return df

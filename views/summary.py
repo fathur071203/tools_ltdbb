@@ -48,7 +48,7 @@ if df is not None:
                 selected_quarter = st.selectbox('Select Quarter:', quarters, key="key_quarter_trx")
 
     df_preprocessed = preprocess_data(df)
-    df_preprocessed_time = preprocess_data(df, isTrx=True)
+    df_preprocessed_time = preprocess_data(df, is_trx=True)
 
     filtered_df = filter_data(df=df_preprocessed,
                               selected_pjp=selected_pjp,

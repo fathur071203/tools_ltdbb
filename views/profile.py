@@ -7,4 +7,4 @@ from service.visualize import *
 
 # Initial Page Setup
 set_page_visuals()
-st.text(st.session_state['uploaded_file'])
+st.text(st.session_state['df'])
