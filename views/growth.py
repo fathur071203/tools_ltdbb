@@ -10,13 +10,13 @@ set_page_visuals()
 if st.session_state['df'] is not None:
     df = st.session_state['df']
     with st.sidebar:
-        unique_years = df['Year'].unique().tolist()
+        with st.expander("Filter Growth", True):
+            unique_years = df['Year'].unique().tolist()
+            selected_start_year = st.selectbox('Select Start Year:', unique_years)
+            selected_end_year = st.selectbox('Select End Year:', unique_years, index=len(unique_years) - 1)
 
-        selected_start_year = st.sidebar.selectbox('Select Start Year:', unique_years)
-        selected_end_year = st.sidebar.selectbox('Select End Year:', unique_years, index=len(unique_years) - 1)
-
-        jenis_transaksi = ['All', 'Incoming', 'Outgoing', 'Domestik']
-        selected_jenis_transaksi = st.sidebar.selectbox('Select Jenis Transaksi:', jenis_transaksi)
+            jenis_transaksi = ['All', 'Incoming', 'Outgoing', 'Domestik']
+            selected_jenis_transaksi = st.selectbox('Select Jenis Transaksi:', jenis_transaksi)
 
     df_preprocessed_time = preprocess_data(df, True)
     df_sum_time = sum_data_time(df_preprocessed_time, False)
