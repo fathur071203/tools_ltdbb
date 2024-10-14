@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 
 
 def make_pie_chart(df, top_n):
@@ -61,28 +62,72 @@ def make_grouped_bar_chart(df, mode, is_month):
     
     st.plotly_chart(fig)
 
-def make_bar_chart_growth(df, mode="Jumlah"):
+def make_combined_bar_line_chart(df, mode="Jumlah"):
     df_copy = df.copy()
-
+    df_copy = df_copy[(df_copy['%YoY'].notnull()) & (df_copy['%QtQ'].notnull())]
     df_copy['Year-Quarter'] = df_copy['Year'].astype(str) + ' Q-' + df_copy['Quarter'].astype(str)
 
     if mode == "Jumlah":
         bar_col = 'Sum of Fin Jumlah Inc'
-        title = "Incoming Transactions - Volume & Growth"
-        bar_yaxis_title = "Jutaan"
+        growth_col_yoy = '%YoY'
+        growth_col_qoq = '%QtQ'
+        bar_title = "Incoming Transactions Volume & Growth"
+        bar_yaxis_title = "Volume (Jutaan)"
     else:
         bar_col = 'Sum of Fin Nilai Inc'
-        title = "Incoming Transactions - Value & Growth"
-        bar_yaxis_title = "Rp Triliun"
+        growth_col_yoy = '%YoY'
+        growth_col_qoq = '%QtQ'
+        bar_title = "Incoming Transactions Value & Growth"
+        bar_yaxis_title = "Value (Rp Triliun)"
 
-    fig = px.bar(df_copy, x='Year-Quarter', y=bar_col, title=title, labels={
-        bar_col: bar_yaxis_title
-    })
+    df_filtered = df_copy.dropna(subset=[growth_col_yoy, growth_col_qoq])
 
-    fig.update_yaxes(
-        tickprefix="",
-        tickformat=",",
-        title_text=bar_yaxis_title
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        x=df_copy['Year-Quarter'],
+        y=df_copy[bar_col],
+        name=bar_yaxis_title,
+        yaxis='y1'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df_filtered['Year-Quarter'],
+        y=df_filtered[growth_col_yoy],
+        name='Year-on-Year Growth (%)',
+        yaxis='y2',
+        mode='lines+markers',
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df_filtered['Year-Quarter'],
+        y=df_filtered[growth_col_qoq],
+        name='Quarter-to-Quarter Growth (%)',
+        yaxis='y2',
+        mode = 'lines+markers',
+    ))
+
+    fig.update_layout(
+        title=bar_title,
+        xaxis=dict(title='Year-Quarter'),
+        yaxis=dict(
+            title=bar_yaxis_title,
+            tickformat=","
+        ),
+        yaxis2=dict(
+            title='Growth (%)',
+            overlaying='y',
+            side='right',
+            tickformat=".1f"
+        ),
+        template="seaborn",
+        legend=dict(
+            x=1.05,
+            y=1,
+            xanchor='left',
+            yanchor='top',
+        )
     )
 
     st.plotly_chart(fig)
+

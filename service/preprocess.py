@@ -2,8 +2,6 @@ import pandas as pd
 import streamlit as st
 import calendar
 
-
-
 @st.cache_data
 def load_data(uploaded_file):
     df = pd.read_excel(uploaded_file, 'Trx_PJPJKT')
@@ -42,10 +40,9 @@ def filter_data(df, selected_pjp=None, selected_year=None,
 
     return df
 
-def filter_data_start_end_year(df, selected_start_year, selected_end_year):
-    df = df[(df['Year'] >= selected_start_year) & (df['Year'] <= selected_end_year)]
-    return df
-
+def filter_start_end_year(df, start_year, end_year):
+    df_filtered = df[(df['Year'] >= start_year) & (df['Year'] <= end_year)]
+    return df_filtered
 
 def set_data_settings():
     pd.set_option('display.float_format', '{:,.2f}'.format)
@@ -170,7 +167,8 @@ def calculate_year_on_year(df: pd.DataFrame, first_year: int, sum_trx_type: str,
 
             if not previous_year_value.empty:
                 previous_year_value = previous_year_value.values[0]
-                df.at[i, '%YoY'] = (((current_value - previous_year_value) / previous_year_value) * 100).round(2)
+                growth_val = (((current_value - previous_year_value) / previous_year_value) * 100).round(2)
+                df.at[i, '%YoY'] = growth_val
     return df
 
 def calculate_quarter_to_quarter(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
@@ -179,5 +177,12 @@ def calculate_quarter_to_quarter(df: pd.DataFrame, first_year: int, sum_trx_type
             current_value = df.iloc[i][f'Sum of Fin {sum_trx_type} {trx_type}']
             previous_year_value = df.iloc[i-1][f'Sum of Fin {sum_trx_type} {trx_type}']
             if not previous_year_value is None:
-                df.at[i, '%QtQ'] = (((current_value - previous_year_value) / previous_year_value) * 100).round(2)
+                growth_val = (((current_value - previous_year_value) / previous_year_value) * 100).round(2)
+                df.at[i, '%QtQ'] = growth_val
     return df
+
+def merge_df_growth(left_df, right_df):
+    df_combined = pd.merge(left_df, right_df, "inner", on=['Year', 'Quarter'])
+    df_combined.rename(columns={"%YoY_x": "%YoY Jumlah", "%QtQ_x": "%QtQ Jumlah",
+                                "%YoY_y": "%YoY Nom", "%QtQ_y": "%QtQ Nom"}, inplace=True)
+    return df_combined
