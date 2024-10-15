@@ -62,14 +62,20 @@ def make_grouped_bar_chart(df, mode, is_month):
     
     st.plotly_chart(fig)
 
-def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str):
+
+def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month: bool = False):
     df_copy = df.copy()
-    df_copy = df_copy[(df_copy['%YoY'].notnull()) & (df_copy['%QtQ'].notnull())]
-    df_copy['Year-Quarter'] = df_copy['Year'].astype(str) + ' Q-' + df_copy['Quarter'].astype(str)
+    target_col = 'Year-Quarter'
+
+    if is_month:
+        df_copy = df_copy[df_copy['%MtM'].notnull()]
+        df_copy['Year-Month'] = df_copy['Year'].astype(str) + '-' + df_copy['Month'].astype(str)
+        target_col = 'Year-Month'
+    else:
+        df_copy = df_copy[(df_copy['%YoY'].notnull()) & (df_copy['%QtQ'].notnull())]
+        df_copy['Year-Quarter'] = df_copy['Year'].astype(str) + ' Q-' + df_copy['Quarter'].astype(str)
 
     bar_col = f'Sum of Fin {sum_trx_type} {trx_type}'
-    growth_col_yoy = '%YoY'
-    growth_col_qoq = '%QtQ'
     bar_title = f"{sum_trx_type} {trx_type} Transactions Volume & Growth"
 
     if sum_trx_type == "Jumlah":
@@ -77,39 +83,46 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str):
     else:
         bar_yaxis_title = "Value (Rp Triliun)"
 
-    df_filtered = df_copy.dropna(subset=[growth_col_yoy, growth_col_qoq])
-
     fig = go.Figure()
 
     fig.add_trace(go.Bar(
-        x=df_copy['Year-Quarter'],
+        x=df_copy[target_col],
         y=df_copy[bar_col],
         name=bar_yaxis_title,
         yaxis='y1'
     ))
 
-    fig.add_trace(go.Scatter(
-        x=df_filtered['Year-Quarter'],
-        y=df_filtered[growth_col_yoy],
-        name='Year-on-Year Growth (%)',
-        yaxis='y2',
-        mode='lines+markers',
-    ))
+    if is_month:
+        fig.add_trace(go.Scatter(
+            x=df_copy[target_col],
+            y=df_copy['%MtM'],
+            name='Month-to-Month Growth (%)',
+            yaxis='y2',
+            mode='lines+markers',
+        ))
+    else:
+        fig.add_trace(go.Scatter(
+            x=df_copy[target_col],
+            y=df_copy['%YoY'],
+            name='Year-on-Year Growth (%)',
+            yaxis='y2',
+            mode='lines+markers',
+        ))
 
-    fig.add_trace(go.Scatter(
-        x=df_filtered['Year-Quarter'],
-        y=df_filtered[growth_col_qoq],
-        name='Quarter-to-Quarter Growth (%)',
-        yaxis='y2',
-        mode = 'lines+markers',
-    ))
+        fig.add_trace(go.Scatter(
+            x=df_copy[target_col],
+            y=df_copy['%QtQ'],
+            name='Quarter-to-Quarter Growth (%)',
+            yaxis='y2',
+            mode='lines+markers',
+        ))
 
     fig.update_layout(
         title=bar_title,
-        xaxis=dict(title='Year-Quarter'),
+        xaxis=dict(title=target_col),
         yaxis=dict(
             title=bar_yaxis_title,
-            tickformat=","
+            tickformat=",",
         ),
         yaxis2=dict(
             title='Growth (%)',

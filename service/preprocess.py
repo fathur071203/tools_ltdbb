@@ -228,8 +228,12 @@ def calculate_month_to_month(df: pd.DataFrame, first_year: int, sum_trx_type: st
     df['Month'] = df['Month'].apply(lambda x: calendar.month_name[x])
     return df
 
-def merge_df_growth(left_df, right_df):
-    df_combined = pd.merge(left_df, right_df, "inner", on=['Year', 'Quarter'])
-    df_combined.rename(columns={"%YoY_x": "%YoY Jumlah", "%QtQ_x": "%QtQ Jumlah",
-                                "%YoY_y": "%YoY Nom", "%QtQ_y": "%QtQ Nom"}, inplace=True)
+def merge_df_growth(left_df, right_df, is_month: bool = False):
+    if not is_month:
+        df_combined = pd.merge(left_df, right_df, "inner", on=['Year', 'Quarter'])
+        df_combined.rename(columns={"%YoY_x": "%YoY Jumlah", "%QtQ_x": "%QtQ Jumlah",
+                                    "%YoY_y": "%YoY Nom", "%QtQ_y": "%QtQ Nom"}, inplace=True)
+    else:
+        df_combined = pd.merge(left_df, right_df, "inner", on=['Year', 'Month'])
+        df_combined.rename(columns={"%MtM_x": "%MtM Jumlah", "%MtM_y": "%QtQ Nom"}, inplace=True)
     return df_combined
