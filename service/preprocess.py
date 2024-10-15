@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 import calendar
+import numpy as np
 
 @st.cache_data
 def load_data(uploaded_file):
@@ -103,7 +104,7 @@ def preprocess_data(df_non_agg, is_trx=False):
 
     return df
 
-def preprocess_data_growth(df):
+def preprocess_data_growth(df, is_month: bool):
     df['%YoY'] = pd.NA
     df['%QtQ'] = pd.NA
     df['%MtM'] = pd.NA
@@ -112,25 +113,47 @@ def preprocess_data_growth(df):
     df.loc[df['Year'] == first_year, ['%YoY', '%QtQ', '%MtM']] = pd.NA
 
     #TODO: Logic calculations for %YoY, %QtQ, and %MtM
-    df_jumlah_inc = df[['Year', 'Quarter', 'Sum of Fin Jumlah Inc', '%YoY', '%QtQ']].copy()
-    df_jumlah_inc = calculate_growth(df_jumlah_inc, first_year, 'Jumlah', 'Inc')
+    if is_month:
+        df_jumlah_inc_month = df[['Year', 'Month', 'Sum of Fin Jumlah Inc', '%MtM']].copy()
+        df_jumlah_inc_month = calculate_month_to_month(df_jumlah_inc_month, first_year, 'Jumlah', 'Inc')
 
-    df_jumlah_out = df[['Year', 'Quarter', 'Sum of Fin Jumlah Out', '%YoY', '%QtQ']].copy()
-    df_jumlah_out = calculate_growth(df_jumlah_out, first_year, 'Jumlah', 'Out')
+        df_jumlah_out_month = df[['Year', 'Month', 'Sum of Fin Jumlah Out', '%MtM']].copy()
+        df_jumlah_out_month = calculate_month_to_month(df_jumlah_out_month, first_year, 'Jumlah', 'Out')
 
-    df_jumlah_dom = df[['Year', 'Quarter', 'Sum of Fin Jumlah Dom', '%YoY', '%QtQ']].copy()
-    df_jumlah_dom = calculate_growth(df_jumlah_dom, first_year, 'Jumlah', 'Dom')
+        df_jumlah_dom_month = df[['Year', 'Month', 'Sum of Fin Jumlah Dom', '%MtM']].copy()
+        df_jumlah_dom_month = calculate_month_to_month(df_jumlah_dom_month, first_year, 'Jumlah', 'Dom')
 
-    df_nom_inc = df[['Year', 'Quarter', 'Sum of Fin Nilai Inc', '%YoY', '%QtQ']].copy()
-    df_nom_inc = calculate_growth(df_nom_inc, first_year, 'Nilai', 'Inc')
+        df_nom_inc_month = df[['Year', 'Month', 'Sum of Fin Nilai Inc', '%MtM']].copy()
+        df_nom_inc_month = calculate_month_to_month(df_nom_inc_month, first_year, 'Nilai', 'Inc')
 
-    df_nom_out = df[['Year', 'Quarter', 'Sum of Fin Nilai Out', '%YoY', '%QtQ']].copy()
-    df_nom_out = calculate_growth(df_nom_out, first_year, 'Nilai', 'Out')
+        df_nom_out_month = df[['Year', 'Month', 'Sum of Fin Nilai Out', '%MtM']].copy()
+        df_nom_out_month = calculate_month_to_month(df_nom_out_month, first_year, 'Nilai', 'Out')
 
-    df_nom_dom = df[['Year', 'Quarter', 'Sum of Fin Nilai Dom', '%YoY', '%QtQ']].copy()
-    df_nom_dom = calculate_growth(df_nom_dom, first_year, 'Nilai', 'Dom')
+        df_nom_dom_month = df[['Year', 'Month', 'Sum of Fin Nilai Dom', '%MtM']].copy()
+        df_nom_dom_month = calculate_month_to_month(df_nom_dom_month, first_year, 'Nilai', 'Dom')
 
-    return df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_nom_inc, df_nom_out, df_nom_dom
+        return (df_jumlah_inc_month, df_jumlah_out_month, df_jumlah_dom_month,
+                df_nom_inc_month, df_nom_out_month, df_nom_dom_month)
+    else:
+        df_jumlah_inc = df[['Year', 'Quarter', 'Sum of Fin Jumlah Inc', '%YoY', '%QtQ']].copy()
+        df_jumlah_inc = calculate_growth(df_jumlah_inc, first_year, 'Jumlah', 'Inc')
+
+        df_jumlah_out = df[['Year', 'Quarter', 'Sum of Fin Jumlah Out', '%YoY', '%QtQ']].copy()
+        df_jumlah_out = calculate_growth(df_jumlah_out, first_year, 'Jumlah', 'Out')
+
+        df_jumlah_dom = df[['Year', 'Quarter', 'Sum of Fin Jumlah Dom', '%YoY', '%QtQ']].copy()
+        df_jumlah_dom = calculate_growth(df_jumlah_dom, first_year, 'Jumlah', 'Dom')
+
+        df_nom_inc = df[['Year', 'Quarter', 'Sum of Fin Nilai Inc', '%YoY', '%QtQ']].copy()
+        df_nom_inc = calculate_growth(df_nom_inc, first_year, 'Nilai', 'Inc')
+
+        df_nom_out = df[['Year', 'Quarter', 'Sum of Fin Nilai Out', '%YoY', '%QtQ']].copy()
+        df_nom_out = calculate_growth(df_nom_out, first_year, 'Nilai', 'Out')
+
+        df_nom_dom = df[['Year', 'Quarter', 'Sum of Fin Nilai Dom', '%YoY', '%QtQ']].copy()
+        df_nom_dom = calculate_growth(df_nom_dom, first_year, 'Nilai', 'Dom')
+
+        return df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_nom_inc, df_nom_out, df_nom_dom
 
 def sum_data_time(df, is_month):
     if is_month:
@@ -179,6 +202,30 @@ def calculate_quarter_to_quarter(df: pd.DataFrame, first_year: int, sum_trx_type
             if not previous_year_value is None:
                 growth_val = (((current_value - previous_year_value) / previous_year_value) * 100).round(2)
                 df.at[i, '%QtQ'] = growth_val
+    return df
+
+def calculate_month_to_month(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
+    df['Month'] = df['Month'].apply(lambda x: list(calendar.month_name).index(x))
+
+    for i in range(1, len(df)):
+        if df.iloc[i]['Year'] > first_year or (df.iloc[i]['Year'] == first_year and df.iloc[i]['Month'] > 1):
+            current_value = df.iloc[i][f'Sum of Fin {sum_trx_type} {trx_type}']
+            previous_month_value = df[(df['Year'] == df.iloc[i]['Year']) & (df['Month'] == df.iloc[i]['Month'] - 1)]
+
+            if previous_month_value.empty:
+                previous_month_value = df[(df['Year'] == df.iloc[i]['Year'] - 1) & (df['Month'] == 12)]
+
+            if not previous_month_value.empty:
+                previous_month_value = previous_month_value[f'Sum of Fin {sum_trx_type} {trx_type}'].values[0]
+
+                if previous_month_value == 0 or np.isnan(previous_month_value):
+                    growth_val = np.nan
+                else:
+                    growth_val = (((current_value - previous_month_value) / previous_month_value) * 100).round(0)
+
+                df.at[i, '%MtM'] = growth_val
+
+    df['Month'] = df['Month'].apply(lambda x: calendar.month_name[x])
     return df
 
 def merge_df_growth(left_df, right_df):

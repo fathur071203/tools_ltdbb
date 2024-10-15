@@ -62,22 +62,19 @@ def make_grouped_bar_chart(df, mode, is_month):
     
     st.plotly_chart(fig)
 
-def make_combined_bar_line_chart(df, mode="Jumlah"):
+def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str):
     df_copy = df.copy()
     df_copy = df_copy[(df_copy['%YoY'].notnull()) & (df_copy['%QtQ'].notnull())]
     df_copy['Year-Quarter'] = df_copy['Year'].astype(str) + ' Q-' + df_copy['Quarter'].astype(str)
 
-    if mode == "Jumlah":
-        bar_col = 'Sum of Fin Jumlah Inc'
-        growth_col_yoy = '%YoY'
-        growth_col_qoq = '%QtQ'
-        bar_title = "Incoming Transactions Volume & Growth"
+    bar_col = f'Sum of Fin {sum_trx_type} {trx_type}'
+    growth_col_yoy = '%YoY'
+    growth_col_qoq = '%QtQ'
+    bar_title = f"{sum_trx_type} {trx_type} Transactions Volume & Growth"
+
+    if sum_trx_type == "Jumlah":
         bar_yaxis_title = "Volume (Jutaan)"
     else:
-        bar_col = 'Sum of Fin Nilai Inc'
-        growth_col_yoy = '%YoY'
-        growth_col_qoq = '%QtQ'
-        bar_title = "Incoming Transactions Value & Growth"
         bar_yaxis_title = "Value (Rp Triliun)"
 
     df_filtered = df_copy.dropna(subset=[growth_col_yoy, growth_col_qoq])
