@@ -18,7 +18,7 @@ if st.session_state['df'] is not None:
             jenis_transaksi = ['All', 'Incoming', 'Outgoing', 'Domestik']
             selected_jenis_transaksi = st.selectbox('Select Jenis Transaksi:', jenis_transaksi)
 
-    with st.spinner('Loading and filtering data...'):
+    with (st.spinner('Loading and filtering data...')):
         df_preprocessed_time = preprocess_data(df, True)
 
         df_sum_time = sum_data_time(df_preprocessed_time, False)
@@ -32,7 +32,6 @@ if st.session_state['df'] is not None:
         (df_jumlah_inc_month, df_jumlah_out_month, df_jumlah_dom_month,
                 df_nom_inc_month, df_nom_out_month, df_nom_dom_month) = df_tuple_month
 
-        # TODO: Filter DF Month
         df_jumlah_inc_filtered = filter_start_end_year(df_jumlah_inc, selected_start_year, selected_end_year)
         df_jumlah_out_filtered = filter_start_end_year(df_jumlah_out, selected_start_year, selected_end_year)
         df_jumlah_dom_filtered = filter_start_end_year(df_jumlah_dom, selected_start_year, selected_end_year)
@@ -56,6 +55,31 @@ if st.session_state['df'] is not None:
         df_inc_combined_month = merge_df_growth(df_jumlah_inc_month_filtered, df_nom_inc_month_filtered, True)
         df_out_combined_month = merge_df_growth(df_jumlah_out_month_filtered, df_nom_out_month_filtered, True)
         df_dom_combined_month = merge_df_growth(df_jumlah_dom_month_filtered, df_nom_dom_month_filtered, True)
+
+        df_jumlah_total = pd.concat([df_jumlah_inc_filtered, df_jumlah_out_filtered, df_jumlah_dom_filtered])
+
+        if 'Quarter' in df_jumlah_total.columns:
+            df_jumlah_total = df_jumlah_total.groupby(['Year', 'Quarter']).sum().reset_index()
+        else:
+            df_jumlah_total = df_jumlah_total.groupby(['Year', 'Month']).sum().reset_index()
+
+        df_nom_total = pd.concat([df_nom_inc_filtered, df_nom_out_filtered, df_nom_dom_filtered])
+
+        if 'Quarter' in df_nom_total.columns:
+            df_nom_total = df_nom_total.groupby(['Year', 'Quarter']).sum().reset_index()
+        else:
+            df_nom_total = df_nom_total.groupby(['Year', 'Month']).sum().reset_index()
+
+        if 'Quarter' in df_jumlah_total.columns:
+            df_total = pd.merge(df_jumlah_total, df_nom_total, on=['Year', 'Quarter'])
+        else:
+            df_total = pd.merge(df_jumlah_total, df_nom_total, on=['Year', 'Month'])
+        df_total['Sum of Fin Jumlah Total'] = df_total['Sum of Fin Jumlah Inc'] + df_total['Sum of Fin Jumlah Out'] + df_total['Sum of Fin Jumlah Dom']
+        df_total['Sum of Fin Nilai Total'] = df_total['Sum of Fin Nilai Inc'] + df_total['Sum of Fin Nilai Out'] + df_total['Sum of Fin Nilai Dom']
+        df_total.drop(['%YoY_x', '%QtQ_x', '%YoY_y', '%QtQ_y', 'Sum of Fin Jumlah Inc',
+                       'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom', 'Sum of Fin Nilai Inc',
+                       'Sum of Fin Nilai Out', 'Sum of Fin Nilai Dom'], axis=1, inplace=True)
+
 
     st.header("Growth in Transactions")
     if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
@@ -98,3 +122,5 @@ if st.session_state['df'] is not None:
 
     make_combined_bar_line_chart(df_jumlah_dom_month_filtered, "Jumlah", "Dom", True)
     make_combined_bar_line_chart(df_nom_dom_month_filtered, "Nilai", "Dom", True)
+
+    st.dataframe(df_total)

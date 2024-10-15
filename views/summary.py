@@ -60,14 +60,14 @@ if df is not None:
         filtered_df_time = filter_data(df=df_preprocessed_time,
                                        selected_year=selected_year,
                                        selected_month=selected_month)
-        isMonth = True
+        is_month = True
     else:
         filtered_df_time = filter_data(df=df_preprocessed_time,
                                        selected_year=selected_year,
                                        selected_quarter=selected_quarter)
-        isMonth = False
+        is_month = False
 
-    df_sum_time = sum_data_time(filtered_df_time, isMonth)
+    df_sum_time = sum_data_time(filtered_df_time, is_month)
 
     total_sum_of_nom = filtered_df['Sum of Total Nom'].sum()
     df_with_market_share = calculate_market_share(filtered_df, total_sum_of_nom)
@@ -97,9 +97,9 @@ if df is not None:
 
     col2, col3 = st.columns(2)
     with col2:
-        make_grouped_bar_chart(df_sum_time, "Jumlah", isMonth)
+        make_grouped_bar_chart(df_sum_time, "Jumlah", is_month)
     with col3:
-        make_grouped_bar_chart(df_sum_time, "Nilai", isMonth)
+        make_grouped_bar_chart(df_sum_time, "Nilai", is_month)
 
     st.dataframe(df_sum_time)
 
