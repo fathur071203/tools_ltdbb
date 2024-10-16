@@ -32,6 +32,24 @@ if st.session_state['df'] is not None:
         (df_jumlah_inc_month, df_jumlah_out_month, df_jumlah_dom_month,
          df_nom_inc_month, df_nom_out_month, df_nom_dom_month) = df_tuple_month
 
+        df_jumlah_total = process_combined_df(df_jumlah_inc, df_jumlah_out,
+                                              df_jumlah_dom, False)
+        df_nom_total = process_combined_df(df_nom_inc, df_nom_out,
+                                           df_nom_dom, False)
+
+        df_jumlah_total_month = process_combined_df(df_jumlah_inc_month, df_jumlah_out_month,
+                                                    df_jumlah_dom_month, True)
+        df_nom_total_month = process_combined_df(df_nom_inc_month, df_nom_out_month,
+                                                 df_nom_dom_month, True)
+
+        df_total_combined = process_growth_combined(df_jumlah_total, df_nom_total, df_preprocessed_time['Year'].min(),
+                                                    False)
+        df_total_month_combined = process_growth_combined(df_jumlah_total_month, df_nom_total_month,
+                                                          df_preprocessed_time['Year'].min(), True)
+
+        df_total_combined = filter_start_end_year(df_total_combined, selected_start_year, selected_end_year)
+        df_total_month_combined = filter_start_end_year(df_total_month_combined, selected_start_year, selected_end_year)
+
         df_jumlah_inc_filtered = filter_start_end_year(df_jumlah_inc, selected_start_year, selected_end_year)
         df_jumlah_out_filtered = filter_start_end_year(df_jumlah_out, selected_start_year, selected_end_year)
         df_jumlah_dom_filtered = filter_start_end_year(df_jumlah_dom, selected_start_year, selected_end_year)
@@ -58,19 +76,6 @@ if st.session_state['df'] is not None:
         df_inc_combined_month = merge_df_growth(df_jumlah_inc_month_filtered, df_nom_inc_month_filtered, True)
         df_out_combined_month = merge_df_growth(df_jumlah_out_month_filtered, df_nom_out_month_filtered, True)
         df_dom_combined_month = merge_df_growth(df_jumlah_dom_month_filtered, df_nom_dom_month_filtered, True)
-
-        df_jumlah_total = process_combined_df(df_jumlah_inc_filtered, df_jumlah_out_filtered,
-                                              df_jumlah_dom_filtered, False)
-        df_nom_total = process_combined_df(df_nom_inc_filtered, df_nom_out_filtered,
-                                           df_nom_dom_filtered, False)
-
-        df_jumlah_total_month = process_combined_df(df_jumlah_inc_month_filtered, df_jumlah_out_month_filtered,
-                                                    df_jumlah_dom_month_filtered, True)
-        df_nom_total_month = process_combined_df(df_nom_inc_month_filtered, df_nom_out_month_filtered,
-                                                 df_nom_dom_month_filtered, True)
-
-        df_total_combined = process_growth_combined(df_jumlah_total, df_nom_total, False)
-        df_total_month_combined = process_growth_combined(df_jumlah_total_month, df_nom_total_month, True)
 
     st.header("Growth in Transactions")
     if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
@@ -121,3 +126,6 @@ if st.session_state['df'] is not None:
     make_combined_bar_line_chart(df_total_combined, "Nilai", "Total", False, True)
 
     st.dataframe(df_total_month_combined)
+
+    make_combined_bar_line_chart(df_total_month_combined, "Jumlah", "Total", True, True)
+    make_combined_bar_line_chart(df_total_month_combined, "Nilai", "Total", True, True)

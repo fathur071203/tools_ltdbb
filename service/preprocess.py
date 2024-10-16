@@ -186,7 +186,7 @@ def process_combined_df(df_inc: pd.DataFrame, df_out: pd.DataFrame, df_dom: pd.D
 
     return df_total
 
-def process_growth_combined(df_jumlah_total: pd.DataFrame, df_nom_total: pd.DataFrame, is_month: bool = False) -> pd.DataFrame:
+def process_growth_combined(df_jumlah_total: pd.DataFrame, df_nom_total: pd.DataFrame, first_year:int, is_month: bool = False) -> pd.DataFrame:
     if is_month:
         group_cols = ['Year', 'Month']
         drop_cols_jumlah = ['%MtM', 'Sum of Fin Jumlah Inc',
@@ -203,8 +203,6 @@ def process_growth_combined(df_jumlah_total: pd.DataFrame, df_nom_total: pd.Data
     df_nom_total.drop(drop_cols_nom, axis=1, inplace=True)
 
     df_total = pd.merge(df_jumlah_total, df_nom_total, on=group_cols)
-
-    first_year = df_total['Year'].min()
 
     if not is_month:
         df_total_jumlah = calculate_growth(df_total, first_year, "Jumlah", "Total")
@@ -260,7 +258,7 @@ def calculate_growth(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_t
 
 
 def calculate_year_on_year(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
-    for i in range(4, len(df)):
+    for i in range(len(df)):
         if df.iloc[i]['Year'] > first_year:
             current_value = df.iloc[i][f'Sum of Fin {sum_trx_type} {trx_type}']
             previous_year_value = df[(df['Year'] == df.iloc[i]['Year'] - 1) &
@@ -275,7 +273,7 @@ def calculate_year_on_year(df: pd.DataFrame, first_year: int, sum_trx_type: str,
 
 
 def calculate_quarter_to_quarter(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
-    for i in range(4, len(df)):
+    for i in range(len(df)):
         if df.iloc[i]['Year'] > first_year:
             current_value = df.iloc[i][f'Sum of Fin {sum_trx_type} {trx_type}']
             previous_year_value = df.iloc[i - 1][f'Sum of Fin {sum_trx_type} {trx_type}']
@@ -289,7 +287,7 @@ def calculate_month_to_month(df_original: pd.DataFrame, first_year: int, sum_trx
     df = df_original.copy()
     df['Month'] = df['Month'].apply(lambda x: list(calendar.month_name).index(x))
 
-    for i in range(1, len(df)):
+    for i in range(len(df)):
         if df.iloc[i]['Year'] > first_year or (df.iloc[i]['Year'] == first_year and df.iloc[i]['Month'] > 1):
             current_value = df.iloc[i][f'Sum of Fin {sum_trx_type} {trx_type}']
             previous_month_value = df[(df['Year'] == df.iloc[i]['Year']) & (df['Month'] == df.iloc[i]['Month'] - 1)]
