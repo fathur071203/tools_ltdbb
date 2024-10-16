@@ -165,7 +165,7 @@ def preprocess_data_growth(df, is_month: bool):
 
         return df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_nom_inc, df_nom_out, df_nom_dom
 
-def process_growth_combined(df_inc: pd.DataFrame, df_out: pd.DataFrame, df_dom: pd.DataFrame, is_month: bool = False) -> pd.DataFrame:
+def process_combined_df(df_inc: pd.DataFrame, df_out: pd.DataFrame, df_dom: pd.DataFrame, is_month: bool = False) -> pd.DataFrame:
     if is_month:
         group_cols = ['Year', 'Month']
     else:
@@ -186,7 +186,7 @@ def process_growth_combined(df_inc: pd.DataFrame, df_out: pd.DataFrame, df_dom: 
 
     return df_total
 
-def clean_col_growth_combined(df_jumlah_total: pd.DataFrame, df_nom_total: pd.DataFrame, is_month: bool = False) -> pd.DataFrame:
+def process_growth_combined(df_jumlah_total: pd.DataFrame, df_nom_total: pd.DataFrame, is_month: bool = False) -> pd.DataFrame:
     if is_month:
         group_cols = ['Year', 'Month']
         drop_cols_jumlah = ['%MtM', 'Sum of Fin Jumlah Inc',
@@ -214,7 +214,7 @@ def clean_col_growth_combined(df_jumlah_total: pd.DataFrame, df_nom_total: pd.Da
             .drop(['Sum of Fin Jumlah Total_y', 'Sum of Fin Nilai Total_y'], axis=1)
             .rename(columns={'Sum of Fin Jumlah Total_x': 'Sum of Fin Jumlah Total',
                              'Sum of Fin Nilai Total_x': 'Sum of Fin Nilai Total',
-                             '%YoY_x': '%YoY Jumlah', '%YoY_y': 'YoY Nilai',
+                             '%YoY_x': '%YoY Jumlah', '%YoY_y': '%YoY Nilai',
                              '%QtQ_x': '%QtQ Jumlah', '%QtQ_y': '%QtQ Nilai', })
         )
     else:
@@ -285,7 +285,8 @@ def calculate_quarter_to_quarter(df: pd.DataFrame, first_year: int, sum_trx_type
     return df
 
 
-def calculate_month_to_month(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
+def calculate_month_to_month(df_original: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
+    df = df_original.copy()
     df['Month'] = df['Month'].apply(lambda x: list(calendar.month_name).index(x))
 
     for i in range(1, len(df)):

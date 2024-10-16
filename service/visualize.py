@@ -6,20 +6,20 @@ import plotly.graph_objects as go
 
 def make_pie_chart(df, top_n):
     df_sorted = df.sort_values('Market Share (%)', ascending=False)
-    
+
     df_top_n = df_sorted.head(top_n)
-    
+
     other_share = df_sorted['Market Share (%)'].sum() - df_top_n['Market Share (%)'].sum()
-    
+
     df_other = pd.DataFrame([{'Nama PJP': 'Other', 'Market Share (%)': other_share}])
     df_combined = pd.concat([df_top_n, df_other], ignore_index=True)
-    
-    fig = px.pie(df_combined, 
-                 values='Market Share (%)', 
-                 names='Nama PJP', 
+
+    fig = px.pie(df_combined,
+                 values='Market Share (%)',
+                 names='Nama PJP',
                  title=f'Top {top_n} PJPs by Market Share (Including Others)',
                  template='plotly_dark')
-    
+
     fig.update_traces(hovertemplate='%{label}: %{value:.2f}%')
 
     fig.update_layout(
@@ -29,51 +29,62 @@ def make_pie_chart(df, top_n):
 
     st.plotly_chart(fig)
 
+
 def make_grouped_bar_chart(df, mode, is_month):
     time_label = 'Quarter'
     if is_month:
         time_label = 'Month'
 
-    value_vars = (['Sum of Fin Jumlah Inc', 'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom'] 
-                  if mode == "Jumlah" 
+    value_vars = (['Sum of Fin Jumlah Inc', 'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom']
+                  if mode == "Jumlah"
                   else ['Sum of Fin Nilai Inc', 'Sum of Fin Nilai Out', 'Sum of Fin Nilai Dom'])
-    
-    df_melted = df.melt(id_vars=[time_label], 
-                        value_vars=value_vars, 
+
+    df_melted = df.melt(id_vars=[time_label],
+                        value_vars=value_vars,
                         var_name='Financial Metric', value_name='Value')
 
     df_grouped = df_melted.groupby([time_label, 'Financial Metric'], as_index=False, observed=False).sum()
-    
+
     df_filtered = df_grouped.groupby(time_label, observed=False).filter(lambda x: x['Value'].sum() != 0)
-    
+
     if mode == "Jumlah":
         label = "Frequency"
     else:
         label = "Nominal"
-        
-    fig = px.bar(df_filtered, 
-                 x=time_label, 
-                 y='Value', 
-                 color='Financial Metric', 
+
+    fig = px.bar(df_filtered,
+                 x=time_label,
+                 y='Value',
+                 color='Financial Metric',
                  barmode='group',
                  title=f'{label} Income, Outcome, and Domestic Transactions by {time_label}',
                  labels={'Value': label, time_label: time_label},
                  template='seaborn')
-    
+
     st.plotly_chart(fig)
 
 
-def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month: bool = False):
+def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month: bool = False, is_combined: bool = False):
     df_copy = df.copy()
-    target_col = 'Year-Quarter'
 
-    if is_month:
-        df_copy = df_copy[df_copy['%MtM'].notnull()]
-        df_copy['Year-Month'] = df_copy['Year'].astype(str) + '-' + df_copy['Month'].astype(str)
-        target_col = 'Year-Month'
+    if is_combined:
+        if is_month:
+            df_copy = df_copy[df_copy[f'%MtM {sum_trx_type}'].notnull()]
+            df_copy['Year-Month'] = df_copy['Year'].astype(str) + '-' + df_copy['Month'].astype(str)
+            target_col = 'Year-Month'
+        else:
+            df_copy = df_copy[(df_copy[f'%YoY {sum_trx_type}'].notnull()) & (df_copy[f'%QtQ {sum_trx_type}'].notnull())]
+            df_copy['Year-Quarter'] = df_copy['Year'].astype(str) + ' Q-' + df_copy['Quarter'].astype(str)
+            target_col = 'Year-Quarter'
     else:
-        df_copy = df_copy[(df_copy['%YoY'].notnull()) & (df_copy['%QtQ'].notnull())]
-        df_copy['Year-Quarter'] = df_copy['Year'].astype(str) + ' Q-' + df_copy['Quarter'].astype(str)
+        if is_month:
+            df_copy = df_copy[df_copy['%MtM'].notnull()]
+            df_copy['Year-Month'] = df_copy['Year'].astype(str) + '-' + df_copy['Month'].astype(str)
+            target_col = 'Year-Month'
+        else:
+            df_copy = df_copy[(df_copy['%YoY'].notnull()) & (df_copy['%QtQ'].notnull())]
+            df_copy['Year-Quarter'] = df_copy['Year'].astype(str) + ' Q-' + df_copy['Quarter'].astype(str)
+            target_col = 'Year-Quarter'
 
     bar_col = f'Sum of Fin {sum_trx_type} {trx_type}'
     bar_title = f"{sum_trx_type} {trx_type} Transactions Volume & Growth"
@@ -92,30 +103,56 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
         yaxis='y1'
     ))
 
-    if is_month:
-        fig.add_trace(go.Scatter(
-            x=df_copy[target_col],
-            y=df_copy['%MtM'],
-            name='Month-to-Month Growth (%)',
-            yaxis='y2',
-            mode='lines+markers',
-        ))
-    else:
-        fig.add_trace(go.Scatter(
-            x=df_copy[target_col],
-            y=df_copy['%YoY'],
-            name='Year-on-Year Growth (%)',
-            yaxis='y2',
-            mode='lines+markers',
-        ))
+    if is_combined:
+        if is_month:
+            fig.add_trace(go.Scatter(
+                x=df_copy[target_col],
+                y=df_copy[f'%MtM {sum_trx_type}'],
+                name='Month-to-Month Growth (%)',
+                yaxis='y2',
+                mode='lines+markers',
+            ))
+        else:
+            fig.add_trace(go.Scatter(
+                x=df_copy[target_col],
+                y=df_copy[f'%YoY {sum_trx_type}'],
+                name='Year-on-Year Growth (%)',
+                yaxis='y2',
+                mode='lines+markers',
+            ))
 
-        fig.add_trace(go.Scatter(
-            x=df_copy[target_col],
-            y=df_copy['%QtQ'],
-            name='Quarter-to-Quarter Growth (%)',
-            yaxis='y2',
-            mode='lines+markers',
-        ))
+            fig.add_trace(go.Scatter(
+                x=df_copy[target_col],
+                y=df_copy[f'%QtQ {sum_trx_type}'],
+                name='Quarter-to-Quarter Growth (%)',
+                yaxis='y2',
+                mode='lines+markers',
+            ))
+    else:
+        if is_month:
+            fig.add_trace(go.Scatter(
+                x=df_copy[target_col],
+                y=df_copy['%MtM'],
+                name='Month-to-Month Growth (%)',
+                yaxis='y2',
+                mode='lines+markers',
+            ))
+        else:
+            fig.add_trace(go.Scatter(
+                x=df_copy[target_col],
+                y=df_copy['%YoY'],
+                name='Year-on-Year Growth (%)',
+                yaxis='y2',
+                mode='lines+markers',
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=df_copy[target_col],
+                y=df_copy['%QtQ'],
+                name='Quarter-to-Quarter Growth (%)',
+                yaxis='y2',
+                mode='lines+markers',
+            ))
 
     fig.update_layout(
         title=bar_title,
@@ -140,4 +177,3 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
     )
 
     st.plotly_chart(fig)
-
