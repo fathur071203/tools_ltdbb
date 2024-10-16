@@ -60,35 +60,18 @@ if st.session_state['df'] is not None:
         df_dom_combined_month = merge_df_growth(df_jumlah_dom_month_filtered, df_nom_dom_month_filtered, True)
 
         # TODO: Refactor code
-        df_jumlah_total = pd.concat([df_jumlah_inc_filtered, df_jumlah_out_filtered, df_jumlah_dom_filtered])
-        df_nom_total = pd.concat([df_nom_inc_filtered, df_nom_out_filtered, df_nom_dom_filtered])
+        df_jumlah_total = process_growth_combined(df_jumlah_inc_filtered, df_jumlah_out_filtered,
+                                                  df_jumlah_dom_filtered, False)
+        df_nom_total = process_growth_combined(df_nom_inc_filtered, df_nom_out_filtered,
+                                               df_nom_dom_filtered, False)
 
-        df_jumlah_total = df_jumlah_total.groupby(['Year', 'Quarter']).sum().reset_index()
-        df_nom_total = df_nom_total.groupby(['Year', 'Quarter']).sum().reset_index()
+        df_jumlah_total_month = process_growth_combined(df_jumlah_inc_month_filtered, df_jumlah_out_month_filtered,
+                                                        df_jumlah_dom_month_filtered, True)
+        df_nom_total_month = process_growth_combined(df_nom_inc_month_filtered, df_nom_out_month_filtered,
+                                                        df_nom_dom_month_filtered, True)
 
-        df_total = pd.merge(df_jumlah_total, df_nom_total, on=['Year', 'Quarter'])
-
-        df_total['Sum of Fin Jumlah Total'] = df_total['Sum of Fin Jumlah Inc'] + df_total['Sum of Fin Jumlah Out'] + \
-                                              df_total['Sum of Fin Jumlah Dom']
-        df_total['Sum of Fin Nilai Total'] = df_total['Sum of Fin Nilai Inc'] + df_total['Sum of Fin Nilai Out'] + \
-                                             df_total['Sum of Fin Nilai Dom']
-        df_total.drop(['%YoY_x', '%QtQ_x', '%YoY_y', '%QtQ_y', 'Sum of Fin Jumlah Inc',
-                       'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom', 'Sum of Fin Nilai Inc',
-                       'Sum of Fin Nilai Out', 'Sum of Fin Nilai Dom'], axis=1, inplace=True)
-
-        first_year = df_total['Year'].min()
-
-        df_total_jumlah = calculate_growth(df_total, first_year, "Jumlah", "Total")
-        df_total_nilai = calculate_growth(df_total, first_year, "Nilai", "Total")
-
-        df_total_combined = (
-            pd.merge(df_total_jumlah, df_total_nilai, on=['Year', 'Quarter'])
-            .drop(['Sum of Fin Jumlah Total_y', 'Sum of Fin Nilai Total_y'], axis=1)
-            .rename(columns={'Sum of Fin Jumlah Total_x': 'Sum of Fin Jumlah Total',
-                             'Sum of Fin Nilai Total_x': 'Sum of Fin Nilai Total',
-                             '%YoY_x': '%YoY Jumlah', '%YoY_y': 'YoY Nilai',
-                             '%QtQ_x': '%QtQ Jumlah', '%QtQ_y': '%QtQ Nilai',})
-        )
+        df_total_combined = clean_col_growth_combined(df_jumlah_total, df_nom_total, False)
+        df_total_month_combined = clean_col_growth_combined(df_jumlah_total_month, df_nom_total_month, True)
 
     st.header("Growth in Transactions")
     if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
@@ -123,6 +106,7 @@ if st.session_state['df'] is not None:
         with col3:
             st.subheader("Domestik (Monthly)")
             st.dataframe(df_dom_combined_month)
+
     make_combined_bar_line_chart(df_jumlah_inc_month_filtered, "Jumlah", "Inc", True)
     make_combined_bar_line_chart(df_nom_inc_month_filtered, "Nilai", "Inc", True)
 
@@ -132,4 +116,4 @@ if st.session_state['df'] is not None:
     make_combined_bar_line_chart(df_jumlah_dom_month_filtered, "Jumlah", "Dom", True)
     make_combined_bar_line_chart(df_nom_dom_month_filtered, "Nilai", "Dom", True)
 
-    st.dataframe(df_total_combined)
+    st.dataframe(df_total_month_combined)
