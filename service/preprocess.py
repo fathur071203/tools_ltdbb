@@ -176,9 +176,10 @@ def calculate_market_share(df, total_sum_of_nom):
     return df
 
 def calculate_growth(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
-    df = calculate_year_on_year(df, first_year, sum_trx_type, trx_type)
-    df = calculate_quarter_to_quarter(df, first_year, sum_trx_type, trx_type)
-    return df
+    df_copy = df.copy()
+    df_copy = calculate_year_on_year(df_copy, first_year, sum_trx_type, trx_type)
+    df_copy = calculate_quarter_to_quarter(df_copy, first_year, sum_trx_type, trx_type)
+    return df_copy
 
 def calculate_year_on_year(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
     for i in range(4, len(df)):
@@ -221,7 +222,7 @@ def calculate_month_to_month(df: pd.DataFrame, first_year: int, sum_trx_type: st
                 if previous_month_value == 0 or np.isnan(previous_month_value):
                     growth_val = np.nan
                 else:
-                    growth_val = (((current_value - previous_month_value) / previous_month_value) * 100).round(0)
+                    growth_val = (((current_value - previous_month_value) / previous_month_value) * 100).round(2)
 
                 df.at[i, '%MtM'] = growth_val
 
@@ -235,5 +236,5 @@ def merge_df_growth(left_df, right_df, is_month: bool = False):
                                     "%YoY_y": "%YoY Nom", "%QtQ_y": "%QtQ Nom"}, inplace=True)
     else:
         df_combined = pd.merge(left_df, right_df, "inner", on=['Year', 'Month'])
-        df_combined.rename(columns={"%MtM_x": "%MtM Jumlah", "%MtM_y": "%QtQ Nom"}, inplace=True)
+        df_combined.rename(columns={"%MtM_x": "%MtM Jumlah", "%MtM_y": "%MtM Nom"}, inplace=True)
     return df_combined
