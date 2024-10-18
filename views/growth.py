@@ -59,15 +59,15 @@ if st.session_state['df'] is not None:
         df_nom_dom_filtered = filter_start_end_year(df_nom_dom, selected_start_year, selected_end_year)
 
         df_jumlah_inc_month_filtered = filter_start_end_year(df_jumlah_inc_month, selected_start_year,
-                                                             selected_end_year)
+                                                             selected_end_year, True)
         df_jumlah_out_month_filtered = filter_start_end_year(df_jumlah_out_month, selected_start_year,
-                                                             selected_end_year)
+                                                             selected_end_year, True)
         df_jumlah_dom_month_filtered = filter_start_end_year(df_jumlah_dom_month, selected_start_year,
-                                                             selected_end_year)
+                                                             selected_end_year, True)
 
-        df_nom_inc_month_filtered = filter_start_end_year(df_nom_inc_month, selected_start_year, selected_end_year)
-        df_nom_out_month_filtered = filter_start_end_year(df_nom_out_month, selected_start_year, selected_end_year)
-        df_nom_dom_month_filtered = filter_start_end_year(df_nom_dom_month, selected_start_year, selected_end_year)
+        df_nom_inc_month_filtered = filter_start_end_year(df_nom_inc_month, selected_start_year, selected_end_year, True)
+        df_nom_out_month_filtered = filter_start_end_year(df_nom_out_month, selected_start_year, selected_end_year, True)
+        df_nom_dom_month_filtered = filter_start_end_year(df_nom_dom_month, selected_start_year, selected_end_year, True)
 
         df_inc_combined = merge_df_growth(df_jumlah_inc_filtered, df_nom_inc_filtered)
         df_out_combined = merge_df_growth(df_jumlah_out_filtered, df_nom_out_filtered)

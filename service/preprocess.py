@@ -46,7 +46,11 @@ def filter_data(df, selected_pjp=None, selected_year=None,
     return df
 
 
-def filter_start_end_year(df, start_year, end_year):
+def filter_start_end_year(df, start_year, end_year, is_month: bool = False):
+    if is_month:
+        for col in df.columns:
+            if 'Sum of Fin' in col:
+                df = df[~((df[col] == 0) & (df['Year'] == df['Year'].max()))]
     df_filtered = df[(df['Year'] >= start_year) & (df['Year'] <= end_year)]
     return df_filtered
 
