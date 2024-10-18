@@ -27,7 +27,7 @@ def make_pie_chart(df, top_n):
         template="plotly_white"
     )
 
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def make_grouped_bar_chart(df, mode, is_month):
@@ -61,7 +61,7 @@ def make_grouped_bar_chart(df, mode, is_month):
                  labels={'Value': label, time_label: time_label},
                  template='seaborn')
 
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month: bool = False, is_combined: bool = False):
@@ -176,4 +176,4 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
         )
     )
 
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
