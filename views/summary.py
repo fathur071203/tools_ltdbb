@@ -93,7 +93,7 @@ if df is not None:
         top_n = 5
         make_pie_chart(df_with_market_share, top_n)
 
-    st.dataframe(df_with_market_share)
+    st.dataframe(df_with_market_share, use_container_width=True)
 
     col2, col3 = st.columns(2)
     with col2:
@@ -101,7 +101,7 @@ if df is not None:
     with col3:
         make_grouped_bar_chart(df_sum_time, "Nilai", is_month)
 
-    st.dataframe(df_sum_time)
+    st.dataframe(df_sum_time, use_container_width=True)
 
     df_grand_totals = pd.DataFrame({
         'Category': ['Incoming', 'Outgoing', 'Domestic', 'All'],
@@ -110,6 +110,6 @@ if df is not None:
         'Grand Total Nominal': [grand_total_inc_nominal, grand_total_out_nominal, grand_total_dom_nominal,
                                 grand_total_nominal]
     })
-    st.dataframe(df_grand_totals.set_index(df_grand_totals.columns[0]))
+    st.dataframe(df_grand_totals.set_index(df_grand_totals.columns[0]), use_container_width=True)
 else:
     st.warning("You Must Upload a CSV or Excel File")

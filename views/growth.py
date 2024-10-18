@@ -17,6 +17,7 @@ if st.session_state['df'] is not None:
 
             jenis_transaksi = ['All', 'Incoming', 'Outgoing', 'Domestik']
             selected_jenis_transaksi = st.selectbox('Select Jenis Transaksi:', jenis_transaksi)
+        st.info("Use the filters to adjust the year range and transaction type.")
 
     with (st.spinner('Loading and filtering data...')):
         df_preprocessed_time = preprocess_data(df, True)
@@ -48,7 +49,8 @@ if st.session_state['df'] is not None:
                                                           df_preprocessed_time['Year'].min(), True)
 
         df_total_combined = filter_start_end_year(df_total_combined, selected_start_year, selected_end_year)
-        df_total_month_combined = filter_start_end_year(df_total_month_combined, selected_start_year, selected_end_year)
+        df_total_month_combined = filter_start_end_year(df_total_month_combined, selected_start_year, selected_end_year,
+                                                        True)
 
         df_jumlah_inc_filtered = filter_start_end_year(df_jumlah_inc, selected_start_year, selected_end_year)
         df_jumlah_out_filtered = filter_start_end_year(df_jumlah_out, selected_start_year, selected_end_year)
@@ -65,9 +67,12 @@ if st.session_state['df'] is not None:
         df_jumlah_dom_month_filtered = filter_start_end_year(df_jumlah_dom_month, selected_start_year,
                                                              selected_end_year, True)
 
-        df_nom_inc_month_filtered = filter_start_end_year(df_nom_inc_month, selected_start_year, selected_end_year, True)
-        df_nom_out_month_filtered = filter_start_end_year(df_nom_out_month, selected_start_year, selected_end_year, True)
-        df_nom_dom_month_filtered = filter_start_end_year(df_nom_dom_month, selected_start_year, selected_end_year, True)
+        df_nom_inc_month_filtered = filter_start_end_year(df_nom_inc_month, selected_start_year, selected_end_year,
+                                                          True)
+        df_nom_out_month_filtered = filter_start_end_year(df_nom_out_month, selected_start_year, selected_end_year,
+                                                          True)
+        df_nom_dom_month_filtered = filter_start_end_year(df_nom_dom_month, selected_start_year, selected_end_year,
+                                                          True)
 
         df_inc_combined = merge_df_growth(df_jumlah_inc_filtered, df_nom_inc_filtered)
         df_out_combined = merge_df_growth(df_jumlah_out_filtered, df_nom_out_filtered)
@@ -77,55 +82,61 @@ if st.session_state['df'] is not None:
         df_out_combined_month = merge_df_growth(df_jumlah_out_month_filtered, df_nom_out_month_filtered, True)
         df_dom_combined_month = merge_df_growth(df_jumlah_dom_month_filtered, df_nom_dom_month_filtered, True)
 
-    st.header("Growth in Transactions")
-    if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
-        st.subheader("Incoming Transactions")
-        st.dataframe(df_inc_combined)
-        make_combined_bar_line_chart(df_jumlah_inc_filtered, "Jumlah", "Inc")
-        make_combined_bar_line_chart(df_nom_inc_filtered, "Nilai", "Inc")
+        st.header("Growth in Transactions")
+        if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
+            st.markdown("### 📥 Incoming Transactions")
+            st.dataframe(df_inc_combined, use_container_width=True)
+            make_combined_bar_line_chart(df_jumlah_inc_filtered, "Jumlah", "Inc")
+            make_combined_bar_line_chart(df_nom_inc_filtered, "Nilai", "Inc")
 
-    if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
-        st.subheader("Outgoing Transactions")
-        st.dataframe(df_out_combined)
-        make_combined_bar_line_chart(df_jumlah_out_filtered, "Jumlah", "Out")
-        make_combined_bar_line_chart(df_nom_out_filtered, "Nilai", "Out")
+        if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
+            st.markdown("### 📤 Outgoing Transactions")
+            st.dataframe(df_out_combined, use_container_width=True)
+            make_combined_bar_line_chart(df_jumlah_out_filtered, "Jumlah", "Out")
+            make_combined_bar_line_chart(df_nom_out_filtered, "Nilai", "Out")
 
-    if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
-        st.subheader("Domestik Transactions")
-        st.dataframe(df_dom_combined)
-        make_combined_bar_line_chart(df_jumlah_dom_filtered, "Jumlah", "Dom")
-        make_combined_bar_line_chart(df_nom_dom_filtered, "Nilai", "Dom")
+        if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
+            st.markdown("### 🇮🇩 Domestik Transactions")
+            st.dataframe(df_dom_combined, use_container_width=True)
+            make_combined_bar_line_chart(df_jumlah_dom_filtered, "Jumlah", "Dom")
+            make_combined_bar_line_chart(df_nom_dom_filtered, "Nilai", "Dom")
 
-    st.header("Monthly Transaction Data Overview")
-    col1, col2, col3 = st.columns(3)
-    if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
-        with col1:
-            st.subheader("Incoming (Monthly)")
-            st.dataframe(df_inc_combined_month)
-    if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
-        with col2:
-            st.subheader("Outgoing (Monthly)")
-            st.dataframe(df_out_combined_month)
-    if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
-        with col3:
-            st.subheader("Domestik (Monthly)")
-            st.dataframe(df_dom_combined_month)
+        st.subheader("📅 Monthly Transaction Data Overview")
+        col1, col2, col3 = st.columns(3)
+        if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
+            with col1:
+                st.markdown("### 📥 Incoming (Monthly)")
+                st.dataframe(df_inc_combined_month, use_container_width=True)
+        if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
+            with col2:
+                st.markdown("### 📤 Outgoing (Monthly)")
+                st.dataframe(df_out_combined_month, use_container_width=True)
+        if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
+            with col3:
+                st.markdown("### 🇮🇩 Domestik (Monthly)")
+                st.dataframe(df_dom_combined_month, use_container_width=True)
 
-    make_combined_bar_line_chart(df_jumlah_inc_month_filtered, "Jumlah", "Inc", True)
-    make_combined_bar_line_chart(df_nom_inc_month_filtered, "Nilai", "Inc", True)
+        make_combined_bar_line_chart(df_jumlah_inc_month_filtered, "Jumlah", "Inc", True)
+        make_combined_bar_line_chart(df_nom_inc_month_filtered, "Nilai", "Inc", True)
 
-    make_combined_bar_line_chart(df_jumlah_out_month_filtered, "Jumlah", "Out", True)
-    make_combined_bar_line_chart(df_nom_out_month_filtered, "Nilai", "Out", True)
+        make_combined_bar_line_chart(df_jumlah_out_month_filtered, "Jumlah", "Out", True)
+        make_combined_bar_line_chart(df_nom_out_month_filtered, "Nilai", "Out", True)
 
-    make_combined_bar_line_chart(df_jumlah_dom_month_filtered, "Jumlah", "Dom", True)
-    make_combined_bar_line_chart(df_nom_dom_month_filtered, "Nilai", "Dom", True)
+        make_combined_bar_line_chart(df_jumlah_dom_month_filtered, "Jumlah", "Dom", True)
+        make_combined_bar_line_chart(df_nom_dom_month_filtered, "Nilai", "Dom", True)
 
-    st.dataframe(df_total_combined)
+        st.subheader("🔍 Overall Summary")
+        st.write("Here is a combined view of the total transaction counts and values across all types.")
+        st.dataframe(df_total_combined, use_container_width=True)
 
-    make_combined_bar_line_chart(df_total_combined, "Jumlah", "Total", False, True)
-    make_combined_bar_line_chart(df_total_combined, "Nilai", "Total", False, True)
+        st.markdown("### 📊 Total Transactions Overview")
+        make_combined_bar_line_chart(df_total_combined, "Jumlah", "Total", False, True)
+        make_combined_bar_line_chart(df_total_combined, "Nilai", "Total", False, True)
 
-    st.dataframe(df_total_month_combined)
+        st.subheader("🔍 Overall Summary (Monthly)")
+        st.write("Here is a combined view of the total transaction counts and values across all types.")
+        st.dataframe(df_total_month_combined, use_container_width=True)
 
-    make_combined_bar_line_chart(df_total_month_combined, "Jumlah", "Total", True, True)
-    make_combined_bar_line_chart(df_total_month_combined, "Nilai", "Total", True, True)
+        st.markdown("### 📊 Total Transactions Overview (Monthly)")
+        make_combined_bar_line_chart(df_total_month_combined, "Jumlah", "Total", True, True)
+        make_combined_bar_line_chart(df_total_month_combined, "Nilai", "Total", True, True)
