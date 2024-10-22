@@ -393,3 +393,12 @@ def process_data_profile_month(df_month: pd.DataFrame, trx_type: str) -> pd.Data
     df_domestic_month = df_month[['Year', 'Month', f'Sum of Fin Jumlah {trx_type}', f'Sum of Fin Nilai {trx_type}']].copy()
     df_domestic_month[f'Sum of Fin Nilai {trx_type}'] = df_domestic_month[f'Sum of Fin Nilai {trx_type}'] / 1_000_000_000
     return df_domestic_month
+
+def process_grand_total_profile(df: pd.DataFrame, trx_type: str) -> pd.DataFrame:
+    grand_total_jumlah_month = df[f'Sum of Fin Jumlah {trx_type}'].sum()
+    grand_total_nilai_month = df[f'Sum of Fin Nilai {trx_type}'].sum()
+    df_grand_total_month = pd.DataFrame({
+        f'Grand Total Jumlah {trx_type}': [grand_total_jumlah_month],
+        f'Grand Total Nilai {trx_type}': [grand_total_nilai_month]
+    })
+    return df_grand_total_month

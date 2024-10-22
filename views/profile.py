@@ -69,14 +69,22 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         merged_data = pd.merge(merged_data, data_nilai_out, on=['Transaction Type'])
         merged_data = pd.merge(merged_data, data_nilai_dom, on=['Transaction Type'])
 
+        df_grand_total_dom = process_grand_total_profile(df_domestic_month, "Dom")
+        df_grand_total_inc = process_grand_total_profile(df_incoming_month, "Inc")
+        df_grand_total_out = process_grand_total_profile(df_outgoing_month, "Out")
+
+        st.subheader(f"Profil Transaksi - PT {selected_pjp} Tahun {selected_year_pjp}")
         st.dataframe(merged_data, use_container_width=True, hide_index=True)
         col1, col2, col3 = st.columns(3)
         with col1:
             st.dataframe(df_domestic_month, use_container_width=True, hide_index=True)
+            st.dataframe(df_grand_total_dom, use_container_width=True, hide_index=True)
         with col2:
             st.dataframe(df_incoming_month, use_container_width=True, hide_index=True)
+            st.dataframe(df_grand_total_inc, use_container_width=True, hide_index=True)
         with col3:
             st.dataframe(df_outgoing_month, use_container_width=True, hide_index=True)
+            st.dataframe(df_grand_total_out, use_container_width=True, hide_index=True)
 
         make_combined_bar_line_chart_profile(df_domestic_month, "Dom", selected_pjp, selected_year_pjp)
         make_combined_bar_line_chart_profile(df_incoming_month, "Inc", selected_pjp, selected_year_pjp)
