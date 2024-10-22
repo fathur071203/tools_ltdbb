@@ -388,3 +388,8 @@ def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_ty
     }
 
     return pd.DataFrame(data)
+
+def process_data_profile_month(df_month: pd.DataFrame, trx_type: str) -> pd.DataFrame:
+    df_domestic_month = df_month[['Year', 'Month', f'Sum of Fin Jumlah {trx_type}', f'Sum of Fin Nilai {trx_type}']].copy()
+    df_domestic_month[f'Sum of Fin Nilai {trx_type}'] = df_domestic_month[f'Sum of Fin Nilai {trx_type}'] / 1_000_000_000
+    return df_domestic_month

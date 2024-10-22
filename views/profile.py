@@ -1,5 +1,3 @@
-from sys import prefix
-
 import pandas as pd
 import streamlit as st
 import calendar
@@ -51,6 +49,11 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     else:
         df_grouped_filtered_year = filter_data(df_preprocessed_grouped_year, selected_pjp, selected_year_pjp)
         df_grouped_national_filtered_year = filter_data(df_national_preprocessed_year, selected_year=selected_year_pjp)
+        df_grouped_filtered_month = filter_data(df_preprocessed_grouped_month, selected_pjp, selected_year_pjp)
+
+        df_incoming_month = process_data_profile_month(df_grouped_filtered_month, "Inc")
+        df_outgoing_month = process_data_profile_month(df_grouped_filtered_month, "Out")
+        df_domestic_month = process_data_profile_month(df_grouped_filtered_month, "Dom")
 
         data_jumlah_inc = compile_data_profile(df_grouped_filtered_year, df_grouped_national_filtered_year, "Jumlah", "Inc")
         data_jumlah_out = compile_data_profile(df_grouped_filtered_year, df_grouped_national_filtered_year, "Jumlah", "Out")
@@ -67,4 +70,14 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         merged_data = pd.merge(merged_data, data_nilai_dom, on=['Transaction Type'])
 
         st.dataframe(merged_data, use_container_width=True, hide_index=True)
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.dataframe(df_domestic_month, use_container_width=True, hide_index=True)
+        with col2:
+            st.dataframe(df_incoming_month, use_container_width=True, hide_index=True)
+        with col3:
+            st.dataframe(df_outgoing_month, use_container_width=True, hide_index=True)
 
+        make_combined_bar_line_chart_profile(df_domestic_month, "Dom", selected_pjp, selected_year_pjp)
+        make_combined_bar_line_chart_profile(df_incoming_month, "Inc", selected_pjp, selected_year_pjp)
+        make_combined_bar_line_chart_profile(df_outgoing_month, "Out", selected_pjp, selected_year_pjp)

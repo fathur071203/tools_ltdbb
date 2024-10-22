@@ -177,3 +177,52 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_pjp: str, selected_year: str):
+    if trx_type == 'Inc':
+        trx_title = "Incoming"
+    elif trx_type == 'Out':
+        trx_title = "Outgoing"
+    else:
+        trx_title = "Domestik"
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        x=df['Month'],
+        y=df[f'Sum of Fin Nilai {trx_type}'],
+        name="Nilai",
+        yaxis='y1'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df['Month'],
+        y=df[f'Sum of Fin Jumlah {trx_type}'],
+        name='Frekuensi',
+        yaxis='y2',
+        mode='lines+markers',
+    ))
+
+    fig.update_layout(
+        title=f"Perkembangan Transaksi {trx_title} {nama_pjp} Tahun {selected_year} s.d. 2024",
+        xaxis=dict(title="Bulan"),
+        yaxis=dict(
+            title="Nilai (Rp Miliar)",
+            tickformat=",",
+        ),
+        yaxis2=dict(
+            title='Frekuensi',
+            overlaying='y',
+            side='right',
+            tickformat=".1f"
+        ),
+        template="seaborn",
+        legend=dict(
+            x=1.05,
+            y=1,
+            xanchor='left',
+            yanchor='top',
+        )
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
