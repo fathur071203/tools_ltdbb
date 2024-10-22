@@ -10,6 +10,8 @@ set_page_visuals()
 
 if 'df' not in st.session_state:
     st.session_state['df'] = None
+if 'df_national' not in st.session_state:
+    st.session_state['df_national'] = None
 if 'file_name' not in st.session_state:
     st.session_state['file_name'] = None
 
@@ -20,12 +22,16 @@ if uploaded_file is not None:
 
     if file_name != st.session_state['file_name']:
         st.session_state['file_name'] = file_name
-        df = load_data(uploaded_file)
+        df = load_data(uploaded_file, False)
+        df_national = load_data(uploaded_file, True)
         st.session_state['df'] = df
+        st.session_state['df_national'] = df_national
     else:
         df = st.session_state['df']
+        df_national = st.session_state['df_national']
 else:
     df = st.session_state['df']
+    df_national = st.session_state['df_national']
 
 if df is not None:
     pjp_list = ['All'] + df['Nama PJP'].unique().tolist()

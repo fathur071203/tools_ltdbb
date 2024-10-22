@@ -5,8 +5,11 @@ import numpy as np
 
 
 @st.cache_data
-def load_data(uploaded_file):
-    df = pd.read_excel(uploaded_file, 'Trx_PJPJKT')
+def load_data(uploaded_file, is_trx_nasional: bool = False):
+    sheet_name = 'Trx_PJPJKT'
+    if is_trx_nasional:
+        sheet_name = 'Raw_JKTNasional'
+    df = pd.read_excel(uploaded_file, sheet_name)
     return df
 
 
@@ -169,7 +172,40 @@ def preprocess_data_growth(df, is_month: bool):
 
         return df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_nom_inc, df_nom_out, df_nom_dom
 
-def process_combined_df(df_inc: pd.DataFrame, df_out: pd.DataFrame, df_dom: pd.DataFrame, is_month: bool = False) -> pd.DataFrame:
+
+def preprocess_data_profile(df: pd.DataFrame, is_year: bool = False):
+    df_copy = df.copy()
+    if "Nom Nasional Total.1" in df.columns:
+        df_copy.drop("Nom Nasional Total.1", axis=1, inplace=True)
+
+    if is_year:
+        grouped_df_year = df_copy.groupby('Year').agg({
+            'Nom Nasional Out': 'sum',
+            'Nom Nasional Inc': 'sum',
+            'Nom Nasional Dom': 'sum',
+            'Nom Nasional Total': 'sum',
+            'Frek Nasional Out' : 'sum',
+            'Frek Nasional Inc' : 'sum',
+            'Frek Nasional Dom' : 'sum',
+            'Frek Nasional Total' : 'sum',
+        }).reset_index()
+        return grouped_df_year
+    else:
+        grouped_df_month = df_copy.groupby(['Year', 'Month']).agg({
+            'Nom Nasional Out': 'sum',
+            'Nom Nasional Inc': 'sum',
+            'Nom Nasional Dom': 'sum',
+            'Nom Nasional Total': 'sum',
+            'Frek Nasional Out': 'sum',
+            'Frek Nasional Inc': 'sum',
+            'Frek Nasional Dom': 'sum',
+            'Frek Nasional Total': 'sum',
+        }).reset_index()
+        return grouped_df_month
+
+
+def process_combined_df(df_inc: pd.DataFrame, df_out: pd.DataFrame, df_dom: pd.DataFrame,
+                        is_month: bool = False) -> pd.DataFrame:
     if is_month:
         group_cols = ['Year', 'Month']
     else:
@@ -185,24 +221,27 @@ def process_combined_df(df_inc: pd.DataFrame, df_out: pd.DataFrame, df_dom: pd.D
             trx_type = "Nilai"
             break
 
-    df_total[f'Sum of Fin {trx_type} Total'] = df_total[f'Sum of Fin {trx_type} Inc'] + df_total[f'Sum of Fin {trx_type} Out'] + \
-                                          df_total[f'Sum of Fin {trx_type} Dom']
+    df_total[f'Sum of Fin {trx_type} Total'] = df_total[f'Sum of Fin {trx_type} Inc'] + df_total[
+        f'Sum of Fin {trx_type} Out'] + \
+                                               df_total[f'Sum of Fin {trx_type} Dom']
 
     return df_total
 
-def process_growth_combined(df_jumlah_total: pd.DataFrame, df_nom_total: pd.DataFrame, first_year:int, is_month: bool = False) -> pd.DataFrame:
+
+def process_growth_combined(df_jumlah_total: pd.DataFrame, df_nom_total: pd.DataFrame, first_year: int,
+                            is_month: bool = False) -> pd.DataFrame:
     if is_month:
         group_cols = ['Year', 'Month']
         drop_cols_jumlah = ['%MtM', 'Sum of Fin Jumlah Inc',
-                   'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom']
+                            'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom']
         drop_cols_nom = ['%MtM', 'Sum of Fin Nilai Inc',
-                   'Sum of Fin Nilai Out', 'Sum of Fin Nilai Dom']
+                         'Sum of Fin Nilai Out', 'Sum of Fin Nilai Dom']
     else:
         group_cols = ['Year', 'Quarter']
         drop_cols_jumlah = ['%YoY', '%QtQ', 'Sum of Fin Jumlah Inc',
-                   'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom']
+                            'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom']
         drop_cols_nom = ['%YoY', '%QtQ', 'Sum of Fin Nilai Inc',
-                   'Sum of Fin Nilai Out', 'Sum of Fin Nilai Dom']
+                         'Sum of Fin Nilai Out', 'Sum of Fin Nilai Dom']
     df_jumlah_total.drop(drop_cols_jumlah, axis=1, inplace=True)
     df_nom_total.drop(drop_cols_nom, axis=1, inplace=True)
 
@@ -322,3 +361,30 @@ def merge_df_growth(left_df, right_df, is_month: bool = False):
         df_combined = pd.merge(left_df, right_df, "inner", on=['Year', 'Month'])
         df_combined.rename(columns={"%MtM_x": "%MtM Jumlah", "%MtM_y": "%MtM Nom"}, inplace=True)
     return df_combined
+
+def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_type: str, trx_type: str) -> pd.DataFrame:
+    data_pjp = df[f'Sum of Fin {sum_trx_type} {trx_type}'].values[0]
+    if sum_trx_type == "Jumlah":
+        sum_trx_word = "Frekuensi"
+        national_word = "Frek"
+    else:
+        sum_trx_word = "Nominal Rp Miliar"
+        national_word = "Nom"
+        data_pjp = (data_pjp / 1_000_000_000).round(2)
+
+    if trx_type == "Inc":
+        trx_word = "Incoming"
+    elif trx_type == "Out":
+        trx_word = "Outgoing"
+    else:
+        trx_word = "Domestik"
+
+    data_national = df_national[f'{national_word} Nasional {trx_type}'].values[0]
+    data_percentage = ((data_pjp / data_national) * 100).round(2)
+
+    data = {
+        "Transaction Type": ["Trx Perusahaan", "Trx Nasional", "Persentase (%)"],
+        f"{trx_word} ({sum_trx_word})": [data_pjp, data_national, data_percentage],
+    }
+
+    return pd.DataFrame(data)
