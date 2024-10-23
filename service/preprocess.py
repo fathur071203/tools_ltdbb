@@ -386,6 +386,7 @@ def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_ty
     return pd.DataFrame(data)
 
 def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_type: str) -> pd.DataFrame:
+    df_copy = df.copy()
     if trx_type == "Inc":
         trx_word = "Incoming"
     elif trx_type == "Out":
@@ -393,22 +394,22 @@ def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_t
     elif trx_type == "Dom":
         trx_word = "Domestik"
     else:
-        df.rename(columns={"Sum of Total Nom" : "Sum of Fin Nilai Total"}, inplace=True)
-        df['Sum of Fin Jumlah Total'] = df['Sum of Fin Jumlah Inc'].values[0] + df['Sum of Fin Jumlah Out'].values[0] + df['Sum of Fin Jumlah Dom'].values[0]
+        df_copy.rename(columns={"Sum of Total Nom" : "Sum of Fin Nilai Total"}, inplace=True)
+        df_copy['Sum of Fin Jumlah Total'] = df_copy['Sum of Fin Jumlah Inc'].sum() + df_copy['Sum of Fin Jumlah Out'].sum() + df_copy['Sum of Fin Jumlah Dom'].sum()
         trx_word = "Total"
 
-    nominal_jkt = (df[f'Sum of Fin Nilai {trx_type}'].values[0] / 1_000_000_000_000).round(2)
-    frek_jkt = (df[f'Sum of Fin Jumlah {trx_type}'].values[0] / 1_000_000).round(2)
-    nominal_nasional = (df_national[f'Nom Nasional {trx_type}'].values[0] / 1_000).round(2)
-    frek_nasional = (df_national[f'Frek Nasional {trx_type}'].values[0] / 1_000_000).round(2)
-    data_out = {
+    nominal_jkt = (df_copy[f'Sum of Fin Nilai {trx_type}'].sum() / 1_000_000_000_000).round(2)
+    frek_jkt = (df_copy[f'Sum of Fin Jumlah {trx_type}'].sum() / 1_000_000).round(2)
+    nominal_nasional = (df_national[f'Nom Nasional {trx_type}'].sum()/ 1_000).round(2)
+    frek_nasional = (df_national[f'Frek Nasional {trx_type}'].sum() / 1_000_000).round(2)
+    data = {
         f"Transaksi {trx_word}": ['Jakarta', 'Nasional', 'Market Share (%)'],
         "Nominal (dalam triliun)": [nominal_jkt, nominal_nasional,
                                     ((nominal_jkt / nominal_nasional) * 100).round(2)],
         "Frekuensi (dalam jutaan)": [frek_jkt, frek_nasional,
                                      ((frek_jkt / frek_nasional) * 100).round(2)],
     }
-    df_out = pd.DataFrame(data_out)
+    df_out = pd.DataFrame(data)
     return df_out
 
 def process_data_profile_month(df_month: pd.DataFrame, trx_type: str) -> pd.DataFrame:
