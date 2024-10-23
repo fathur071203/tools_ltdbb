@@ -390,15 +390,19 @@ def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_t
         trx_word = "Incoming"
     elif trx_type == "Out":
         trx_word = "Outgoing"
-    else:
+    elif trx_type == "Dom":
         trx_word = "Domestik"
+    else:
+        df.rename(columns={"Sum of Total Nom" : "Sum of Fin Nilai Total"}, inplace=True)
+        df['Sum of Fin Jumlah Total'] = df['Sum of Fin Jumlah Inc'].values[0] + df['Sum of Fin Jumlah Out'].values[0] + df['Sum of Fin Jumlah Dom'].values[0]
+        trx_word = "Total"
 
     nominal_jkt = (df[f'Sum of Fin Nilai {trx_type}'].values[0] / 1_000_000_000_000).round(2)
     frek_jkt = (df[f'Sum of Fin Jumlah {trx_type}'].values[0] / 1_000_000).round(2)
     nominal_nasional = (df_national[f'Nom Nasional {trx_type}'].values[0] / 1_000).round(2)
     frek_nasional = (df_national[f'Frek Nasional {trx_type}'].values[0] / 1_000_000).round(2)
     data_out = {
-        f"Transaksi {trx_word}": ['Jakarta', 'Nasional', 'Market Share'],
+        f"Transaksi {trx_word}": ['Jakarta', 'Nasional', 'Market Share (%)'],
         "Nominal (dalam triliun)": [nominal_jkt, nominal_nasional,
                                     ((nominal_jkt / nominal_nasional) * 100).round(2)],
         "Frekuensi (dalam jutaan)": [frek_jkt, frek_nasional,

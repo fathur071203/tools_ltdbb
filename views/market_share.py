@@ -55,12 +55,10 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
 
     st.subheader(f"Market Share PJP Jakarta Triwulan {selected_quarter_pjp} Tahun {selected_year_pjp}")
 
-    st.dataframe(df_national_filtered, hide_index=True, use_container_width=True)
-    st.dataframe(df_preprocessed_filtered, hide_index=True, use_container_width=True)
-
     df_out = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Out")
     df_inc = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Inc")
     df_dom = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Dom")
+    df_total = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Total")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -68,4 +66,5 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         st.dataframe(df_inc, hide_index=True, use_container_width=True)
     with col2:
         st.dataframe(df_dom, hide_index=True, use_container_width=True)
+        st.dataframe(df_total, hide_index=True, use_container_width=True)
     st.info("*Market Share merupakan Market Share Transaksi Jakarta terhadap Transaksi Nasional")
