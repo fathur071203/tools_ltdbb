@@ -21,8 +21,8 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             selected_year_pjp = st.selectbox('Select Year:', years, key="key_year_pjp")
         st.info("Use the filters to adjust the PJP name and transaction year.")
 
-    df_national_preprocessed_year = preprocess_data_profile(df_national, True)
-    df_national_preprocessed_month = preprocess_data_profile(df_national, False)
+    df_national_preprocessed_year = preprocess_data_national(df_national, True)
+    df_national_preprocessed_month = preprocess_data_national(df_national, False)
     df_preprocessed = preprocess_data(df, True)
 
     df_preprocessed_grouped_year = df_preprocessed.groupby(['Nama PJP', 'Year']).agg({
@@ -75,6 +75,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
 
         st.subheader(f"Profil Transaksi - PT {selected_pjp} Tahun {selected_year_pjp}")
         st.dataframe(merged_data, use_container_width=True, hide_index=True)
+        st.info("*Persentase merupakan persentase jumlah atau nilai transaksi PJP terhadap jumlah atau nilai transaksi nasional")
         col1, col2, col3 = st.columns(3)
         with col1:
             st.dataframe(df_domestic_month, use_container_width=True, hide_index=True)

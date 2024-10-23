@@ -173,36 +173,32 @@ def preprocess_data_growth(df, is_month: bool):
         return df_jumlah_inc, df_jumlah_out, df_jumlah_dom, df_nom_inc, df_nom_out, df_nom_dom
 
 
-def preprocess_data_profile(df: pd.DataFrame, is_year: bool = False):
+def preprocess_data_national(df: pd.DataFrame, is_year: bool = False, is_quarter: bool = False) -> pd.DataFrame:
     df_copy = df.copy()
-    if "Nom Nasional Total.1" in df.columns:
-        df_copy.drop("Nom Nasional Total.1", axis=1, inplace=True)
+
+    if 'Nom Nasional Total.1' in df_copy.columns:
+        df_copy.drop('Nom Nasional Total.1', axis=1, inplace=True)
+
+    aggregation_dict = {
+        'Nom Nasional Out': 'sum',
+        'Nom Nasional Inc': 'sum',
+        'Nom Nasional Dom': 'sum',
+        'Nom Nasional Total': 'sum',
+        'Frek Nasional Out': 'sum',
+        'Frek Nasional Inc': 'sum',
+        'Frek Nasional Dom': 'sum',
+        'Frek Nasional Total': 'sum',
+    }
 
     if is_year:
-        grouped_df_year = df_copy.groupby('Year').agg({
-            'Nom Nasional Out': 'sum',
-            'Nom Nasional Inc': 'sum',
-            'Nom Nasional Dom': 'sum',
-            'Nom Nasional Total': 'sum',
-            'Frek Nasional Out' : 'sum',
-            'Frek Nasional Inc' : 'sum',
-            'Frek Nasional Dom' : 'sum',
-            'Frek Nasional Total' : 'sum',
-        }).reset_index()
-        return grouped_df_year
+        if is_quarter:
+            grouped_df = df_copy.groupby(['Year', 'Quarter']).agg(aggregation_dict).reset_index()
+        else:
+            grouped_df = df_copy.groupby('Year').agg(aggregation_dict).reset_index()
     else:
-        grouped_df_month = df_copy.groupby(['Year', 'Month']).agg({
-            'Nom Nasional Out': 'sum',
-            'Nom Nasional Inc': 'sum',
-            'Nom Nasional Dom': 'sum',
-            'Nom Nasional Total': 'sum',
-            'Frek Nasional Out': 'sum',
-            'Frek Nasional Inc': 'sum',
-            'Frek Nasional Dom': 'sum',
-            'Frek Nasional Total': 'sum',
-        }).reset_index()
-        return grouped_df_month
+        grouped_df = df_copy.groupby(['Year', 'Month']).agg(aggregation_dict).reset_index()
 
+    return grouped_df
 
 def process_combined_df(df_inc: pd.DataFrame, df_out: pd.DataFrame, df_dom: pd.DataFrame,
                         is_month: bool = False) -> pd.DataFrame:
@@ -389,6 +385,28 @@ def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_ty
 
     return pd.DataFrame(data)
 
+def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_type: str) -> pd.DataFrame:
+    if trx_type == "Inc":
+        trx_word = "Incoming"
+    elif trx_type == "Out":
+        trx_word = "Outgoing"
+    else:
+        trx_word = "Domestik"
+
+    nominal_jkt = (df[f'Sum of Fin Nilai {trx_type}'].values[0] / 1_000_000_000_000).round(2)
+    frek_jkt = (df[f'Sum of Fin Jumlah {trx_type}'].values[0] / 1_000_000).round(2)
+    nominal_nasional = (df_national[f'Nom Nasional {trx_type}'].values[0] / 1_000).round(2)
+    frek_nasional = (df_national[f'Frek Nasional {trx_type}'].values[0] / 1_000_000).round(2)
+    data_out = {
+        f"Transaksi {trx_word}": ['Jakarta', 'Nasional', 'Market Share'],
+        "Nominal (dalam triliun)": [nominal_jkt, nominal_nasional,
+                                    ((nominal_jkt / nominal_nasional) * 100).round(2)],
+        "Frekuensi (dalam jutaan)": [frek_jkt, frek_nasional,
+                                     ((frek_jkt / frek_nasional) * 100).round(2)],
+    }
+    df_out = pd.DataFrame(data_out)
+    return df_out
+
 def process_data_profile_month(df_month: pd.DataFrame, trx_type: str) -> pd.DataFrame:
     df_domestic_month = df_month[['Year', 'Month', f'Sum of Fin Jumlah {trx_type}', f'Sum of Fin Nilai {trx_type}']].copy()
     df_domestic_month[f'Sum of Fin Nilai {trx_type}'] = df_domestic_month[f'Sum of Fin Nilai {trx_type}'] / 1_000_000_000
@@ -402,3 +420,7 @@ def process_grand_total_profile(df: pd.DataFrame, trx_type: str) -> pd.DataFrame
         f'Grand Total Nilai {trx_type}': [grand_total_nilai_month]
     })
     return df_grand_total_month
+
+def add_quarter_column(df: pd.DataFrame) -> pd.DataFrame:
+    df['Quarter'] = (df['Month'] - 1) // 3 + 1
+    return df
