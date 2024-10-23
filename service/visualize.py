@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 
-def make_pie_chart(df, top_n):
+def make_pie_chart_summary(df, top_n):
     df_sorted = df.sort_values('Market Share (%)', ascending=False)
 
     df_top_n = df_sorted.head(top_n)
@@ -26,6 +26,33 @@ def make_pie_chart(df, top_n):
         title=f"Top {top_n} PJPs by Market Share (Including Others)",
         template="plotly_white"
     )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def make_pie_chart_market_share(df: pd.DataFrame, trx_type: str ,is_nom: bool = True):
+    if is_nom:
+        data = {
+            "Market Share": ["Jakarta", "National"],
+            "Percentage": [df['Nominal (dalam triliun)'].values[2], 100 - df['Nominal (dalam triliun)'].values[2]]
+        }
+        text = "Nominal"
+    else:
+        data = {
+            "Market Share": ["Jakarta", "National"],
+            "Percentage": [df['Frekuensi (dalam jutaan)'].values[2], 100 - df['Frekuensi (dalam jutaan)'].values[2]]
+        }
+        text = "Frekuensi"
+
+    df_combined = pd.DataFrame(data)
+
+    fig = px.pie(df_combined,
+                 names='Market Share',
+                 values='Percentage',
+                 title=f'Market Share {text} {trx_type} Jakarta VS National',
+                 template='seaborn')
+
+    fig.update_traces(hovertemplate='%{label}: %{value:.2f}%')
 
     st.plotly_chart(fig, use_container_width=True)
 

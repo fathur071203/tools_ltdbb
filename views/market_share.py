@@ -53,18 +53,41 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     df_preprocessed_filtered = filter_data(df_preprocessed_grouped, selected_quarter=selected_quarter_pjp,
                                            selected_year=selected_year_pjp)
 
-    st.subheader(f"Market Share PJP Jakarta Triwulan {selected_quarter_pjp} Tahun {selected_year_pjp}")
+    st.subheader(f"Market Share PJP LR Jakarta Triwulan {selected_quarter_pjp} Tahun {selected_year_pjp}")
 
     df_out = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Out")
     df_inc = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Inc")
     df_dom = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Dom")
     df_total = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Total")
 
+
+    st.dataframe(df_out, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
-        st.dataframe(df_out, hide_index=True, use_container_width=True)
-        st.dataframe(df_inc, hide_index=True, use_container_width=True)
+        make_pie_chart_market_share(df_out, "Out", is_nom=True)
     with col2:
-        st.dataframe(df_dom, hide_index=True, use_container_width=True)
-        st.dataframe(df_total, hide_index=True, use_container_width=True)
-    st.info("*Market Share merupakan Market Share Transaksi Jakarta terhadap Transaksi Nasional")
+        make_pie_chart_market_share(df_out, "Out", is_nom=False)
+    st.divider()
+    st.dataframe(df_inc, hide_index=True, use_container_width=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        make_pie_chart_market_share(df_inc, "Inc", is_nom=True)
+    with col2:
+        make_pie_chart_market_share(df_inc, "Inc", is_nom=False)
+    st.divider()
+    st.dataframe(df_dom, hide_index=True, use_container_width=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        make_pie_chart_market_share(df_inc, "Dom", is_nom=True)
+    with col2:
+        make_pie_chart_market_share(df_inc, "Dom", is_nom=False)
+    st.divider()
+    st.dataframe(df_total, hide_index=True, use_container_width=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        make_pie_chart_market_share(df_total, "Total", is_nom=True)
+    with col2:
+        make_pie_chart_market_share(df_total, "Total", is_nom=False)
+    st.info("*Market Share merupakan Persentase Market Share Transaksi Jakarta terhadap Transaksi Nasional")
+
+    st.subheader(f"Market Share PJP Jakarta LR All-Time ({selected_year_pjp} - {max_year})")

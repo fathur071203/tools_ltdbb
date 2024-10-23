@@ -97,7 +97,7 @@ if df is not None:
     col1 = st.columns(1)
     with col1[0]:
         top_n = 5
-        make_pie_chart(df_with_market_share, top_n)
+        make_pie_chart_summary(df_with_market_share, top_n)
 
     st.dataframe(df_with_market_share, use_container_width=True)
 
