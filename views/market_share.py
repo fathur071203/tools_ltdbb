@@ -61,12 +61,13 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     df_out = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Out")
     df_inc = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Inc")
     df_dom = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Dom")
-    df_total = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Total")
+    df_total = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Total", df_inc, df_out, df_dom)
 
     df_out_year = compile_data_market_share(df_preprocessed_filtered_year, df_national_filtered_year, "Out")
     df_inc_year = compile_data_market_share(df_preprocessed_filtered_year, df_national_filtered_year, "Inc")
     df_dom_year = compile_data_market_share(df_preprocessed_filtered_year, df_national_filtered_year, "Dom")
-    df_total_year = compile_data_market_share(df_preprocessed_filtered_year, df_national_filtered_year, "Total")
+    df_total_year = compile_data_market_share(df_preprocessed_filtered_year, df_national_filtered_year, "Total",
+                                              df_inc_year, df_out_year, df_dom_year)
 
     st.dataframe(df_out, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
@@ -98,8 +99,8 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     st.info("*Market Share merupakan Persentase Market Share Transaksi Jakarta terhadap Transaksi Nasional")
 
     st.subheader(f"Market Share PJP Jakarta LR All-Time ({selected_year_pjp} - {max_year})")
-    # st.dataframe(df_national_filtered_year)
-    # st.dataframe(df_preprocessed_filtered_year)
+    st.dataframe(df_national_filtered_year)
+    st.dataframe(df_preprocessed_filtered_year)
     st.dataframe(df_out_year, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:

@@ -385,8 +385,8 @@ def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_ty
 
     return pd.DataFrame(data)
 
-def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_type: str) -> pd.DataFrame:
-    df_copy = df.copy()
+def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_type: str, df_inc: pd.DataFrame = None,
+                              df_out: pd.DataFrame = None, df_dom: pd.DataFrame = None) -> pd.DataFrame:
     if trx_type == "Inc":
         trx_word = "Incoming"
     elif trx_type == "Out":
@@ -394,14 +394,23 @@ def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_t
     elif trx_type == "Dom":
         trx_word = "Domestik"
     else:
-        df_copy.rename(columns={"Sum of Total Nom" : "Sum of Fin Nilai Total"}, inplace=True)
-        df_copy['Sum of Fin Jumlah Total'] = df_copy['Sum of Fin Jumlah Inc'].sum() + df_copy['Sum of Fin Jumlah Out'].sum() + df_copy['Sum of Fin Jumlah Dom'].sum()
         trx_word = "Total"
 
-    nominal_jkt = (df_copy[f'Sum of Fin Nilai {trx_type}'].sum() / 1_000_000_000_000).round(2)
-    frek_jkt = (df_copy[f'Sum of Fin Jumlah {trx_type}'].sum() / 1_000_000).round(2)
-    nominal_nasional = (df_national[f'Nom Nasional {trx_type}'].sum()/ 1_000).round(2)
-    frek_nasional = (df_national[f'Frek Nasional {trx_type}'].sum() / 1_000_000).round(2)
+    if trx_type == "Total":
+        nominal_jkt = df_inc['Nominal (dalam triliun)'].values[0] + df_out['Nominal (dalam triliun)'].values[0] + \
+                      df_dom['Nominal (dalam triliun)'].values[0]
+        frek_jkt = df_inc['Frekuensi (dalam jutaan)'].values[0] + df_out['Frekuensi (dalam jutaan)'].values[0] + \
+                   df_dom['Frekuensi (dalam jutaan)'].values[0]
+        nominal_nasional = df_inc['Nominal (dalam triliun)'].values[1] + df_out['Nominal (dalam triliun)'].values[1] + \
+                           df_dom['Nominal (dalam triliun)'].values[1]
+        frek_nasional = df_inc['Frekuensi (dalam jutaan)'].values[1] + df_out['Frekuensi (dalam jutaan)'].values[1] + \
+                        df_dom['Frekuensi (dalam jutaan)'].values[1]
+    else:
+        nominal_jkt = (df[f'Sum of Fin Nilai {trx_type}'].sum() / 1_000_000_000_000).round(2)
+        frek_jkt = (df[f'Sum of Fin Jumlah {trx_type}'].sum() / 1_000_000).round(2)
+        nominal_nasional = (df_national[f'Nom Nasional {trx_type}'].sum() / 1_000).round(2)
+        frek_nasional = (df_national[f'Frek Nasional {trx_type}'].sum() / 1_000_000).round(2)
+
     data = {
         f"Transaksi {trx_word}": ['Jakarta', 'Nasional', 'Market Share (%)'],
         "Nominal (dalam triliun)": [nominal_jkt, nominal_nasional,
