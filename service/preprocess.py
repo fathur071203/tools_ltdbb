@@ -79,7 +79,7 @@ def set_page_settings():
     ]
     st.set_page_config(
         page_title="Tools Analisa Data LTDBB",
-        page_icon="./static/favicon.png",
+        page_icon="https://github.com/user-attachments/assets/ef3e77f5-47e7-4042-a5e7-f6be4347b6bf",
         layout="wide",
         initial_sidebar_state="expanded")
     pg = st.navigation(pages=pages)
@@ -89,7 +89,7 @@ def set_page_settings():
 def set_page_visuals():
     st.title('Data LTDBB PJP LR JKT Visualization')
     with st.sidebar:
-        st.image("./static/Logo.png")
+        st.image("https://github.com/user-attachments/assets/bba29ea5-5708-40f4-bb94-f8652690e4c3")
 
 
 def aggregate_data(df, is_trx=False):
