@@ -70,25 +70,26 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
                                               df_inc_year, df_out_year, df_dom_year)
 
     st.dataframe(df_out, hide_index=True, use_container_width=True)
+    st.info("*Market Share merupakan Persentase Market Share Transaksi Jakarta terhadap Transaksi Nasional")
     col1, col2 = st.columns(2)
     with col1:
-        make_pie_chart_market_share(df_out, "Out", is_nom=True)
+        make_pie_chart_market_share(df_out, "Outgoing", is_nom=True)
     with col2:
-        make_pie_chart_market_share(df_out, "Out", is_nom=False)
+        make_pie_chart_market_share(df_out, "Outgoing", is_nom=False)
     st.divider()
     st.dataframe(df_inc, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
-        make_pie_chart_market_share(df_inc, "Inc", is_nom=True)
+        make_pie_chart_market_share(df_inc, "Incoming", is_nom=True)
     with col2:
-        make_pie_chart_market_share(df_inc, "Inc", is_nom=False)
+        make_pie_chart_market_share(df_inc, "Incoming", is_nom=False)
     st.divider()
     st.dataframe(df_dom, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
-        make_pie_chart_market_share(df_dom, "Dom", is_nom=True)
+        make_pie_chart_market_share(df_dom, "Domestik", is_nom=True)
     with col2:
-        make_pie_chart_market_share(df_dom, "Dom", is_nom=False)
+        make_pie_chart_market_share(df_dom, "Domestik", is_nom=False)
     st.divider()
     st.dataframe(df_total, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
@@ -96,31 +97,30 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         make_pie_chart_market_share(df_total, "Total", is_nom=True)
     with col2:
         make_pie_chart_market_share(df_total, "Total", is_nom=False)
-    st.info("*Market Share merupakan Persentase Market Share Transaksi Jakarta terhadap Transaksi Nasional")
 
     st.subheader(f"Market Share PJP Jakarta LR All-Time ({selected_year_pjp} - {max_year})")
-    st.dataframe(df_national_filtered_year)
-    st.dataframe(df_preprocessed_filtered_year)
     st.dataframe(df_out_year, hide_index=True, use_container_width=True)
+    st.info("*Market Share merupakan Persentase Market Share Transaksi Jakarta terhadap Transaksi Nasional.")
+    st.warning("Pada bagian ini, hanya Filter Profile (Year) yang berpengaruh terhadap data yang ditampilkan.")
     col1, col2 = st.columns(2)
     with col1:
-        make_pie_chart_market_share(df_out_year, "Out", is_nom=True)
+        make_pie_chart_market_share(df_out_year, "Outgoing", is_nom=True)
     with col2:
-        make_pie_chart_market_share(df_out_year, "Out", is_nom=False)
+        make_pie_chart_market_share(df_out_year, "Outgoing", is_nom=False)
     st.divider()
     st.dataframe(df_inc_year, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
-        make_pie_chart_market_share(df_inc_year, "Inc", is_nom=True)
+        make_pie_chart_market_share(df_inc_year, "Incoming", is_nom=True)
     with col2:
-        make_pie_chart_market_share(df_inc_year, "Inc", is_nom=False)
+        make_pie_chart_market_share(df_inc_year, "Incoming", is_nom=False)
     st.divider()
     st.dataframe(df_dom_year, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
-        make_pie_chart_market_share(df_dom_year, "Dom", is_nom=True)
+        make_pie_chart_market_share(df_dom_year, "Domestik", is_nom=True)
     with col2:
-        make_pie_chart_market_share(df_dom_year, "Dom", is_nom=False)
+        make_pie_chart_market_share(df_dom_year, "Domestik", is_nom=False)
     st.divider()
     st.dataframe(df_total_year, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
@@ -128,3 +128,5 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         make_pie_chart_market_share(df_total_year, "Total", is_nom=True)
     with col2:
         make_pie_chart_market_share(df_total_year, "Total", is_nom=False)
+else:
+    st.warning("Please Upload the Main Excel File first in the Summary Section.")

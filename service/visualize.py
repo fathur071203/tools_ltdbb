@@ -18,14 +18,10 @@ def make_pie_chart_summary(df, top_n):
                  values='Market Share (%)',
                  names='Nama PJP',
                  title=f'Top {top_n} PJPs by Market Share (Including Others)',
-                 template='plotly_dark')
+                 template='seaborn')
 
-    fig.update_traces(hovertemplate='%{label}: %{value:.2f}%')
-
-    fig.update_layout(
-        title=f"Top {top_n} PJPs by Market Share (Including Others)",
-        template="plotly_white"
-    )
+    fig.update_traces(hovertemplate='%{label}: %{value:.2f}%',
+                      textfont=dict(color='white'))
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -52,7 +48,8 @@ def make_pie_chart_market_share(df: pd.DataFrame, trx_type: str ,is_nom: bool = 
                  title=f'Market Share {text} {trx_type} Jakarta VS National',
                  template='seaborn')
 
-    fig.update_traces(hovertemplate='%{label}: %{value:.2f}%')
+    fig.update_traces(hovertemplate='%{label}: %{value:.2f}%',
+                      textfont=dict(color='white'))
 
     st.plotly_chart(fig, use_container_width=True)
 

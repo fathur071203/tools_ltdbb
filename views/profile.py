@@ -45,7 +45,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     }).reset_index()
 
     if selected_pjp == 'All' or selected_year_pjp == 'All':
-        st.warning("Please Select PJP and Year to show the PJP's Profile")
+        st.warning("Please Select PJP and Year to show the PJP's Profile.")
     else:
         df_grouped_filtered_year = filter_data(df_preprocessed_grouped_year, selected_pjp, selected_year_pjp)
         df_grouped_national_filtered_year = filter_data(df_national_preprocessed_year, selected_year=selected_year_pjp)
@@ -90,3 +90,5 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         make_combined_bar_line_chart_profile(df_domestic_month, "Dom", selected_pjp, selected_year_pjp)
         make_combined_bar_line_chart_profile(df_incoming_month, "Inc", selected_pjp, selected_year_pjp)
         make_combined_bar_line_chart_profile(df_outgoing_month, "Out", selected_pjp, selected_year_pjp)
+else:
+    st.warning("Please Upload the Main Excel File first in the Summary Section.")

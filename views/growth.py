@@ -85,19 +85,19 @@ if st.session_state['df'] is not None:
         st.header("Growth in Transactions")
         if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
             st.markdown("### 📥 Incoming Transactions")
-            st.dataframe(df_inc_combined, use_container_width=True)
+            st.dataframe(df_inc_combined, use_container_width=True, hide_index=True)
             make_combined_bar_line_chart(df_jumlah_inc_filtered, "Jumlah", "Inc")
             make_combined_bar_line_chart(df_nom_inc_filtered, "Nilai", "Inc")
 
         if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
             st.markdown("### 📤 Outgoing Transactions")
-            st.dataframe(df_out_combined, use_container_width=True)
+            st.dataframe(df_out_combined, use_container_width=True, hide_index=True)
             make_combined_bar_line_chart(df_jumlah_out_filtered, "Jumlah", "Out")
             make_combined_bar_line_chart(df_nom_out_filtered, "Nilai", "Out")
 
         if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
             st.markdown("### 🇮🇩 Domestik Transactions")
-            st.dataframe(df_dom_combined, use_container_width=True)
+            st.dataframe(df_dom_combined, use_container_width=True, hide_index=True)
             make_combined_bar_line_chart(df_jumlah_dom_filtered, "Jumlah", "Dom")
             make_combined_bar_line_chart(df_nom_dom_filtered, "Nilai", "Dom")
 
@@ -106,15 +106,15 @@ if st.session_state['df'] is not None:
         if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
             with col1:
                 st.markdown("### 📥 Incoming (Monthly)")
-                st.dataframe(df_inc_combined_month, use_container_width=True)
+                st.dataframe(df_inc_combined_month, use_container_width=True, hide_index=True)
         if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
             with col2:
                 st.markdown("### 📤 Outgoing (Monthly)")
-                st.dataframe(df_out_combined_month, use_container_width=True)
+                st.dataframe(df_out_combined_month, use_container_width=True, hide_index=True)
         if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
             with col3:
                 st.markdown("### 🇮🇩 Domestik (Monthly)")
-                st.dataframe(df_dom_combined_month, use_container_width=True)
+                st.dataframe(df_dom_combined_month, use_container_width=True, hide_index=True)
 
         make_combined_bar_line_chart(df_jumlah_inc_month_filtered, "Jumlah", "Inc", True)
         make_combined_bar_line_chart(df_nom_inc_month_filtered, "Nilai", "Inc", True)
@@ -127,7 +127,7 @@ if st.session_state['df'] is not None:
 
         st.subheader("🔍 Overall Summary")
         st.write("Here is a combined view of the total transaction counts and values across all types.")
-        st.dataframe(df_total_combined, use_container_width=True)
+        st.dataframe(df_total_combined, use_container_width=True, hide_index=True)
 
         st.markdown("### 📊 Total Transactions Overview")
         make_combined_bar_line_chart(df_total_combined, "Jumlah", "Total", False, True)
@@ -135,8 +135,10 @@ if st.session_state['df'] is not None:
 
         st.subheader("🔍 Overall Summary (Monthly)")
         st.write("Here is a combined view of the total transaction counts and values across all types.")
-        st.dataframe(df_total_month_combined, use_container_width=True)
+        st.dataframe(df_total_month_combined, use_container_width=True, hide_index=True)
 
         st.markdown("### 📊 Total Transactions Overview (Monthly)")
         make_combined_bar_line_chart(df_total_month_combined, "Jumlah", "Total", True, True)
         make_combined_bar_line_chart(df_total_month_combined, "Nilai", "Total", True, True)
+else:
+    st.warning("Please Upload the Main Excel File first in the Summary Section.")

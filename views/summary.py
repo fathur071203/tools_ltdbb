@@ -15,7 +15,9 @@ if 'df_national' not in st.session_state:
 if 'file_name' not in st.session_state:
     st.session_state['file_name'] = None
 
-uploaded_file = st.file_uploader("Choose an Excel file")
+uploaded_file = st.file_uploader("Choose an Excel file",
+                                 type=["xlsx", "xls"],
+                                 help="Pastikan upload file Excel Data LTDBB PJP LR JKT yang memiliki dua worksheet, yaitu: 'Trx_PJPJKT' dan 'Raw_JKTNasional'.")
 
 if uploaded_file is not None:
     file_name = uploaded_file.name
@@ -33,7 +35,7 @@ else:
     df = st.session_state['df']
     df_national = st.session_state['df_national']
 
-if df is not None:
+if df is not None and df_national is not None:
     pjp_list = ['All'] + df['Nama PJP'].unique().tolist()
     years = ['All'] + list(df['Year'].unique())
     quarters = ['All'] + list(df['Quarter'].unique())
@@ -107,7 +109,7 @@ if df is not None:
     with col3:
         make_grouped_bar_chart(df_sum_time, "Nilai", is_month)
 
-    st.dataframe(df_sum_time, use_container_width=True)
+    st.dataframe(df_sum_time, use_container_width=True, hide_index=True)
 
     df_grand_totals = pd.DataFrame({
         'Category': ['Incoming', 'Outgoing', 'Domestic', 'All'],
@@ -118,4 +120,4 @@ if df is not None:
     })
     st.dataframe(df_grand_totals.set_index(df_grand_totals.columns[0]), use_container_width=True)
 else:
-    st.warning("You Must Upload a CSV or Excel File")
+    st.warning("You Must Upload an Excel File.")

@@ -9,7 +9,14 @@ def load_data(uploaded_file, is_trx_nasional: bool = False):
     sheet_name = 'Trx_PJPJKT'
     if is_trx_nasional:
         sheet_name = 'Raw_JKTNasional'
-    df = pd.read_excel(uploaded_file, sheet_name)
+    try:
+        df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
+    except ValueError as e:
+        st.error(f"Sheet '{sheet_name}' not found in the uploaded file. Please upload the file according to the format.")
+        return None
+    except Exception as e:
+        st.error(f"An error occurred while loading the data: {e}")
+        return None
     return df
 
 
