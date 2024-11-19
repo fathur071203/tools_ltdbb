@@ -3,7 +3,6 @@ import streamlit as st
 import calendar
 import numpy as np
 
-
 @st.cache_data
 def load_data(uploaded_file, is_trx_nasional: bool = False):
     sheet_name = 'Trx_PJPJKT'
@@ -76,6 +75,7 @@ def set_page_settings():
         st.Page(page="views/growth.py", title="Growth"),
         st.Page(page="views/profile.py", title="Profile"),
         st.Page(page="views/market_share.py", title="Market Share"),
+        st.Page(page="views/fraud.py", title="Analisis TKM"),
     ]
     st.set_page_config(
         page_title="Tools Analisa Data LTDBB",
@@ -86,11 +86,13 @@ def set_page_settings():
     pg.run()
 
 
-def set_page_visuals():
-    st.title('Data LTDBB PJP LR JKT Visualization')
+def set_page_visuals(condition):
+    if condition == "viz":
+        st.title('Data LTDBB PJP LR JKT Visualization')
+    elif condition == "fds":
+        st.title('Analisis Transaksi Keuangan Mencurigakan (TKM)')
     with st.sidebar:
         st.image("https://github.com/user-attachments/assets/bba29ea5-5708-40f4-bb94-f8652690e4c3")
-
 
 def aggregate_data(df, is_trx=False):
     if is_trx:

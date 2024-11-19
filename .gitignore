@@ -192,4 +192,4 @@ file/
 *.png
 *.jpg
 *.jpeg
-.streamlit/*
+.streamlit/secrets.toml

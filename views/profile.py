@@ -6,7 +6,7 @@ from service.preprocess import *
 from service.visualize import *
 
 # Initial Page Setup
-set_page_visuals()
+set_page_visuals("viz")
 
 if st.session_state['df_national'] is not None and st.session_state['df'] is not None:
     df_national = st.session_state['df_national']

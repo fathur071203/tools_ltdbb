@@ -6,7 +6,7 @@ from service.preprocess import *
 from service.visualize import *
 
 # Initial Page Setup
-set_page_visuals()
+set_page_visuals("viz")
 
 if 'df' not in st.session_state:
     st.session_state['df'] = None
