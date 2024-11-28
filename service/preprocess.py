@@ -76,6 +76,7 @@ def set_page_settings():
         st.Page(page="views/profile.py", title="Profile"),
         st.Page(page="views/market_share.py", title="Market Share"),
         st.Page(page="views/fraud.py", title="Analisis TKM"),
+        st.Page(page="views/manage_data.py", title="Kelola Data")
     ]
     st.set_page_config(
         page_title="Tools Analisa Data LTDBB",
@@ -91,6 +92,8 @@ def set_page_visuals(condition):
         st.title('Data LTDBB PJP LR JKT Visualization')
     elif condition == "fds":
         st.title('Analisis Transaksi Keuangan Mencurigakan (TKM)')
+    elif condition == "dm":
+        st.title('Kelola Data Sistem')
     with st.sidebar:
         st.image("https://github.com/user-attachments/assets/bba29ea5-5708-40f4-bb94-f8652690e4c3")
 
