@@ -2,7 +2,7 @@ import streamlit as st
 from service.preprocess import set_page_visuals
 from service.fds import load_models, read_excel, read_parquets, split_df, get_ml_model
 from datetime import datetime
-from service.database import connect_db
+from service.database import connect_db, get_pjp_jkt
 
 # Initial Page Setup
 set_page_visuals("fds")
@@ -66,12 +66,8 @@ if st.session_state["date_submitted"]:
 if st.session_state["uploaded_files"]:
     success_placeholder.empty()
     uploaded_files = st.session_state["uploaded_files"]
-    file_name = uploaded_files.name
     try:
-        if file_name.endswith(".parquet"):
-            df = read_parquets(uploaded_files)
-        else:
-            df = read_excel(uploaded_files)
+        df = read_parquets(uploaded_files)
 
         df.reset_index(inplace=True)
 
@@ -101,18 +97,24 @@ if st.session_state["uploaded_files"]:
 
         num_of_rows = len(df)
 
+        # Filter df
+        list_pjp = get_pjp_jkt(db)
+
         col1, col2 = st.columns(2)
         with col1:
             st.write(f"**Jumlah Data Transaksi**: {num_of_rows:,}")
 
         if df_split:
             for key in df_split.keys():
+                indx = int(key) - 1
                 selected_df_split = df_split[key][predict_cols].copy()
                 original_index = df_split[key].index
-                predictions = selected_model.predict(selected_df_split)
+                predictions = selected_model[indx].predict(selected_df_split)
+                negative_predictions_count = sum(pred == -1 for pred in predictions)
+                print(f"Number of negative predictions (-1): {negative_predictions_count}")
                 df.loc[original_index, 'PREDICTED'] = predictions
         else:
-            predictions = selected_model.predict(df[predict_cols])
+            predictions = selected_model[0].predict(df[predict_cols])
             df['PREDICTED'] = predictions
         negative_predictions = df[df['PREDICTED'] == -1]
         st.warning(f"Found {len(negative_predictions)} transactions with negative predictions (-1).")

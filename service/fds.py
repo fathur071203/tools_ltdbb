@@ -34,9 +34,12 @@ def get_unique_tujuan(df) -> pd.DataFrame:
 
 def get_ml_model(tipe_trx: str, models: dict):
     tipe_trx = tipe_trx.lower()[:3]
+    list_models = []
     for key in models.keys():
         if tipe_trx in key:
-            return models.get(key)
+            print(models.get(key))
+            list_models.append(models.get(key))
+    return list_models
 
 def check_df_null(df):
     col_na = df.isnull().sum().sort_values(ascending=True)
