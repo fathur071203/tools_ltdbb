@@ -33,3 +33,7 @@ def update_pjp(_db, pjp_code_src: str, pjp_code: str, pjp_name: str, pjp_second_
          "updated_at": updated_at}
     ).eq("code", pjp_code_src).execute()
     return request
+
+def delete_pjp(_db, pjp_code: str):
+    request = _db.table("pjp_reference").delete().eq("code", pjp_code).execute()
+    return request
