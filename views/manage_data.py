@@ -10,6 +10,11 @@ def update_selected_update_pjp(code: str, list_pjp_db):
         if pjp_db["code"] == code:
             return pjp_db
 
+def update_selected_city(code: str, list_city_db):
+    for city_db in list_city_db:
+        if city_db["code"] == code:
+            return city_db
+
 # Initial Page Setup
 set_page_visuals("dm")
 
@@ -17,7 +22,7 @@ db = connect_db()
 
 st.markdown("### Kelola Data PJP")
 list_pjp = get_pjp_jkt(db).copy()
-edited_df = st.data_editor(
+df_pjp = st.data_editor(
     list_pjp,
     column_config={
         "code" : "Kode Penyelenggara",
@@ -44,10 +49,10 @@ with col1:
                 st.warning("Kode PJP hanya angka yang diperbolehkan!")
             else:
                 try:
-                    request = inset_new_pjp(db, pjp_code, pjp_name, pjp_second_name, pjp_pt_name)
+                    request = insert_new_pjp(db, pjp_code, pjp_name, pjp_second_name, pjp_pt_name)
                     if request.data is not None:
                         st.success("Data PJP Baru telah berhasil disimpan!")
-                        time.sleep(2)
+                        time.sleep(1.5)
                         streamlit_js_eval(js_expressions="parent.window.location.reload()")
                 except Exception as e:
                     if 'duplicate key value violates unique constraint' in str(e):
@@ -86,7 +91,7 @@ with col2:
         if submitted_update:
             if not update_code_pjp or not update_name_pjp or not update_second_name_pjp or not update_pt_name_pjp:
                 st.error("Semua field harus diisi!")
-            elif pjp_code and not pjp_code.isdigit():
+            elif update_code_pjp and not update_code_pjp.isdigit():
                 st.warning("Kode PJP hanya angka yang diperbolehkan!")
             else:
                 try:
@@ -94,7 +99,7 @@ with col2:
                                          update_pt_name_pjp)
                     if request.data is not None:
                         st.success("Data PJP telah berhasil diubah!")
-                        time.sleep(2)
+                        time.sleep(1.5)
                         streamlit_js_eval(js_expressions="parent.window.location.reload()")
                 except Exception as e:
                     if 'duplicate key value violates unique constraint' in str(e):
@@ -105,10 +110,109 @@ with col2:
         elif submitted_delete:
             try:
                 request = delete_pjp(db, selected_code)
-                print(request)
                 if request.data is not None:
                     st.success("Data PJP telah berhasil dihapus!")
-                    time.sleep(2)
+                    time.sleep(1.5)
                     streamlit_js_eval(js_expressions="parent.window.location.reload()")
             except Exception as e:
                 st.error(f"Terdapat Error dalam memasukkan PJP baru ke Database: {e}")
+
+st.markdown("### Kelola Data Referensi Kota")
+
+list_cities = get_city_ref(db)
+list_provinces = get_province_ref(db)
+
+options_province = transform_options_province(list_provinces)
+df_cities = st.data_editor(
+    list_cities,
+    column_config={
+        "code" : "Kode Kota",
+        "name" : "Nama Kota",
+        "province_reference": "Provinsi Kota",
+    },
+    use_container_width=True,
+    hide_index=False
+)
+col3, col4 = st.columns(2)
+with col3:
+    st.markdown("#### Tambah Data Kota Baru")
+    with st.form(key='add_city_form', enter_to_submit=False, clear_on_submit=True):
+        city_code = st.text_input("Kode Kota", key="city_code", help="Isian harus berupa angka")
+        city_name = st.text_input("Nama Kota", key='city_name')
+        city_province = st.selectbox("Pilih Provinsi Kota", key='city_province', options=options_province)
+        submitted_insert_city = st.form_submit_button("Submit", use_container_width=True, type="secondary")
+        if submitted_insert_city:
+            if not city_code or not city_name or not city_province:
+                st.error("Semua field harus diisi!")
+            elif city_code and not city_code.isdigit():
+                st.warning("Kode Kota hanya angka yang diperbolehkan!")
+            else:
+                try:
+                    prov_code = transform_prov_name_to_prov_code(list_provinces, city_province)
+                    request = insert_new_city(db, city_code, city_name, prov_code)
+                    if request.data is not None:
+                        st.success("Data Kota Baru telah berhasil disimpan!")
+                        time.sleep(1.5)
+                        streamlit_js_eval(js_expressions="parent.window.location.reload()")
+                except Exception as e:
+                    if 'duplicate key value violates unique constraint' in str(e):
+                        st.error(
+                            "Terdapat Error dalam memasukkan Kota baru ke Database: Kode Kota yang sama sudah tersimpan pada database")
+                    else:
+                        st.error(f"Terdapat Error dalam memasukkan Kota baru ke Database: {e}")
+with col4:
+    st.markdown("#### Update Data Kota")
+    list_name_cities = []
+    for city in list_cities:
+        list_name_cities.append(f"{city['code']}-{city['name']}")
+    selected_city_update = st.selectbox("Pilih Kota yang ingin diubah: ", options=list_name_cities,
+                                       key="selected_city_update", index=0)
+    st.info("Pilihan Kota berdasarkan format <Kode Kota>-<Nama Kota>")
+    if selected_city_update:
+        # TODO: Belum handle kalo selected_city == None
+        selected_city_code = selected_city_update.split('-')[0]
+        selected_city = update_selected_city(selected_city_code, list_cities)
+        print(selected_city)
+        index_select_update_prov = get_index_options_province(options_province, selected_city['province_reference'])
+    with st.form(key='update_city_form', enter_to_submit=False, clear_on_submit=True):
+        update_city_code = st.text_input("Kode Kota",
+                                        key="update_code_city",
+                                        help="Isian harus berupa angka", value=selected_city['code'])
+        update_city_name = st.text_input("Nama Kota", key='update_name_city', value=selected_city['name'])
+        update_city_province = st.selectbox("Pilih Provinsi Kota", key='update_city_province', options=options_province
+                                            , index=index_select_update_prov)
+
+        col5, col6 = st.columns(2)
+        with col5:
+            submitted_update = st.form_submit_button("Update", use_container_width=True, type="secondary")
+        with col6:
+            submitted_delete = st.form_submit_button("Delete", use_container_width=True, type="primary")
+
+        if submitted_update:
+            if not update_city_code or not update_city_name or not update_city_province:
+                st.error("Semua field harus diisi!")
+            elif update_city_code and not update_city_code.isdigit():
+                st.warning("Kode Kota hanya angka yang diperbolehkan!")
+            else:
+                try:
+                    prov_code = transform_prov_name_to_prov_code(list_provinces, update_city_province)
+                    request = update_city(db, selected_city_code, update_city_code, update_city_name, prov_code)
+                    if request.data is not None:
+                        st.success("Data Kota telah berhasil diubah!")
+                        time.sleep(1.5)
+                        streamlit_js_eval(js_expressions="parent.window.location.reload()")
+                except Exception as e:
+                    if 'duplicate key value violates unique constraint' in str(e):
+                        st.error(
+                            "Terdapat Error dalam memasukkan Kota baru ke Database: Kode Kota yang sama sudah tersimpan pada database")
+                    else:
+                        st.error(f"Terdapat Error dalam memasukkan Kota baru ke Database: {e}")
+        elif submitted_delete:
+            try:
+                request = delete_city(db, selected_city_code)
+                if request.data is not None:
+                    st.success("Data Kota telah berhasil dihapus!")
+                    time.sleep(1.5)
+                    streamlit_js_eval(js_expressions="parent.window.location.reload()")
+            except Exception as e:
+                st.error(f"Terdapat Error dalam memasukkan Kota baru ke Database: {e}")
