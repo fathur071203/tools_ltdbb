@@ -31,7 +31,16 @@ def get_city_ref(_db):
 
 def get_province_ref(_db):
     response = _db.table("province_reference").select("code, name, country_reference(name)").execute()
-    return response.data
+    transformed_data = []
+    for province in response.data:
+        country_ref = province['country_reference']
+        province_entry = {
+            "code": province['code'],
+            "name": province['name'],
+            "country_reference": country_ref['name']
+        }
+        transformed_data.append(province_entry)
+    return transformed_data
 
 def transform_options_province(list_province):
     transformed_data = []
@@ -45,14 +54,6 @@ def get_index_options_province(options_provice, prov_name):
         if prov == prov_name:
             return index
 
-def insert_new_pjp(_db, pjp_code: str, pjp_name: str, pjp_second_name: str, pjp_pt_name: str):
-    request = _db.table("pjp_reference").insert(
-        {"code": pjp_code,
-         "name": pjp_name,
-         "second_name": pjp_second_name,
-         "pt_name": pjp_pt_name}).execute()
-    return request
-
 def transform_prov_name_to_prov_code(list_provinces, city_province):
     prov_code = None
     for prov in list_provinces:
@@ -61,11 +62,27 @@ def transform_prov_name_to_prov_code(list_provinces, city_province):
             break
     return prov_code
 
+def insert_new_pjp(_db, pjp_code: str, pjp_name: str, pjp_second_name: str, pjp_pt_name: str):
+    request = _db.table("pjp_reference").insert(
+        {"code": pjp_code,
+         "name": pjp_name,
+         "second_name": pjp_second_name,
+         "pt_name": pjp_pt_name}).execute()
+    return request
+
 def insert_new_city(_db, city_code: str, city_name: str, prov_code: str):
     request = _db.table("city_reference").insert(
         {"code": city_code,
          "name": city_name,
          "province_code": prov_code}
+    ).execute()
+    return request
+
+def insert_new_province(_db, prov_code: str, prov_name: str, country_code: str):
+    request = _db.table("province_reference").insert(
+        {"code": prov_code,
+         "name": prov_name,
+         "country_code": country_code}
     ).execute()
     return request
 
@@ -89,10 +106,26 @@ def update_city(_db, city_code_src: str, city_code: str, city_name: str, prov_co
     ).eq("code", city_code_src).execute()
     return request
 
+def update_province(_db, prov_code_src: str, prov_code: str, prov_name: str, country_code: str):
+    updated_at = datetime.now().isoformat()
+    request = _db.table("province_reference").update(
+        {
+            "code": prov_code,
+            "name": prov_name,
+            "country_code": country_code,
+            "updated_at": updated_at
+        }
+    ).eq("code", prov_code_src).execute()
+    return request
+
 def delete_pjp(_db, pjp_code: str):
     request = _db.table("pjp_reference").delete().eq("code", pjp_code).execute()
     return request
 
 def delete_city(_db, city_code: str):
     request = _db.table("city_reference").delete().eq("code", city_code).execute()
+    return request
+
+def delete_province(_db, prov_code: str):
+    request = _db.table("province_reference").delete().eq("code", prov_code).execute()
     return request
