@@ -20,6 +20,11 @@ def get_selected_prov(code: str, list_prov_db):
         if prov_db["code"] == code:
             return prov_db
 
+def get_selected_country(code: str, list_country_db):
+    for country_db in list_country_db:
+        if country_db["code"] == code:
+            return country_db
+
 # Initial Page Setup
 set_page_visuals("dm")
 
@@ -109,9 +114,9 @@ with col2:
                 except Exception as e:
                     if 'duplicate key value violates unique constraint' in str(e):
                         st.error(
-                            "Terdapat Error dalam memasukkan PJP baru ke Database: Kode PJP yang sama sudah tersimpan pada database")
+                            "Terdapat Error dalam mengupdate data PJP: Kode PJP yang sama sudah tersimpan pada database")
                     else:
-                        st.error(f"Terdapat Error dalam memasukkan PJP baru ke Database: {e}")
+                        st.error(f"Terdapat Error dalam mengupdate data PJP: {e}")
         elif submitted_delete:
             try:
                 request = delete_pjp(db, selected_code)
@@ -120,7 +125,7 @@ with col2:
                     time.sleep(1.5)
                     streamlit_js_eval(js_expressions="parent.window.location.reload()")
             except Exception as e:
-                st.error(f"Terdapat Error dalam memasukkan PJP baru ke Database: {e}")
+                st.error(f"Terdapat Error dalam menghapus data PJP: {e}")
 
 st.markdown("### Kelola Data Referensi Kota")
 
@@ -208,9 +213,9 @@ with col6:
                 except Exception as e:
                     if 'duplicate key value violates unique constraint' in str(e):
                         st.error(
-                            "Terdapat Error dalam memasukkan Kota baru ke Database: Kode Kota yang sama sudah tersimpan pada database")
+                            "Terdapat Error dalam mengupdate data Kota: Kode Kota yang sama sudah tersimpan pada database")
                     else:
-                        st.error(f"Terdapat Error dalam memasukkan Kota baru ke Database: {e}")
+                        st.error(f"Terdapat Error dalam mengupdate data Kota: {e}")
         elif submitted_delete:
             try:
                 request = delete_city(db, selected_city_code)
@@ -219,7 +224,7 @@ with col6:
                     time.sleep(1.5)
                     streamlit_js_eval(js_expressions="parent.window.location.reload()")
             except Exception as e:
-                st.error(f"Terdapat Error dalam memasukkan Kota baru ke Database: {e}")
+                st.error(f"Terdapat Error dalam menghapus data Kota dari Database: {e}")
 
 st.markdown("### Kelola Data Referensi Provinsi")
 
@@ -245,7 +250,7 @@ with col9:
             if not prov_code or not prov_name or not province_country:
                 st.error("Semua field harus diisi!")
             elif prov_code and not prov_code.isdigit():
-                st.warning("Kode Kota hanya angka yang diperbolehkan!")
+                st.warning("Kode Provinsi hanya angka yang diperbolehkan!")
             else:
                 try:
                     # Hardcode Indonesia code
@@ -290,7 +295,7 @@ with col10:
             if not update_prov_code or not update_prov_name or not update_prov_country:
                 st.error("Semua field harus diisi!")
             elif update_prov_code and not update_prov_code.isdigit():
-                st.warning("Kode Kota hanya angka yang diperbolehkan!")
+                st.warning("Kode Provinsi hanya angka yang diperbolehkan!")
             else:
                 try:
                     country_code = "ID"
@@ -302,15 +307,101 @@ with col10:
                 except Exception as e:
                     if 'duplicate key value violates unique constraint' in str(e):
                         st.error(
-                            "Terdapat Error dalam memasukkan Provinsi baru ke Database: Kode Provinsi yang sama sudah tersimpan pada database")
+                            "Terdapat Error dalam mengupdate data Provinsi: Kode Provinsi yang sama sudah tersimpan pada database")
                     else:
-                        st.error(f"Terdapat Error dalam memasukkan Provinsi baru ke Database: {e}")
+                        st.error(f"Terdapat Error dalam mengupdate data Provinsi: {e}")
         elif submitted_delete:
             try:
                 request = delete_province(db, selected_prov_code)
                 if request.data is not None:
-                    st.success("Data Kota telah berhasil dihapus!")
+                    st.success("Data Provinsi telah berhasil dihapus!")
                     time.sleep(1.5)
                     streamlit_js_eval(js_expressions="parent.window.location.reload()")
             except Exception as e:
-                st.error(f"Terdapat Error dalam memasukkan Kota baru ke Database: {e}")
+                st.error(f"Terdapat Error dalam menghapus Provinsi dari Database: {e}")
+
+st.markdown("### Kelola Data Referensi Negara")
+
+list_countries = get_country_ref(db)
+
+df_countries = st.data_editor(
+    list_countries,
+    column_config={
+        "code" : "Kode Negara",
+        "name" : "Nama Negara",
+    },
+    use_container_width=True,
+    hide_index=False
+)
+col13, col14 = st.columns(2)
+with col13:
+    st.markdown("#### Tambah Data Negara Baru")
+    with st.form(key='add_country_form', enter_to_submit=False, clear_on_submit=True):
+        country_code = st.text_input("Kode Negara", key="country_code", help="Isian harus berupa non-angka")
+        country_name = st.text_input("Nama Negara", key='country_name')
+        submitted_insert_country = st.form_submit_button("Submit", use_container_width=True, type="secondary")
+        if submitted_insert_country:
+            if not country_code or not country_name:
+                st.error("Semua field harus diisi!")
+            else:
+                try:
+                    request = insert_new_country(db, country_code, country_name)
+                    if request.data is not None:
+                        st.success("Data Negara Baru telah berhasil disimpan!")
+                        time.sleep(1.5)
+                        streamlit_js_eval(js_expressions="parent.window.location.reload()")
+                except Exception as e:
+                    if 'duplicate key value violates unique constraint' in str(e):
+                        st.error(
+                            "Terdapat Error dalam memasukkan Negara baru ke Database: Kode Negara yang sama sudah tersimpan pada database")
+                    else:
+                        st.error(f"Terdapat Error dalam memasukkan Negara baru ke Database: {e}")
+with col14:
+    st.markdown("#### Update Data Negara")
+    list_name_countries = []
+    for countries in list_countries:
+        list_name_countries.append(f"{countries['code']}-{countries['name']}")
+    selected_country_update = st.selectbox("Pilih Negara yang ingin diubah: ", options=list_name_countries,
+                                            key="selected_country_update", index=0)
+    st.info("Pilihan Negara berdasarkan format <Kode Negara>-<Nama Negara>")
+    if selected_country_update:
+        # TODO: Belum handle kalo selected_country == None
+        selected_country_code = selected_country_update.split('-')[0]
+        selected_country = get_selected_country(selected_country_code, list_countries)
+    with st.form(key='update_country_form', enter_to_submit=False, clear_on_submit=True):
+        update_country_code = st.text_input("Kode Negara",
+                                         key="update_country_code",
+                                         help="Isian harus berupa non-angka", value=selected_country['code'])
+        update_country_name = st.text_input("Nama Negara", key='update_country_name', value=selected_country['name'])
+
+        col15, col16 = st.columns(2)
+        with col15:
+            submitted_update = st.form_submit_button("Update", use_container_width=True, type="secondary")
+        with col16:
+            submitted_delete = st.form_submit_button("Delete", use_container_width=True, type="primary")
+
+        if submitted_update:
+            if not update_country_code or not update_country_name:
+                st.error("Semua field harus diisi!")
+            else:
+                try:
+                    request = update_country(db, selected_country_code, update_country_code, update_country_name)
+                    if request.data is not None:
+                        st.success("Data Negara telah berhasil diubah!")
+                        time.sleep(1.5)
+                        streamlit_js_eval(js_expressions="parent.window.location.reload()")
+                except Exception as e:
+                    if 'duplicate key value violates unique constraint' in str(e):
+                        st.error(
+                            "Terdapat Error dalam mengupdate data Negara: Kode Negara yang sama sudah tersimpan pada database")
+                    else:
+                        st.error(f"Terdapat Error dalam mengupdate data Negara: {e}")
+        elif submitted_delete:
+            try:
+                request = delete_country(db, selected_country_code)
+                if request.data is not None:
+                    st.success("Data Negara telah berhasil dihapus!")
+                    time.sleep(1.5)
+                    streamlit_js_eval(js_expressions="parent.window.location.reload()")
+            except Exception as e:
+                st.error(f"Terdapat Error dalam menghapus data Negara dari database: {e}")

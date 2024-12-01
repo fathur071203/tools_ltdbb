@@ -42,6 +42,10 @@ def get_province_ref(_db):
         transformed_data.append(province_entry)
     return transformed_data
 
+def get_country_ref(_db):
+    response = _db.table("country_reference").select("code, name").execute()
+    return response.data
+
 def transform_options_province(list_province):
     transformed_data = []
     for prov in list_province:
@@ -86,6 +90,13 @@ def insert_new_province(_db, prov_code: str, prov_name: str, country_code: str):
     ).execute()
     return request
 
+def insert_new_country(_db, country_code: str, country_name: str):
+    request = _db.table("country_reference").insert(
+        {"code": country_code,
+         "name": country_name}
+    ).execute()
+    return request
+
 def update_pjp(_db, pjp_code_src: str, pjp_code: str, pjp_name: str, pjp_second_name: str, pjp_pt_name: str):
     updated_at = datetime.now().isoformat()
     request = _db.table("pjp_reference").update(
@@ -118,6 +129,17 @@ def update_province(_db, prov_code_src: str, prov_code: str, prov_name: str, cou
     ).eq("code", prov_code_src).execute()
     return request
 
+def update_country(_db, country_code_src: str, country_code: str, country_name: str):
+    updated_at = datetime.now().isoformat()
+    request = _db.table("country_reference").update(
+        {
+            "code": country_code,
+            "name": country_name,
+            "updated_at": updated_at
+        }
+    ).eq("code", country_code_src).execute()
+    return request
+
 def delete_pjp(_db, pjp_code: str):
     request = _db.table("pjp_reference").delete().eq("code", pjp_code).execute()
     return request
@@ -128,4 +150,8 @@ def delete_city(_db, city_code: str):
 
 def delete_province(_db, prov_code: str):
     request = _db.table("province_reference").delete().eq("code", prov_code).execute()
+    return request
+
+def delete_country(_db, country_code: str):
+    request = _db.table("country_reference").delete().eq("code", country_code).execute()
     return request
