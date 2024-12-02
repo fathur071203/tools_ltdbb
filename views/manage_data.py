@@ -10,25 +10,30 @@ def get_selected_pjp(code: str, list_pjp_db):
         if pjp_db["code"] == code:
             return pjp_db
 
+
 def get_selected_city(code: str, list_city_db):
     for city_db in list_city_db:
         if city_db["code"] == code:
             return city_db
+
 
 def get_selected_prov(code: str, list_prov_db):
     for prov_db in list_prov_db:
         if prov_db["code"] == code:
             return prov_db
 
+
 def get_selected_country(code: str, list_country_db):
     for country_db in list_country_db:
         if country_db["code"] == code:
             return country_db
 
+
 def get_selected_person(name: str, list_person_db):
     for person_db in list_person_db:
         if person_db["name"] == name:
             return person_db
+
 
 # Initial Page Setup
 set_page_visuals("dm")
@@ -51,7 +56,6 @@ list_non_blacklisted = sorted(list_non_blacklisted, key=lambda x: x['name'])
 list_non_greylisted = sorted(list_non_greylisted, key=lambda x: x['name'])
 list_blacklisted = sorted(list_blacklisted, key=lambda x: x['name'])
 list_greylisted = sorted(list_greylisted, key=lambda x: x['name'])
-
 
 tab1, tab2 = st.tabs(["Kelola Data Tersangka/Mencurigakan", "Kelola Data Referensi"])
 
@@ -85,7 +89,8 @@ with tab1:
                             streamlit_js_eval(js_expressions="parent.window.location.reload()")
                     except Exception as e:
                         if 'duplicate key value violates unique constraint' in str(e):
-                            st.error("Terdapat Error dalam memasukkan Nama Tersangka baru ke Database: Nama yang sama sudah tersimpan pada database")
+                            st.error(
+                                "Terdapat Error dalam memasukkan Nama Tersangka baru ke Database: Nama yang sama sudah tersimpan pada database")
                         else:
                             st.error(f"Terdapat Error dalam memasukkan Data Orang Tersangka baru ke Database: {e}")
     with col_sus2:
@@ -94,13 +99,14 @@ with tab1:
         if len(list_sus_people) > 0:
             for person in list_sus_people:
                 options_sus_people.append(person['name'])
-            selected_person_update = st.selectbox("Pilih Nama Tersangka yang ingin diubah: ", options=options_sus_people,
-                                               key="selected_person_update", index=0)
+            selected_person_update = st.selectbox("Pilih Nama Tersangka yang ingin diubah: ",
+                                                  options=options_sus_people,
+                                                  key="selected_person_update", index=0)
             if selected_person_update:
                 selected_person = get_selected_person(selected_person_update, list_sus_people)
             with st.form(key='update_person_form', enter_to_submit=False, clear_on_submit=True):
                 update_person_name = st.text_input("Nama Tersangka",
-                                                key="update_person_name", value=selected_person['name'])
+                                                   key="update_person_name", value=selected_person['name'])
                 col_sus3, col_sus4 = st.columns(2)
                 with col_sus3:
                     submitted_update = st.form_submit_button("Update", use_container_width=True, type="secondary")
@@ -275,7 +281,7 @@ with tab1:
                 for country in list_blacklisted:
                     options_blacklisted_countries.append(f"{country['code']}-{country['name']}")
                 selected_delete_blacklisted_country = st.selectbox("Pilih Negara yang ingin dihilangkan blacklist-nya",
-                                                        options=options_blacklisted_countries)
+                                                                   options=options_blacklisted_countries)
                 submitted_del_blacklist = st.form_submit_button("Delete", use_container_width=True, type="primary")
                 if submitted_del_blacklist:
                     if not selected_delete_blacklisted_country:
@@ -321,7 +327,7 @@ with tab1:
                     "code": "Kode Negara",
                     "name": "Nama Negara"
                 },
-                key = "greylisted_countries",
+                key="greylisted_countries",
                 use_container_width=True
             )
 
@@ -331,7 +337,7 @@ with tab1:
                 for country in list_greylisted:
                     options_greylist_countries.append(f"{country['code']}-{country['name']}")
                 selected_delete_greylisted_country = st.selectbox("Pilih Negara yang ingin dihilangkan greylist-nya",
-                                                                   options=options_greylist_countries)
+                                                                  options=options_greylist_countries)
                 submitted_del_greylisted = st.form_submit_button("Delete", use_container_width=True, type="primary")
                 if submitted_del_greylisted:
                     if not selected_delete_greylisted_country:
@@ -354,7 +360,7 @@ with tab1:
             for country in list_non_greylisted:
                 options_insert_greylisted_countries.append(f"{country['code']}-{country['name']}")
             selected_greylisted_country = st.selectbox("Pilih Negara yang ingin di-greylist",
-                                                        options=options_insert_greylisted_countries)
+                                                       options=options_insert_greylisted_countries)
             submitted_greylist = st.form_submit_button("Submit", use_container_width=True, type="secondary")
             if submitted_greylist:
                 if not selected_greylisted_country:
@@ -375,10 +381,10 @@ with tab2:
     df_pjp = st.data_editor(
         list_pjp,
         column_config={
-            "code" : "Kode Penyelenggara",
-            "name" : "Nama Penyelenggara",
-            "second_name" : "Nama Penyelenggara 2",
-            "pt_name" : "Nama Penyelenggara PT"
+            "code": "Kode Penyelenggara",
+            "name": "Nama Penyelenggara",
+            "second_name": "Nama Penyelenggara 2",
+            "pt_name": "Nama Penyelenggara PT"
         },
         use_container_width=True,
         hide_index=False
@@ -390,7 +396,8 @@ with tab2:
             pjp_code = st.text_input("Kode PJP", key="pjp_code", help="Isian harus berupa angka")
             pjp_name = st.text_input("Nama PJP", key='pjp_name')
             pjp_second_name = st.text_input("Nama PJP Kedua", key='pjp_second_name', help="Nama kedua PJP (Jika ada)")
-            pjp_pt_name = st.text_input("Nama PJP (dalam PT)", key='pjp_pt_name', help="Nama PJP dengan PT sebagai awalan")
+            pjp_pt_name = st.text_input("Nama PJP (dalam PT)", key='pjp_pt_name',
+                                        help="Nama PJP dengan PT sebagai awalan")
             submitted_insert = st.form_submit_button("Submit", use_container_width=True, type="secondary")
             if submitted_insert:
                 if not pjp_code or not pjp_name or not pjp_second_name or not pjp_pt_name:
@@ -445,7 +452,8 @@ with tab2:
                     st.warning("Kode PJP hanya angka yang diperbolehkan!")
                 else:
                     try:
-                        request = update_pjp(db, selected_code, update_code_pjp, update_name_pjp, update_second_name_pjp,
+                        request = update_pjp(db, selected_code, update_code_pjp, update_name_pjp,
+                                             update_second_name_pjp,
                                              update_pt_name_pjp)
                         if request.data is not None:
                             st.success("Data PJP telah berhasil diubah!")
@@ -476,8 +484,8 @@ with tab2:
     df_cities = st.data_editor(
         list_cities,
         column_config={
-            "code" : "Kode Kota",
-            "name" : "Nama Kota",
+            "code": "Kode Kota",
+            "name": "Nama Kota",
             "province_reference": "Provinsi Kota",
         },
         use_container_width=True,
@@ -516,7 +524,7 @@ with tab2:
         for city in list_cities:
             list_name_cities.append(f"{city['code']}-{city['name']}")
         selected_city_update = st.selectbox("Pilih Kota yang ingin diubah: ", options=list_name_cities,
-                                           key="selected_city_update", index=0)
+                                            key="selected_city_update", index=0)
         st.info("Pilihan Kota berdasarkan format <Kode Kota>-<Nama Kota>")
         if selected_city_update:
             # TODO: Belum handle kalo selected_city == None
@@ -525,10 +533,11 @@ with tab2:
             index_select_update_prov = get_index_options_province(options_province, selected_city['province_reference'])
         with st.form(key='update_city_form', enter_to_submit=False, clear_on_submit=True):
             update_city_code = st.text_input("Kode Kota",
-                                            key="update_code_city",
-                                            help="Isian harus berupa angka", value=selected_city['code'])
+                                             key="update_code_city",
+                                             help="Isian harus berupa angka", value=selected_city['code'])
             update_city_name = st.text_input("Nama Kota", key='update_name_city', value=selected_city['name'])
-            update_city_province = st.selectbox("Pilih Provinsi Kota", key='update_city_province', options=options_province
+            update_city_province = st.selectbox("Pilih Provinsi Kota", key='update_city_province',
+                                                options=options_province
                                                 , index=index_select_update_prov)
 
             col7, col8 = st.columns(2)
@@ -571,8 +580,8 @@ with tab2:
     df_cities = st.data_editor(
         list_provinces,
         column_config={
-            "code" : "Kode Provinsi",
-            "name" : "Nama Provinsi",
+            "code": "Kode Provinsi",
+            "name": "Nama Provinsi",
             "country_reference": "Negara Kota",
         },
         use_container_width=True,
@@ -584,7 +593,8 @@ with tab2:
         with st.form(key='add_prov_form', enter_to_submit=False, clear_on_submit=True):
             prov_code = st.text_input("Kode Provinsi", key="prov_code", help="Isian harus berupa angka")
             prov_name = st.text_input("Nama Provinsi", key='prov_name')
-            province_country = st.selectbox("Pilih Negara Provinsi", key='province_country', options=['Indonesia'], disabled=True)
+            province_country = st.selectbox("Pilih Negara Provinsi", key='province_country', options=['Indonesia'],
+                                            disabled=True)
             submitted_insert_province = st.form_submit_button("Submit", use_container_width=True, type="secondary")
             if submitted_insert_province:
                 if not prov_code or not prov_name or not province_country:
@@ -612,7 +622,7 @@ with tab2:
         for province in list_provinces:
             list_name_provinces.append(f"{province['code']}-{province['name']}")
         selected_province_update = st.selectbox("Pilih Provinsi yang ingin diubah: ", options=list_name_provinces,
-                                            key="selected_province_update", index=0)
+                                                key="selected_province_update", index=0)
         st.info("Pilihan Provinsi berdasarkan format <Kode Provinsi>-<Nama Provinsi>")
         if selected_province_update:
             # TODO: Belum handle kalo selected_province == None
@@ -623,7 +633,8 @@ with tab2:
                                              key="update_prov_code",
                                              help="Isian harus berupa angka", value=selected_prov['code'])
             update_prov_name = st.text_input("Nama Provinsi", key='update_prov_name', value=selected_prov['name'])
-            update_prov_country = st.selectbox("Pilih Negara Kota", key='update_prov_country', options=['Indonesia'], disabled=True)
+            update_prov_country = st.selectbox("Pilih Negara Kota", key='update_prov_country', options=['Indonesia'],
+                                               disabled=True)
 
             col11, col12 = st.columns(2)
             with col11:
@@ -639,7 +650,8 @@ with tab2:
                 else:
                     try:
                         country_code = "ID"
-                        request = update_province(db, selected_prov_code, update_prov_code, update_prov_name, country_code)
+                        request = update_province(db, selected_prov_code, update_prov_code, update_prov_name,
+                                                  country_code)
                         if request.data is not None:
                             st.success("Data Provinsi telah berhasil diubah!")
                             time.sleep(1.5)
@@ -667,8 +679,8 @@ with tab2:
     df_countries = st.data_editor(
         list_countries,
         column_config={
-            "code" : "Kode Negara",
-            "name" : "Nama Negara",
+            "code": "Kode Negara",
+            "name": "Nama Negara",
         },
         use_container_width=True,
         hide_index=False
@@ -702,7 +714,7 @@ with tab2:
         for countries in list_countries:
             list_name_countries.append(f"{countries['code']}-{countries['name']}")
         selected_country_update = st.selectbox("Pilih Negara yang ingin diubah: ", options=list_name_countries,
-                                                key="selected_country_update", index=0)
+                                               key="selected_country_update", index=0)
         st.info("Pilihan Negara berdasarkan format <Kode Negara>-<Nama Negara>")
         if selected_country_update:
             # TODO: Belum handle kalo selected_country == None
@@ -710,9 +722,10 @@ with tab2:
             selected_country = get_selected_country(selected_country_code, list_countries)
         with st.form(key='update_country_form', enter_to_submit=False, clear_on_submit=True):
             update_country_code = st.text_input("Kode Negara",
-                                             key="update_country_code",
-                                             help="Isian harus berupa non-angka", value=selected_country['code'])
-            update_country_name = st.text_input("Nama Negara", key='update_country_name', value=selected_country['name'])
+                                                key="update_country_code",
+                                                help="Isian harus berupa non-angka", value=selected_country['code'])
+            update_country_name = st.text_input("Nama Negara", key='update_country_name',
+                                                value=selected_country['name'])
 
             col15, col16 = st.columns(2)
             with col15:

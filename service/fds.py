@@ -62,3 +62,9 @@ def split_df(df: pd.DataFrame, tipe_trx: str):
     for value in unique_values:
         df_split[value] = df[df[col] == value]
     return df_split
+
+def get_pjp_suspected_blacklisted_greylisted(df, list_pjp):
+    pjp_dict = {pjp['code']: pjp['name'] for pjp in list_pjp}
+    list_pjp_name = df['SANDI_PELAPOR'].apply(lambda code: pjp_dict.get(code, None)).dropna().tolist()
+    return list_pjp_name
+

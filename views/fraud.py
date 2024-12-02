@@ -1,8 +1,11 @@
 import streamlit as st
+import pandas as pd
 from service.preprocess import set_page_visuals
-from service.fds import load_models, read_excel, read_parquets, split_df, get_ml_model
+from service.fds import load_models, read_excel, read_parquets, split_df, get_ml_model, \
+    get_pjp_suspected_blacklisted_greylisted
 from datetime import datetime
-from service.database import connect_db, get_pjp_jkt, get_blacklisted_country, get_greylisted_country
+from service.database import connect_db, get_pjp_jkt, get_blacklisted_country, get_greylisted_country, get_sus_peoples
+from collections import Counter
 
 # Initial Page Setup
 set_page_visuals("fds")
@@ -12,6 +15,7 @@ db = connect_db()
 list_pjp_dki = get_pjp_jkt(db)
 list_blacklisted = get_blacklisted_country(db, True)
 list_greylisted = get_greylisted_country(db, True)
+list_sus_person = get_sus_peoples(db)
 
 list_code_blacklisted = []
 for country in list_blacklisted:
@@ -20,6 +24,10 @@ for country in list_blacklisted:
 list_code_greylisted = []
 for country in list_greylisted:
     list_code_greylisted.append(country['code'])
+
+list_name_sus_person = []
+for person in list_sus_person:
+    list_name_sus_person.append(person['name'])
 
 if "date_submitted" not in st.session_state:
     st.session_state["date_submitted"] = False
@@ -94,6 +102,10 @@ if st.session_state["uploaded_files"]:
         if form_no == "FORMG0001":
             df_blacklisted_filter = df[df['NEGARA_TUJUAN'].isin(list_code_blacklisted)]
             df_greylisted_filter = df[df['NEGARA_TUJUAN'].isin(list_code_greylisted)]
+            df_suspected_person_filter = df[
+                (df['NAMA_PENERIMA'].str.lower().isin([name.lower() for name in list_name_sus_person])) |
+                (df['NAMA_PENGIRIM'].str.lower().isin([name.lower() for name in list_name_sus_person]))
+                ]
             negara_text = "ke"
             tipe_laporan = "Outgoing"
             predict_cols = ['FREKUENSI', 'NOMINAL_TRX', 'TUJUAN']
@@ -102,6 +114,10 @@ if st.session_state["uploaded_files"]:
         elif form_no == "FORMG0002":
             df_blacklisted_filter = df[df['NEGARA_ASAL'].isin(list_code_blacklisted)]
             df_greylisted_filter = df[df['NEGARA_ASAL'].isin(list_code_greylisted)]
+            df_suspected_person_filter = df[
+                (df['NAMA_PENERIMA'].str.lower().isin([name.lower() for name in list_name_sus_person])) |
+                (df['NAMA_PENGIRIM'].str.lower().isin([name.lower() for name in list_name_sus_person]))
+                ]
             negara_text = "dari"
             tipe_laporan = "Incoming"
             predict_cols = ['FREKUENSI', 'NOMINAL_TRX']
@@ -111,6 +127,10 @@ if st.session_state["uploaded_files"]:
             df_blacklisted_filter = None
             df_greylisted_filter = None
             negara_text = None
+            df_suspected_person_filter = df[
+                (df['NAMA_PENERIMA'].str.lower().isin([name.lower() for name in list_name_sus_person])) |
+                (df['NAMA_PENGIRIM'].str.lower().isin([name.lower() for name in list_name_sus_person]))
+                ]
             tipe_laporan = "Domestik"
             predict_cols = ['FREKUENSI_PENGIRIMAN', 'NOMINAL_TRX', 'TUJUAN_TRX']
             selected_model = get_ml_model(tipe_laporan, models)
@@ -122,14 +142,12 @@ if st.session_state["uploaded_files"]:
         st.dataframe(df)
         st.markdown(f"### Informasi Data Transaksi")
 
-        num_of_rows = len(df)
-
         # Filter df
         list_pjp = get_pjp_jkt(db)
 
         col1, col2 = st.columns(2)
         with col1:
-            st.write(f"**Jumlah Data Transaksi**: {num_of_rows:,}")
+            st.write(f"**Jumlah Data Transaksi**: {len(df):,}")
 
         if df_split:
             for key in df_split.keys():
@@ -138,7 +156,6 @@ if st.session_state["uploaded_files"]:
                 original_index = df_split[key].index
                 predictions = selected_model[indx].predict(selected_df_split)
                 negative_predictions_count = sum(pred == -1 for pred in predictions)
-                print(f"Number of negative predictions (-1): {negative_predictions_count}")
                 df.loc[original_index, 'PREDICTED'] = predictions
         else:
             predictions = selected_model[0].predict(df[predict_cols])
@@ -147,17 +164,72 @@ if st.session_state["uploaded_files"]:
         st.warning(f"Found {len(negative_predictions)} transactions with negative predictions (-1).")
         st.dataframe(negative_predictions)
 
+        if not df_suspected_person_filter.empty:
+            st.markdown(f"### Informasi Transaksi dengan Nama Pengirim atau Nama Penerima Tersangka")
+            list_pjp_name = get_pjp_suspected_blacklisted_greylisted(df_suspected_person_filter, list_pjp_dki)
+            pjp_counts = Counter(list_pjp_name)
+
+            pjp_df = pd.DataFrame(pjp_counts.items(), columns=["PJP Name", "Count"])
+            pjp_df = pjp_df.sort_values(by="Count", ascending=False).reset_index(drop=True)
+
+            st.write(f"**Jumlah Data Transaksi**: {len(df_suspected_person_filter):,}")
+            df_sus_person = st.data_editor(
+                df_suspected_person_filter,
+                key="df_suspected_person"
+            )
+            st.write("**PJP Tersangka:**")
+            st.data_editor(
+                pjp_df,
+                hide_index=True,
+                column_config={
+                    "PJP Name": "Nama Penyelenggara",
+                    "Count": "Jumlah TKM"
+                },
+                use_container_width=False
+            )
         if not df_blacklisted_filter.empty:
             st.markdown(f"### Informasi Transaksi yang dilakukan {negara_text} Negara Blacklisted")
+            list_pjp_name = get_pjp_suspected_blacklisted_greylisted(df_blacklisted_filter, list_pjp_dki)
+            pjp_counts = Counter(list_pjp_name)
+
+            pjp_df = pd.DataFrame(pjp_counts.items(), columns=["PJP Name", "Count"])
+            pjp_df = pjp_df.sort_values(by="Count", ascending=False).reset_index(drop=True)
+            st.write(f"**Jumlah Data Transaksi**: {len(df_blacklisted_filter):,}")
             df_blacklisted = st.data_editor(
                 df_blacklisted_filter,
                 key="df_blacklisted"
             )
+            st.write("**PJP Tersangka:**")
+            st.data_editor(
+                pjp_df,
+                hide_index=True,
+                column_config={
+                    "PJP Name": "Nama Penyelenggara",
+                    "Count": "Jumlah TKM"
+                },
+                use_container_width=False
+            )
         if not df_greylisted_filter.empty:
             st.markdown(f"### Informasi Transaksi yang dilakukan {negara_text} Negara Greylisted")
+            list_pjp_name = get_pjp_suspected_blacklisted_greylisted(df_greylisted_filter, list_pjp_dki)
+            pjp_counts = Counter(list_pjp_name)
+
+            pjp_df = pd.DataFrame(pjp_counts.items(), columns=["PJP Name", "Count"])
+            pjp_df = pjp_df.sort_values(by="Count", ascending=False).reset_index(drop=True)
+            st.write(f"**Jumlah Data Transaksi**: {len(df_greylisted_filter):,}")
             df_greylisted = st.data_editor(
                 df_greylisted_filter,
                 key="df_greylisted"
+            )
+            st.write("**PJP Tersangka:**")
+            st.data_editor(
+                pjp_df,
+                hide_index=True,
+                column_config={
+                    "PJP Name": "Nama Penyelenggara",
+                    "Count": "Jumlah TKM"
+                },
+                use_container_width=False
             )
     except Exception as e:
         st.error(f"Error processing files: {e}")
