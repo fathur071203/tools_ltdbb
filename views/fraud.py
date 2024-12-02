@@ -2,12 +2,24 @@ import streamlit as st
 from service.preprocess import set_page_visuals
 from service.fds import load_models, read_excel, read_parquets, split_df, get_ml_model
 from datetime import datetime
-from service.database import connect_db, get_pjp_jkt
+from service.database import connect_db, get_pjp_jkt, get_blacklisted_country, get_greylisted_country
 
 # Initial Page Setup
 set_page_visuals("fds")
 
 db = connect_db()
+
+list_pjp_dki = get_pjp_jkt(db)
+list_blacklisted = get_blacklisted_country(db, True)
+list_greylisted = get_greylisted_country(db, True)
+
+list_code_blacklisted = []
+for country in list_blacklisted:
+    list_code_blacklisted.append(country['code'])
+
+list_code_greylisted = []
+for country in list_greylisted:
+    list_code_greylisted.append(country['code'])
 
 if "date_submitted" not in st.session_state:
     st.session_state["date_submitted"] = False
@@ -67,23 +79,38 @@ if st.session_state["uploaded_files"]:
     success_placeholder.empty()
     uploaded_files = st.session_state["uploaded_files"]
     try:
+        list_pjp_code_dki = []
+        for pjp in list_pjp_dki:
+            list_pjp_code_dki.append(pjp['code'])
+
         df = read_parquets(uploaded_files)
 
         df.reset_index(inplace=True)
 
+        df = df[df['SANDI_PELAPOR'].isin(list_pjp_code_dki)]
+
         # Determine the report type based on FORM_NO
         form_no = df['FORM_NO'].iloc[0]
         if form_no == "FORMG0001":
+            df_blacklisted_filter = df[df['NEGARA_TUJUAN'].isin(list_code_blacklisted)]
+            df_greylisted_filter = df[df['NEGARA_TUJUAN'].isin(list_code_greylisted)]
+            negara_text = "ke"
             tipe_laporan = "Outgoing"
             predict_cols = ['FREKUENSI', 'NOMINAL_TRX', 'TUJUAN']
             selected_model = get_ml_model(tipe_laporan, models)
             df_split = split_df(df, tipe_laporan)
         elif form_no == "FORMG0002":
+            df_blacklisted_filter = df[df['NEGARA_ASAL'].isin(list_code_blacklisted)]
+            df_greylisted_filter = df[df['NEGARA_ASAL'].isin(list_code_greylisted)]
+            negara_text = "dari"
             tipe_laporan = "Incoming"
             predict_cols = ['FREKUENSI', 'NOMINAL_TRX']
             selected_model = get_ml_model(tipe_laporan, models)
             df_split = None
         else:
+            df_blacklisted_filter = None
+            df_greylisted_filter = None
+            negara_text = None
             tipe_laporan = "Domestik"
             predict_cols = ['FREKUENSI_PENGIRIMAN', 'NOMINAL_TRX', 'TUJUAN_TRX']
             selected_model = get_ml_model(tipe_laporan, models)
@@ -119,5 +146,18 @@ if st.session_state["uploaded_files"]:
         negative_predictions = df[df['PREDICTED'] == -1]
         st.warning(f"Found {len(negative_predictions)} transactions with negative predictions (-1).")
         st.dataframe(negative_predictions)
+
+        if not df_blacklisted_filter.empty:
+            st.markdown(f"### Informasi Transaksi yang dilakukan {negara_text} Negara Blacklisted")
+            df_blacklisted = st.data_editor(
+                df_blacklisted_filter,
+                key="df_blacklisted"
+            )
+        if not df_greylisted_filter.empty:
+            st.markdown(f"### Informasi Transaksi yang dilakukan {negara_text} Negara Greylisted")
+            df_greylisted = st.data_editor(
+                df_greylisted_filter,
+                key="df_greylisted"
+            )
     except Exception as e:
         st.error(f"Error processing files: {e}")

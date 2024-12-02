@@ -4,9 +4,14 @@ import calendar
 
 from service.preprocess import *
 from service.visualize import *
+from service.database import *
 
 # Initial Page Setup
 set_page_visuals("viz")
+
+db = connect_db()
+
+list_pjp_dki = get_pjp_jkt(db)
 
 if 'df' not in st.session_state:
     st.session_state['df'] = None
@@ -36,6 +41,12 @@ else:
     df_national = st.session_state['df_national']
 
 if df is not None and df_national is not None:
+    list_pjp_code_dki = []
+    for pjp in list_pjp_dki:
+        list_pjp_code_dki.append(pjp['code'])
+
+    # TODO: Filter out based on DB PJP List
+
     pjp_list = ['All'] + df['Nama PJP'].unique().tolist()
     years = ['All'] + list(df['Year'].unique())
     quarters = ['All'] + list(df['Quarter'].unique())
