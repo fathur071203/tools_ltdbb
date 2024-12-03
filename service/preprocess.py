@@ -371,6 +371,8 @@ def merge_df_growth(left_df, right_df, is_month: bool = False):
     return df_combined
 
 def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_type: str, trx_type: str) -> pd.DataFrame:
+    if len(df_national) <= 0:
+        return pd.DataFrame()
     data_pjp = df[f'Sum of Fin {sum_trx_type} {trx_type}'].values[0]
     if sum_trx_type == "Jumlah":
         sum_trx_word = "Frekuensi"
