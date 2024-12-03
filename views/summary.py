@@ -112,13 +112,67 @@ if df is not None and df_national is not None:
         top_n = 5
         make_pie_chart_summary(df_with_market_share, top_n)
 
-    st.dataframe(df_with_market_share, use_container_width=True)
+    df_with_market_share.index = df_with_market_share.index + 1
 
+    df_with_market_share.rename(columns={
+        "Sum of Total Jumlah": "Total Frekuensi Seluruh Transaksi",
+        "Sum of Total Nom": "Total Nominal Seluruh Transaksi",
+        "Sum of Fin Nilai Out": "Total Nominal Outgoing",
+        "Sum of Fin Nilai Inc": "Total Nominal Incoming",
+        "Sum of Fin Nilai Dom": "Total Nominal Domestik",
+        "Sum of Fin Jumlah Out": "Total Frekuensi Outgoing",
+        "Sum of Fin Jumlah Inc": "Total Frekuensi Incoming",
+        "Sum of Fin Jumlah Dom": "Total Frekuensi Domestik",
+        "Market Share (%)": "Market Share (%)"
+    }, inplace=True)
+
+    df_with_market_share = df_with_market_share.style.format(
+        {
+            "Total Frekuensi Seluruh Transaksi": lambda x: '{:,.0f}'.format(x),
+            "Total Nominal Seluruh Transaksi": lambda x: '{:,.0f}'.format(x),
+            "Total Nominal Outgoing": lambda x: '{:,.0f}'.format(x),
+            "Total Nominal Incoming": lambda x: '{:,.0f}'.format(x),
+            "Total Nominal Domestik": lambda x: '{:,.0f}'.format(x),
+            "Total Frekuensi Outgoing": lambda x: '{:,.0f}'.format(x),
+            "Total Frekuensi Incoming": lambda x: '{:,.0f}'.format(x),
+            "Total Frekuensi Domestik": lambda x: '{:,.0f}'.format(x),
+            "Market Share (%)": lambda x: '{:,.2f} %'.format(x),
+        },
+        thousands=".",
+        decimal=",",
+    )
+
+    st.dataframe(df_with_market_share, use_container_width=True)
     col2, col3 = st.columns(2)
     with col2:
         make_grouped_bar_chart(df_sum_time, "Jumlah", is_month)
     with col3:
         make_grouped_bar_chart(df_sum_time, "Nilai", is_month)
+
+    df_sum_time.rename(columns={
+        "Sum of Total Nom": "Total Nominal Seluruh Transaksi",
+        "Sum of Fin Nilai Out": "Total Nominal Outgoing",
+        "Sum of Fin Nilai Inc": "Total Nominal Incoming",
+        "Sum of Fin Nilai Dom": "Total Nominal Domestik",
+        "Sum of Fin Jumlah Out": "Total Frekuensi Outgoing",
+        "Sum of Fin Jumlah Inc": "Total Frekuensi Incoming",
+        "Sum of Fin Jumlah Dom": "Total Frekuensi Domestik",
+    }, inplace=True)
+
+    df_sum_time = df_sum_time.style.format(
+        {
+            "Year": lambda x: "{:.0f}".format(x),
+            "Total Nominal Seluruh Transaksi": lambda x: '{:,.0f}'.format(x),
+            "Total Nominal Outgoing": lambda x: '{:,.0f}'.format(x),
+            "Total Nominal Incoming": lambda x: '{:,.0f}'.format(x),
+            "Total Nominal Domestik": lambda x: '{:,.0f}'.format(x),
+            "Total Frekuensi Outgoing": lambda x: '{:,.0f}'.format(x),
+            "Total Frekuensi Incoming": lambda x: '{:,.0f}'.format(x),
+            "Total Frekuensi Domestik": lambda x: '{:,.0f}'.format(x),
+        },
+        thousands=".",
+        decimal=",",
+    )
 
     st.dataframe(df_sum_time, use_container_width=True, hide_index=True)
 
@@ -129,6 +183,14 @@ if df is not None and df_national is not None:
         'Grand Total Nominal': [grand_total_inc_nominal, grand_total_out_nominal, grand_total_dom_nominal,
                                 grand_total_nominal]
     })
-    st.dataframe(df_grand_totals.set_index(df_grand_totals.columns[0]), use_container_width=True)
+    df_grand_totals = df_grand_totals.style.format(
+        {
+            "Grand Total Jumlah": lambda x: '{:,.0f}'.format(x),
+            "Grand Total Nominal": lambda x: '{:,.0f}'.format(x)
+        },
+        thousands=".",
+        decimal=",",
+    )
+    st.dataframe(df_grand_totals, use_container_width=True, hide_index=True)
 else:
     st.warning("You Must Upload an Excel File.")
