@@ -43,9 +43,11 @@ else:
 if df is not None and df_national is not None:
     list_pjp_code_dki = []
     for pjp in list_pjp_dki:
-        list_pjp_code_dki.append(pjp['code'])
+        list_pjp_code_dki.append(int(pjp['code']))
 
-    # TODO: Filter out based on DB PJP List
+    print(f"Original size: {len(df)}")
+    df = df[df['Kode'].isin(list_pjp_code_dki)]
+    print(f"Modified size: {len(df)}")
 
     pjp_list = ['All'] + df['Nama PJP'].unique().tolist()
     years = ['All'] + list(df['Year'].unique())

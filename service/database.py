@@ -1,6 +1,10 @@
 from datetime import datetime
 
 import streamlit as st
+import pandas as pd
+import json
+import io
+
 from supabase import create_client
 
 
@@ -9,6 +13,10 @@ def connect_db():
     url = st.secrets.connections.supabase["SUPABASE_URL"]
     key = st.secrets.connections.supabase["SUPABASE_KEY"]
     return create_client(url, key)
+
+def get_user_logs_data(_db):
+    response = _db.table("user_logs").select("data").eq("username", "Rakan").execute()
+    return response.data
 
 
 def get_pjp_jkt(_db):
@@ -266,3 +274,23 @@ def delete_country(_db, country_code: str):
 def delete_person(_db, person_name: str):
     request_delete_person = _db.table("suspicious_person").delete().eq("name", person_name).execute()
     return request_delete_person
+
+def upload_df(_db, username: str, df: pd.DataFrame):
+    json_data = df.to_json(orient="records")
+    file_metadata = {
+        "file_name": "uploaded_data.json",
+        "json_data": json_data
+    }
+
+def get_country_participated(_db, list_countries_code):
+    list_countries = []
+    for code in list_countries_code:
+        response = _db.table("country_reference").select("code, name").eq("code", code).execute()
+        if response.data:
+            for country in response.data:
+                country_entry = {
+                    "code": country['code'],
+                    "name": country['name'],
+                }
+                list_countries.append(country_entry)
+    return list_countries

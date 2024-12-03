@@ -4,8 +4,10 @@ from service.preprocess import set_page_visuals
 from service.fds import load_models, read_excel, read_parquets, split_df, get_ml_model, \
     get_pjp_suspected_blacklisted_greylisted
 from datetime import datetime
-from service.database import connect_db, get_pjp_jkt, get_blacklisted_country, get_greylisted_country, get_sus_peoples
+from service.database import connect_db, get_pjp_jkt, get_blacklisted_country, get_greylisted_country, get_sus_peoples, \
+    upload_df, get_user_logs_data, get_country_participated
 from collections import Counter
+import json
 
 # Initial Page Setup
 set_page_visuals("fds")
@@ -93,8 +95,6 @@ if st.session_state["uploaded_files"]:
 
         df = read_parquets(uploaded_files)
 
-        df.reset_index(inplace=True)
-
         df = df[df['SANDI_PELAPOR'].isin(list_pjp_code_dki)]
 
         # Determine the report type based on FORM_NO
@@ -140,6 +140,7 @@ if st.session_state["uploaded_files"]:
         st.markdown(f"## Laporan Analisis Transaksi {tipe_laporan} ({st.session_state["selected_month"]}, "
                     f"{st.session_state["selected_year"]})")
         st.dataframe(df)
+        st.divider()
         st.markdown(f"### Informasi Data Transaksi")
 
         # Filter df
@@ -163,7 +164,7 @@ if st.session_state["uploaded_files"]:
         negative_predictions = df[df['PREDICTED'] == -1]
         st.warning(f"Found {len(negative_predictions)} transactions with negative predictions (-1).")
         st.dataframe(negative_predictions)
-
+        st.divider()
         if not df_suspected_person_filter.empty:
             st.markdown(f"### Informasi Transaksi dengan Nama Pengirim atau Nama Penerima Tersangka")
             list_pjp_name = get_pjp_suspected_blacklisted_greylisted(df_suspected_person_filter, list_pjp_dki)
@@ -187,11 +188,18 @@ if st.session_state["uploaded_files"]:
                 },
                 use_container_width=False
             )
+            st.divider()
         if not df_blacklisted_filter.empty:
             st.markdown(f"### Informasi Transaksi yang dilakukan {negara_text} Negara Blacklisted")
             list_pjp_name = get_pjp_suspected_blacklisted_greylisted(df_blacklisted_filter, list_pjp_dki)
             pjp_counts = Counter(list_pjp_name)
 
+            if form_no == "FORMG0001":
+                list_unique_participating_countries = sorted(list(set(df_blacklisted_filter['NEGARA_TUJUAN'])))
+            else:
+                list_unique_participating_countries = sorted(list(set(df_blacklisted_filter['NEGARA_ASAL'])))
+
+            list_participating_country = get_country_participated(db, list_unique_participating_countries)
             pjp_df = pd.DataFrame(pjp_counts.items(), columns=["PJP Name", "Count"])
             pjp_df = pjp_df.sort_values(by="Count", ascending=False).reset_index(drop=True)
             st.write(f"**Jumlah Data Transaksi**: {len(df_blacklisted_filter):,}")
@@ -199,20 +207,41 @@ if st.session_state["uploaded_files"]:
                 df_blacklisted_filter,
                 key="df_blacklisted"
             )
-            st.write("**PJP Tersangka:**")
-            st.data_editor(
-                pjp_df,
-                hide_index=True,
-                column_config={
-                    "PJP Name": "Nama Penyelenggara",
-                    "Count": "Jumlah TKM"
-                },
-                use_container_width=False
-            )
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**PJP Terlibat:**")
+                st.data_editor(
+                    pjp_df,
+                    hide_index=True,
+                    column_config={
+                        "PJP Name": "Nama Penyelenggara",
+                        "Count": "Jumlah TKM"
+                    },
+                    use_container_width=True
+                )
+            with col2:
+                st.write("**Negara Terlibat:**")
+                st.data_editor(
+                    list_participating_country,
+                    hide_index=True,
+                    column_config={
+                        "code": "Kode Negara",
+                        "name": "Nama Negara"
+                    },
+                    use_container_width=True
+                )
+            st.divider()
         if not df_greylisted_filter.empty:
             st.markdown(f"### Informasi Transaksi yang dilakukan {negara_text} Negara Greylisted")
             list_pjp_name = get_pjp_suspected_blacklisted_greylisted(df_greylisted_filter, list_pjp_dki)
             pjp_counts = Counter(list_pjp_name)
+
+            if form_no == "FORMG0001":
+                list_unique_participating_countries = sorted(list(set(df_greylisted_filter['NEGARA_TUJUAN'])))
+            else:
+                list_unique_participating_countries = sorted(list(set(df_greylisted_filter['NEGARA_ASAL'])))
+
+            list_participating_country = get_country_participated(db, list_unique_participating_countries)
 
             pjp_df = pd.DataFrame(pjp_counts.items(), columns=["PJP Name", "Count"])
             pjp_df = pjp_df.sort_values(by="Count", ascending=False).reset_index(drop=True)
@@ -221,15 +250,28 @@ if st.session_state["uploaded_files"]:
                 df_greylisted_filter,
                 key="df_greylisted"
             )
-            st.write("**PJP Tersangka:**")
-            st.data_editor(
-                pjp_df,
-                hide_index=True,
-                column_config={
-                    "PJP Name": "Nama Penyelenggara",
-                    "Count": "Jumlah TKM"
-                },
-                use_container_width=False
-            )
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**PJP Terlibat:**")
+                st.data_editor(
+                    pjp_df,
+                    hide_index=True,
+                    column_config={
+                        "PJP Name": "Nama Penyelenggara",
+                        "Count": "Jumlah TKM"
+                    },
+                    use_container_width=True
+                )
+            with col2:
+                st.write("**Negara Terlibat:**")
+                st.data_editor(
+                    list_participating_country,
+                    hide_index=True,
+                    column_config={
+                        "code": "Kode Negara",
+                        "name": "Nama Negara"
+                    },
+                    use_container_width=True
+                )
     except Exception as e:
         st.error(f"Error processing files: {e}")

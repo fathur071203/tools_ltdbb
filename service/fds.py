@@ -37,7 +37,6 @@ def get_ml_model(tipe_trx: str, models: dict):
     list_models = []
     for key in models.keys():
         if tipe_trx in key:
-            print(models.get(key))
             list_models.append(models.get(key))
     return list_models
 
@@ -67,4 +66,5 @@ def get_pjp_suspected_blacklisted_greylisted(df, list_pjp):
     pjp_dict = {pjp['code']: pjp['name'] for pjp in list_pjp}
     list_pjp_name = df['SANDI_PELAPOR'].apply(lambda code: pjp_dict.get(code, None)).dropna().tolist()
     return list_pjp_name
+
 
