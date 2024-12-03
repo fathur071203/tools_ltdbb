@@ -4,6 +4,8 @@ import streamlit as st
 import pandas as pd
 import json
 import io
+from streamlit_js_eval import streamlit_js_eval
+import time
 
 from supabase import create_client
 
@@ -294,3 +296,437 @@ def get_country_participated(_db, list_countries_code):
                 }
                 list_countries.append(country_entry)
     return list_countries
+
+@st.dialog("Konfirmasi Data Baru")
+def submit_add_pjp(db, pjp_code, pjp_name, pjp_second_name, pjp_pt_name):
+    st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = insert_new_pjp(db, pjp_code, pjp_name, pjp_second_name, pjp_pt_name)
+            if request.data is not None:
+                st.success("Data PJP Baru telah berhasil disimpan!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam memasukkan PJP baru ke Database: Kode PJP yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam memasukkan PJP baru ke Database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Data Baru")
+def submit_add_city(db, city_code, city_name, list_provinces, city_province):
+    st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            prov_code = transform_prov_name_to_prov_code(list_provinces, city_province)
+            request = insert_new_city(db, city_code, city_name, prov_code)
+            if request.data is not None:
+                st.success("Data Kota Baru telah berhasil disimpan!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam memasukkan Kota baru ke Database: Kode Kota yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam memasukkan Kota baru ke Database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Data Baru")
+def submit_add_prov(db, prov_code, prov_name):
+    st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            country_code = "ID"
+            request = insert_new_province(db, prov_code, prov_name, country_code)
+            if request.data is not None:
+                st.success("Data Provinsi Baru telah berhasil disimpan!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam memasukkan Provinsi baru ke Database: Kode Provinsi yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam memasukkan Provinsi baru ke Database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Data Baru")
+def submit_add_country(db, country_code, country_name):
+    st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = insert_new_country(db, country_code, country_name)
+            if request.data is not None:
+                st.success("Data Negara Baru telah berhasil disimpan!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam memasukkan Negara baru ke Database: Kode Negara yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam memasukkan Negara baru ke Database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Data Baru")
+def submit_add_sus_person(db, person_name_input):
+    st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = insert_new_sus_person(db, person_name_input)
+            if request.data is not None:
+                st.success("Data Orang Tersangka Baru telah berhasil disimpan!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam memasukkan Nama Tersangka baru ke Database: Nama yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam memasukkan Data Orang Tersangka baru ke Database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Data Baru")
+def submit_add_blacklisted_country(db, selected_blacklisted_country, is_blacklisted):
+    st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            selected_code_blacklisted_country = selected_blacklisted_country.split('-')[0]
+            request = update_blacklisted_country(db, selected_code_blacklisted_country, is_blacklisted)
+            if request.data is not None:
+                st.success("Data Negara Blacklisted Baru telah berhasil disimpan!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            st.error(f"Terdapat Error dalam memasukkan Data Negara Blacklisted Baru ke Database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Data Baru")
+def submit_add_greylisted_country(db, selected_greylisted_country, is_greylisted):
+    st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            selected_code_greylisted_country = selected_greylisted_country.split('-')[0]
+            request = update_greylisted_country(db, selected_code_greylisted_country, is_greylisted)
+            if request.data is not None:
+                st.success("Data Negara Greylist Baru telah berhasil disimpan!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            st.error(f"Terdapat Error dalam memasukkan Data Negara Greylist Baru ke Database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+
+@st.dialog("Konfirmasi Perubahan Data")
+def submit_update_sus_person(db, selected_person_update, update_person_name):
+    st.write(f"Apakah Anda yakin ingin mengubah data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = update_sus_person(db, selected_person_update, update_person_name)
+            if request.data is not None:
+                st.success("Data Nama Tersangka telah berhasil diubah!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam mengupdate data Nama Tersangka: Nama yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam mengupdate data Nama Tersangka: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Perubahan Data")
+def submit_update_pjp(db, selected_code, update_code_pjp, update_name_pjp,
+                                             update_second_name_pjp,
+                                             update_pt_name_pjp):
+    st.write(f"Apakah Anda yakin ingin mengubah data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = update_pjp(db, selected_code, update_code_pjp, update_name_pjp,
+                                 update_second_name_pjp,
+                                 update_pt_name_pjp)
+            if request.data is not None:
+                st.success("Data PJP telah berhasil diubah!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam mengupdate data PJP: Kode PJP yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam mengupdate data PJP: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Perubahan Data")
+def submit_update_city(db, selected_city_code, update_city_code, update_city_name, list_provinces, update_city_province):
+    st.write(f"Apakah Anda yakin ingin mengubah data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            prov_code = transform_prov_name_to_prov_code(list_provinces, update_city_province)
+            request = update_city(db, selected_city_code, update_city_code, update_city_name, prov_code)
+            if request.data is not None:
+                st.success("Data Kota telah berhasil diubah!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam mengupdate data Kota: Kode Kota yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam mengupdate data Kota: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Perubahan Data")
+def submit_update_prov(db, selected_prov_code, update_prov_code, update_prov_name):
+    st.write(f"Apakah Anda yakin ingin mengubah data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            country_code = "ID"
+            request = update_province(db, selected_prov_code, update_prov_code, update_prov_name,
+                                      country_code)
+            if request.data is not None:
+                st.success("Data Provinsi telah berhasil diubah!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam mengupdate data Provinsi: Kode Provinsi yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam mengupdate data Provinsi: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Perubahan Data")
+def submit_update_country(db, selected_country_code, update_country_code, update_country_name):
+    st.write(f"Apakah Anda yakin ingin mengubah data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = update_country(db, selected_country_code, update_country_code, update_country_name)
+            if request.data is not None:
+                st.success("Data Negara telah berhasil diubah!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            if 'duplicate key value violates unique constraint' in str(e):
+                st.error(
+                    "Terdapat Error dalam mengupdate data Negara: Kode Negara yang sama sudah tersimpan pada database")
+            else:
+                st.error(f"Terdapat Error dalam mengupdate data Negara: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Penghapusan Data")
+def submit_delete_sus_person(db, selected_person_update):
+    st.write(f"Apakah Anda yakin ingin menghapus data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = delete_person(db, selected_person_update)
+            if request.data is not None:
+                st.success("Data Nama Tersangka telah berhasil dihapus!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            st.error(f"Terdapat Error dalam menghapus data Tersangka: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Penghapusan Data")
+def submit_delete_pjp(db, selected_code):
+    st.write(f"Apakah Anda yakin ingin menghapus data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = delete_pjp(db, selected_code)
+            if request.data is not None:
+                st.success("Data PJP telah berhasil dihapus!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            st.error(f"Terdapat Error dalam menghapus data PJP: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Penghapusan Data")
+def submit_delete_city(db, selected_city_code):
+    st.write(f"Apakah Anda yakin ingin menghapus data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = delete_city(db, selected_city_code)
+            if request.data is not None:
+                st.success("Data Kota telah berhasil dihapus!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            st.error(f"Terdapat Error dalam menghapus data Kota dari Database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Penghapusan Data")
+def submit_delete_prov(db, selected_prov_code):
+    st.write(f"Apakah Anda yakin ingin menghapus data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = delete_province(db, selected_prov_code)
+            if request.data is not None:
+                st.success("Data Provinsi telah berhasil dihapus!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            st.error(f"Terdapat Error dalam menghapus Provinsi dari Database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Penghapusan Data")
+def submit_delete_country(db, selected_country_code):
+    st.write(f"Apakah Anda yakin ingin menghapus data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            request = delete_country(db, selected_country_code)
+            if request.data is not None:
+                st.success("Data Negara telah berhasil dihapus!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            st.error(f"Terdapat Error dalam menghapus data Negara dari database: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Penghapusan Data")
+def submit_delete_blacklisted_country(db, selected_delete_blacklisted_country, is_blacklisted):
+    st.write(f"Apakah Anda yakin ingin menghapus data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            selected_code_delete_blacklisted_country = selected_delete_blacklisted_country.split('-')[0]
+            request = update_blacklisted_country(db, selected_code_delete_blacklisted_country, is_blacklisted)
+            if request.data is not None:
+                st.success("Data Negara Blacklisted telah berhasil dihapus!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            st.error(f"Terdapat Error dalam mengubah Data Negara Blacklisted: {e}")
+    elif cancel_button:
+        st.rerun()
+
+@st.dialog("Konfirmasi Penghapusan Data")
+def submit_delete_greylisted_country(db, selected_delete_greylisted_country, is_greylisted):
+    st.write(f"Apakah Anda yakin ingin menghapus data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        confirm_button = st.button("Iya", use_container_width=True, type="primary")
+    with col2:
+        cancel_button = st.button("Batal", use_container_width=True, type="secondary")
+    if confirm_button:
+        try:
+            selected_code_delete_greylisted_country = selected_delete_greylisted_country.split('-')[0]
+            request = update_greylisted_country(db, selected_code_delete_greylisted_country, is_greylisted)
+            if request.data is not None:
+                st.success("Data Negara Greylist telah berhasil dihapus!")
+                time.sleep(1.5)
+                streamlit_js_eval(js_expressions="parent.window.location.reload()")
+        except Exception as e:
+            st.error(f"Terdapat Error dalam mengubah Data Negara Greylist: {e}")
+    elif cancel_button:
+        st.rerun()
