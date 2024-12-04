@@ -80,7 +80,7 @@ def set_page_settings():
     ]
     st.set_page_config(
         page_title="Tools Analisa Data LTDBB",
-        page_icon="https://github.com/user-attachments/assets/ef3e77f5-47e7-4042-a5e7-f6be4347b6bf",
+        page_icon="static/favicon.png",
         layout="wide",
         initial_sidebar_state="expanded")
     pg = st.navigation(pages=pages)
@@ -95,7 +95,7 @@ def set_page_visuals(condition):
     elif condition == "dm":
         st.title('Kelola Data Sistem')
     with st.sidebar:
-        st.image("https://github.com/user-attachments/assets/bba29ea5-5708-40f4-bb94-f8652690e4c3")
+        st.image("static/Logo.png")
 
 def aggregate_data(df, is_trx=False):
     if is_trx:
@@ -511,6 +511,63 @@ def rename_format_growth_monthly_df(df: pd.DataFrame, trx_type: str):
             f"Total Nominal {trx_var}": lambda x: '{:,.0f}'.format(x),
             "Month-to-Month Frekuensi": lambda x: '{:,.2f} %'.format(x),
             "Month-to-Month Nominal": lambda x: '{:,.2f} %'.format(x),
+        },
+        thousands=".",
+        decimal=",",
+    )
+    return df
+
+def format_profile_df(df: pd.DataFrame):
+    df.iloc[:2] = df.iloc[:2].applymap(lambda x: f"{x:,.2f}".replace(".", ",") if isinstance(x, (int, float)) else x)
+    df.iloc[-1:] = df.iloc[-1:].applymap(lambda x: f"{x:,.2f} %".replace(".", ",") if isinstance(x, (int, float)) else x)
+    df = df.style.format(
+        thousands=".",
+        decimal=",",
+    )
+    return df
+
+
+def rename_format_profile_df(df: pd.DataFrame, trx_type: str):
+    if trx_type == "Inc":
+        trx_var = "Incoming"
+    elif trx_type == "Out":
+        trx_var = "Outgoing"
+    else:
+        trx_var = "Domestik"
+
+    df.rename(columns={
+        f"Sum of Fin Jumlah {trx_type}": f"Total Frekuensi {trx_var}",
+        f"Sum of Fin Nilai {trx_type}": f"Total Nominal {trx_var} (Miliar)",
+    }, inplace=True)
+
+    df = df.style.format(
+        {
+            "Year": lambda x: "{:.0f}".format(x),
+            f"Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x),
+            f"Total Nominal {trx_var} (Miliar)": lambda x: '{:,.0f}'.format(x),
+        },
+        thousands=".",
+        decimal=",",
+    )
+    return df
+
+def format_profile_df_grand_total(df: pd.DataFrame, trx_type: str):
+    if trx_type == "Inc":
+        trx_var = "Incoming"
+    elif trx_type == "Out":
+        trx_var = "Outgoing"
+    else:
+        trx_var = "Domestik"
+
+    df.rename(columns={
+        f"Grand Total Jumlah {trx_type}": f"Grand Total Frekuensi {trx_var}",
+        f"Grand Total Nilai {trx_type}": f"Grand Total Nominal {trx_var} (Miliar)",
+    }, inplace=True)
+
+    df = df.style.format(
+        {
+            f"Grand Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x),
+            f"Grand Total Nominal {trx_var} (Miliar)": lambda x: '{:,.0f}'.format(x),
         },
         thousands=".",
         decimal=",",

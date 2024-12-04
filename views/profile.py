@@ -13,7 +13,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     df = st.session_state['df']
 
     with st.sidebar:
-        with st.expander("Filter Profile", True):
+        with st.expander("Filter Individu", True):
             pjp_list = ['All'] + df['Nama PJP'].unique().tolist()
             years = ['All'] + list(df['Year'].unique())
 
@@ -82,20 +82,34 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             df_grand_total_out = process_grand_total_profile(df_outgoing_month, "Out")
 
             st.subheader(f"Profil Transaksi - PT {selected_pjp} Tahun {selected_year_pjp}")
+            merged_data = format_profile_df(merged_data)
             st.dataframe(merged_data, use_container_width=True, hide_index=True)
             st.info(
                 "*Persentase merupakan persentase jumlah atau nilai transaksi PJP terhadap jumlah atau nilai transaksi nasional")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.dataframe(df_domestic_month, use_container_width=True, hide_index=True)
+                df_domestic_month_display = df_domestic_month.copy()
+                df_domestic_month_display = rename_format_profile_df(df_domestic_month_display, "Dom")
+                df_grand_total_dom = format_profile_df_grand_total(df_grand_total_dom, "Dom")
+                st.dataframe(df_domestic_month_display, use_container_width=True, hide_index=True)
                 st.dataframe(df_grand_total_dom, use_container_width=True, hide_index=True)
             with col2:
-                st.dataframe(df_incoming_month, use_container_width=True, hide_index=True)
+                df_incoming_month_display = df_incoming_month.copy()
+                df_incoming_month_display = rename_format_profile_df(df_incoming_month_display, "Inc")
+                df_grand_total_inc = format_profile_df_grand_total(df_grand_total_inc, "Inc")
+                st.dataframe(df_incoming_month_display, use_container_width=True, hide_index=True)
                 st.dataframe(df_grand_total_inc, use_container_width=True, hide_index=True)
             with col3:
-                st.dataframe(df_outgoing_month, use_container_width=True, hide_index=True)
+                df_outgoing_month_display = df_outgoing_month.copy()
+                df_outgoing_month_display = rename_format_profile_df(df_outgoing_month_display, "Out")
+                df_grand_total_out = format_profile_df_grand_total(df_grand_total_out, "Out")
+                st.dataframe(df_outgoing_month_display, use_container_width=True, hide_index=True)
                 st.dataframe(df_grand_total_out, use_container_width=True, hide_index=True)
-
+            st.warning("""
+            Pada visualisasi di bawah saja:
+            - Simbol , (koma) berfungsi sebagai pemisah ribuan
+            - Simbol . (titik) berfungsi sebagai pemisah desimal
+            """)
             make_combined_bar_line_chart_profile(df_domestic_month, "Dom", selected_pjp, selected_year_pjp)
             make_combined_bar_line_chart_profile(df_incoming_month, "Inc", selected_pjp, selected_year_pjp)
             make_combined_bar_line_chart_profile(df_outgoing_month, "Out", selected_pjp, selected_year_pjp)

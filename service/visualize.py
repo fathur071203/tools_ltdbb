@@ -26,7 +26,7 @@ def make_pie_chart_summary(df, top_n):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def make_pie_chart_market_share(df: pd.DataFrame, trx_type: str ,is_nom: bool = True):
+def make_pie_chart_market_share(df: pd.DataFrame, trx_type: str, key: str ,is_nom: bool = True):
     if is_nom:
         data = {
             "Market Share": ["Jakarta", "National"],
@@ -51,7 +51,7 @@ def make_pie_chart_market_share(df: pd.DataFrame, trx_type: str ,is_nom: bool = 
     fig.update_traces(hovertemplate='%{label}: %{value:.2f}%',
                       textfont=dict(color='white'))
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
 
 def make_grouped_bar_chart(df, mode, is_month):
@@ -230,21 +230,25 @@ def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_p
         trx_title = "Outgoing"
     else:
         trx_title = "Domestik"
+
     fig = go.Figure()
 
     fig.add_trace(go.Bar(
         x=df['Month'],
         y=df[f'Sum of Fin Nilai {trx_type}'],
         name="Nilai",
-        yaxis='y1'
+        yaxis='y1',
+        hovertemplate="%{y:,.0f} <extra></extra>"
     ))
 
+    # Line trace
     fig.add_trace(go.Scatter(
         x=df['Month'],
         y=df[f'Sum of Fin Jumlah {trx_type}'],
         name='Frekuensi',
         yaxis='y2',
         mode='lines+markers',
+        hovertemplate="%{y:,.0f} <extra></extra>"
     ))
 
     fig.update_layout(
@@ -252,13 +256,13 @@ def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_p
         xaxis=dict(title="Bulan"),
         yaxis=dict(
             title="Nilai (Rp Miliar)",
-            tickformat=",",
+            tickformat=",.0f",
         ),
         yaxis2=dict(
             title='Frekuensi',
             overlaying='y',
             side='right',
-            tickformat=".1f"
+            tickformat=",.0f",
         ),
         template="seaborn",
         legend=dict(
