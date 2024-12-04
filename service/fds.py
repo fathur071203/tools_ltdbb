@@ -4,16 +4,13 @@ import joblib
 import os
 import io
 
-@st.cache_resource
 def load_models(folder_path="./models"):
-    url = "https://vepvyhefdqhszaywswaw.supabase.co/storage/v1/object/public/model_bucket/isolation_forest_model_dom_1.joblib?t=2024-12-04T09%3A41%3A40.486Z"
     models = {}
     for filename in os.listdir(folder_path):
         if filename.endswith(".joblib"):
-            print(filename)
             filepath = os.path.join(folder_path, filename)
             models[filename] = joblib.load(filepath)
-    print(models)
+            st.write(f"Loaded model: {filename}")  # Debugging line
     return models
 
 @st.cache_data
@@ -41,6 +38,7 @@ def get_ml_model(tipe_trx: str, models: dict):
     for key in models.keys():
         if tipe_trx in key:
             list_models.append(models.get(key))
+    st.write(f"Selected models: {list_models}")  # Debugging line
     return list_models
 
 def check_df_null(df):
