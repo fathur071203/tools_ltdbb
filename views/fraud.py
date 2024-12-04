@@ -108,8 +108,10 @@ if st.session_state["uploaded_files"]:
                 ]
             negara_text = "ke"
             tipe_laporan = "Outgoing"
+            list_model_name = {1 : "isolation_forest_model_out_1.joblib", 2 : "isolation_forest_model_out_2.joblib",
+                               3 : "isolation_forest_model_out_3.joblib"}
             predict_cols = ['FREKUENSI', 'NOMINAL_TRX', 'TUJUAN']
-            selected_model = get_ml_model(tipe_laporan, models)
+            selected_model = get_ml_model(tipe_laporan, models)  # dict {nama file : model}
             df_split = split_df(df, tipe_laporan)
         elif form_no == "FORMG0002":
             df_blacklisted_filter = df[df['NEGARA_ASAL'].isin(list_code_blacklisted)]
@@ -120,6 +122,7 @@ if st.session_state["uploaded_files"]:
                 ]
             negara_text = "dari"
             tipe_laporan = "Incoming"
+            list_model_name = ["isolation_forest_model_inc.joblib"]
             predict_cols = ['FREKUENSI', 'NOMINAL_TRX']
             selected_model = get_ml_model(tipe_laporan, models)
             df_split = None
@@ -132,6 +135,8 @@ if st.session_state["uploaded_files"]:
                 (df['NAMA_PENGIRIM'].str.lower().isin([name.lower() for name in list_name_sus_person]))
                 ]
             tipe_laporan = "Domestik"
+            list_model_name = { 1 : "isolation_forest_model_dom_1.joblib", 2 : "isolation_forest_model_dom_2.joblib",
+                                3 : "isolation_forest_model_dom_3.joblib"}
             predict_cols = ['FREKUENSI_PENGIRIMAN', 'NOMINAL_TRX', 'TUJUAN_TRX']
             selected_model = get_ml_model(tipe_laporan, models)
             df_split = split_df(df, tipe_laporan)
@@ -152,14 +157,16 @@ if st.session_state["uploaded_files"]:
 
         if df_split:
             for key in df_split.keys():
-                indx = int(key) - 1
+                selected_model_name = list_model_name.get(key)
+                model_predict = selected_model.get(selected_model_name)
                 selected_df_split = df_split[key][predict_cols].copy()
                 original_index = df_split[key].index
-                predictions = selected_model[indx].predict(selected_df_split)
+                predictions = model_predict.predict(selected_df_split)
                 negative_predictions_count = sum(pred == -1 for pred in predictions)
                 df.loc[original_index, 'PREDICTED'] = predictions
         else:
-            predictions = selected_model[0].predict(df[predict_cols])
+            model_predict = selected_model.get(list_model_name[0])
+            predictions = model_predict.predict(df[predict_cols])
             df['PREDICTED'] = predictions
         negative_predictions = df[df['PREDICTED'] == -1]
         st.warning(f"Found {len(negative_predictions)} transactions with negative predictions (-1).")
