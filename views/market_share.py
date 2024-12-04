@@ -70,7 +70,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
                                               df_inc_year, df_out_year, df_dom_year)
     st.markdown("#### Market Share Outgoing")
     df_out_display = df_out.copy()
-    df_out_display = format_profile_df(df_out_display)
+    df_out_display = format_profile_df(df_out_display, is_market_share=True)
     st.dataframe(df_out_display, hide_index=True, use_container_width=True)
     st.info("*Market Share merupakan Persentase Market Share Transaksi Jakarta terhadap Transaksi Nasional")
     col1, col2 = st.columns(2)
@@ -81,7 +81,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     st.divider()
     st.markdown("#### Market Share Incoming")
     df_inc_display = df_inc.copy()
-    df_inc_display = format_profile_df(df_inc_display)
+    df_inc_display = format_profile_df(df_inc_display, is_market_share=True)
     st.dataframe(df_inc_display, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
@@ -91,7 +91,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     st.divider()
     st.markdown("#### Market Share Domestik")
     df_dom_display = df_dom.copy()
-    df_dom_display = format_profile_df(df_dom_display)
+    df_dom_display = format_profile_df(df_dom_display, is_market_share=True)
     st.dataframe(df_dom_display, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
@@ -101,7 +101,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     st.divider()
     st.markdown("#### Market Share Total (Outgoing & Incoming & Domestik)")
     df_total_display = df_total.copy()
-    df_total_display = format_profile_df(df_total_display)
+    df_total_display = format_profile_df(df_total_display, is_market_share=True)
     st.dataframe(df_total_display, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
@@ -112,7 +112,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     st.subheader(f"Market Share PJP Jakarta LR All-Time ({selected_year_pjp} - {max_year})")
     st.markdown("#### Market Share Outgoing All-Time")
     df_out_year_display = df_out_year.copy()
-    df_out_year_display = format_profile_df(df_out_year_display)
+    df_out_year_display = format_profile_df(df_out_year_display, is_market_share=True)
     st.dataframe(df_out_year_display, hide_index=True, use_container_width=True)
     st.info("*Market Share merupakan Persentase Market Share Transaksi Jakarta terhadap Transaksi Nasional.")
     st.warning("Pada bagian ini, hanya Filter Profile (Year) yang berpengaruh terhadap data yang ditampilkan.")
@@ -124,7 +124,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     st.divider()
     st.markdown("#### Market Share Incoming All-Time")
     df_inc_year_display = df_inc_year.copy()
-    df_inc_year_display = format_profile_df(df_inc_year_display)
+    df_inc_year_display = format_profile_df(df_inc_year_display, is_market_share=True)
     st.dataframe(df_inc_year, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
@@ -134,7 +134,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     st.divider()
     st.markdown("#### Market Share Domestik All-Time")
     df_dom_year_display = df_dom_year.copy()
-    df_dom_year_display = format_profile_df(df_dom_year_display)
+    df_dom_year_display = format_profile_df(df_dom_year_display, is_market_share=True)
     st.dataframe(df_dom_year_display, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:
@@ -144,7 +144,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     st.divider()
     st.markdown("#### Market Share Total (Outgoing & Incoming & Domestik) All-Time")
     df_total_year_display = df_total_year.copy()
-    df_total_year_display = format_profile_df(df_total_year_display)
+    df_total_year_display = format_profile_df(df_total_year_display, is_market_share=True)
     st.dataframe(df_total_year_display, hide_index=True, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:

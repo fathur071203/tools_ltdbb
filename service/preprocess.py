@@ -517,8 +517,8 @@ def rename_format_growth_monthly_df(df: pd.DataFrame, trx_type: str):
     )
     return df
 
-def format_profile_df(df: pd.DataFrame):
-    df.iloc[:2] = df.iloc[:2].applymap(lambda x: f"{x:,.2f}".replace(".", ",") if isinstance(x, (int, float)) else x)
+def format_profile_df(df: pd.DataFrame, is_market_share: bool = False):
+    df.iloc[:2] = df.iloc[:2].applymap(lambda x: f"{x:,.2f}".replace(",", ".") if isinstance(x, (int, float)) else x)
     df.iloc[-1:] = df.iloc[-1:].applymap(lambda x: f"{x:,.2f} %".replace(".", ",") if isinstance(x, (int, float)) else x)
     df = df.style.format(
         thousands=".",
