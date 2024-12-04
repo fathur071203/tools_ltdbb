@@ -277,12 +277,14 @@ def delete_person(_db, person_name: str):
     request_delete_person = _db.table("suspicious_person").delete().eq("name", person_name).execute()
     return request_delete_person
 
+
 def upload_df(_db, username: str, df: pd.DataFrame):
     json_data = df.to_json(orient="records")
     file_metadata = {
         "file_name": "uploaded_data.json",
         "json_data": json_data
     }
+
 
 def get_country_participated(_db, list_countries_code):
     list_countries = []
@@ -296,6 +298,7 @@ def get_country_participated(_db, list_countries_code):
                 }
                 list_countries.append(country_entry)
     return list_countries
+
 
 @st.dialog("Konfirmasi Data Baru")
 def submit_add_pjp(db, pjp_code, pjp_name, pjp_second_name, pjp_pt_name):
@@ -320,6 +323,7 @@ def submit_add_pjp(db, pjp_code, pjp_name, pjp_second_name, pjp_pt_name):
                 st.error(f"Terdapat Error dalam memasukkan PJP baru ke Database: {e}")
     elif cancel_button:
         st.rerun()
+
 
 @st.dialog("Konfirmasi Data Baru")
 def submit_add_city(db, city_code, city_name, list_provinces, city_province):
@@ -346,6 +350,7 @@ def submit_add_city(db, city_code, city_name, list_provinces, city_province):
     elif cancel_button:
         st.rerun()
 
+
 @st.dialog("Konfirmasi Data Baru")
 def submit_add_prov(db, prov_code, prov_name):
     st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
@@ -371,6 +376,7 @@ def submit_add_prov(db, prov_code, prov_name):
     elif cancel_button:
         st.rerun()
 
+
 @st.dialog("Konfirmasi Data Baru")
 def submit_add_country(db, country_code, country_name):
     st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
@@ -394,6 +400,7 @@ def submit_add_country(db, country_code, country_name):
                 st.error(f"Terdapat Error dalam memasukkan Negara baru ke Database: {e}")
     elif cancel_button:
         st.rerun()
+
 
 @st.dialog("Konfirmasi Data Baru")
 def submit_add_sus_person(db, person_name_input):
@@ -419,6 +426,7 @@ def submit_add_sus_person(db, person_name_input):
     elif cancel_button:
         st.rerun()
 
+
 @st.dialog("Konfirmasi Data Baru")
 def submit_add_blacklisted_country(db, selected_blacklisted_country, is_blacklisted):
     st.write(f"Apakah Anda yakin ingin menambahkan data baru ini?")
@@ -439,6 +447,7 @@ def submit_add_blacklisted_country(db, selected_blacklisted_country, is_blacklis
             st.error(f"Terdapat Error dalam memasukkan Data Negara Blacklisted Baru ke Database: {e}")
     elif cancel_button:
         st.rerun()
+
 
 @st.dialog("Konfirmasi Data Baru")
 def submit_add_greylisted_country(db, selected_greylisted_country, is_greylisted):
@@ -486,10 +495,11 @@ def submit_update_sus_person(db, selected_person_update, update_person_name):
     elif cancel_button:
         st.rerun()
 
+
 @st.dialog("Konfirmasi Perubahan Data")
 def submit_update_pjp(db, selected_code, update_code_pjp, update_name_pjp,
-                                             update_second_name_pjp,
-                                             update_pt_name_pjp):
+                      update_second_name_pjp,
+                      update_pt_name_pjp):
     st.write(f"Apakah Anda yakin ingin mengubah data ini?")
     col1, col2 = st.columns(2)
     with col1:
@@ -514,8 +524,10 @@ def submit_update_pjp(db, selected_code, update_code_pjp, update_name_pjp,
     elif cancel_button:
         st.rerun()
 
+
 @st.dialog("Konfirmasi Perubahan Data")
-def submit_update_city(db, selected_city_code, update_city_code, update_city_name, list_provinces, update_city_province):
+def submit_update_city(db, selected_city_code, update_city_code, update_city_name, list_provinces,
+                       update_city_province):
     st.write(f"Apakah Anda yakin ingin mengubah data ini?")
     col1, col2 = st.columns(2)
     with col1:
@@ -538,6 +550,7 @@ def submit_update_city(db, selected_city_code, update_city_code, update_city_nam
                 st.error(f"Terdapat Error dalam mengupdate data Kota: {e}")
     elif cancel_button:
         st.rerun()
+
 
 @st.dialog("Konfirmasi Perubahan Data")
 def submit_update_prov(db, selected_prov_code, update_prov_code, update_prov_name):
@@ -565,6 +578,7 @@ def submit_update_prov(db, selected_prov_code, update_prov_code, update_prov_nam
     elif cancel_button:
         st.rerun()
 
+
 @st.dialog("Konfirmasi Perubahan Data")
 def submit_update_country(db, selected_country_code, update_country_code, update_country_name):
     st.write(f"Apakah Anda yakin ingin mengubah data ini?")
@@ -589,6 +603,7 @@ def submit_update_country(db, selected_country_code, update_country_code, update
     elif cancel_button:
         st.rerun()
 
+
 @st.dialog("Konfirmasi Penghapusan Data")
 def submit_delete_sus_person(db, selected_person_update):
     st.write(f"Apakah Anda yakin ingin menghapus data ini?")
@@ -608,6 +623,7 @@ def submit_delete_sus_person(db, selected_person_update):
             st.error(f"Terdapat Error dalam menghapus data Tersangka: {e}")
     elif cancel_button:
         st.rerun()
+
 
 @st.dialog("Konfirmasi Penghapusan Data")
 def submit_delete_pjp(db, selected_code):
@@ -629,6 +645,7 @@ def submit_delete_pjp(db, selected_code):
     elif cancel_button:
         st.rerun()
 
+
 @st.dialog("Konfirmasi Penghapusan Data")
 def submit_delete_city(db, selected_city_code):
     st.write(f"Apakah Anda yakin ingin menghapus data ini?")
@@ -648,6 +665,7 @@ def submit_delete_city(db, selected_city_code):
             st.error(f"Terdapat Error dalam menghapus data Kota dari Database: {e}")
     elif cancel_button:
         st.rerun()
+
 
 @st.dialog("Konfirmasi Penghapusan Data")
 def submit_delete_prov(db, selected_prov_code):
@@ -669,6 +687,7 @@ def submit_delete_prov(db, selected_prov_code):
     elif cancel_button:
         st.rerun()
 
+
 @st.dialog("Konfirmasi Penghapusan Data")
 def submit_delete_country(db, selected_country_code):
     st.write(f"Apakah Anda yakin ingin menghapus data ini?")
@@ -688,6 +707,7 @@ def submit_delete_country(db, selected_country_code):
             st.error(f"Terdapat Error dalam menghapus data Negara dari database: {e}")
     elif cancel_button:
         st.rerun()
+
 
 @st.dialog("Konfirmasi Penghapusan Data")
 def submit_delete_blacklisted_country(db, selected_delete_blacklisted_country, is_blacklisted):
@@ -709,6 +729,7 @@ def submit_delete_blacklisted_country(db, selected_delete_blacklisted_country, i
             st.error(f"Terdapat Error dalam mengubah Data Negara Blacklisted: {e}")
     elif cancel_button:
         st.rerun()
+
 
 @st.dialog("Konfirmasi Penghapusan Data")
 def submit_delete_greylisted_country(db, selected_delete_greylisted_country, is_greylisted):
