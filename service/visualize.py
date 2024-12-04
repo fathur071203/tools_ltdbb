@@ -110,21 +110,36 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
             df_copy['Year-Quarter'] = df_copy['Year'].astype(str) + ' Q-' + df_copy['Quarter'].astype(str)
             target_col = 'Year-Quarter'
 
+    if sum_trx_type == "Jumlah":
+        variabel_trx = "Frekuensi"
+    else:
+        variabel_trx = "Nominal"
+
+    if trx_type == "Out":
+        jenis_trx = "Outgoing"
+    elif trx_type == "Inc":
+        jenis_trx = "Incoming"
+    else:
+        jenis_trx = "Domestik"
+
     bar_col = f'Sum of Fin {sum_trx_type} {trx_type}'
-    bar_title = f"{sum_trx_type} {trx_type} Transactions Volume & Growth"
+    bar_title = f"Transactions Volume & Growth untuk {variabel_trx} {jenis_trx}"
 
     if sum_trx_type == "Jumlah":
         bar_yaxis_title = "Volume (Jutaan)"
+        scale_factor = 1e6
     else:
         bar_yaxis_title = "Value (Rp Triliun)"
+        scale_factor = 1e12
 
     fig = go.Figure()
 
     fig.add_trace(go.Bar(
         x=df_copy[target_col],
-        y=df_copy[bar_col],
+        y=df_copy[bar_col] / scale_factor,
         name=bar_yaxis_title,
-        yaxis='y1'
+        yaxis='y1',
+        hovertemplate='%{x} <br>' + bar_yaxis_title + ': %{y:,.2f}' + '<extra></extra>'
     ))
 
     if is_combined:
@@ -135,6 +150,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
                 name='Month-to-Month Growth (%)',
                 yaxis='y2',
                 mode='lines+markers',
+                hovertemplate='%{x} <br>Month-to-Month Growth: %{y:,.2f}%' + '<extra></extra>'
             ))
         else:
             fig.add_trace(go.Scatter(
@@ -143,6 +159,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
                 name='Year-on-Year Growth (%)',
                 yaxis='y2',
                 mode='lines+markers',
+                hovertemplate='%{x} <br>Year-on-Year Growth: %{y:,.2f}%' + '<extra></extra>'
             ))
 
             fig.add_trace(go.Scatter(
@@ -151,6 +168,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
                 name='Quarter-to-Quarter Growth (%)',
                 yaxis='y2',
                 mode='lines+markers',
+                hovertemplate='%{x} <br>Quarter-to-Quarter Growth: %{y:,.2f}%' + '<extra></extra>'
             ))
     else:
         if is_month:
@@ -160,6 +178,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
                 name='Month-to-Month Growth (%)',
                 yaxis='y2',
                 mode='lines+markers',
+                hovertemplate='%{x} <br>Month-to-Month Growth: %{y:,.2f}%' + '<extra></extra>'
             ))
         else:
             fig.add_trace(go.Scatter(
@@ -168,6 +187,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
                 name='Year-on-Year Growth (%)',
                 yaxis='y2',
                 mode='lines+markers',
+                hovertemplate='%{x} <br>Year-on-Year Growth: %{y:,.2f}%' + '<extra></extra>'
             ))
 
             fig.add_trace(go.Scatter(
@@ -176,6 +196,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
                 name='Quarter-to-Quarter Growth (%)',
                 yaxis='y2',
                 mode='lines+markers',
+                hovertemplate='%{x} <br>Quarter-to-Quarter Growth: %{y:,.2f}%' + '<extra></extra>'
             ))
 
     fig.update_layout(
@@ -183,7 +204,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
         xaxis=dict(title=target_col),
         yaxis=dict(
             title=bar_yaxis_title,
-            tickformat=",",
+            tickformat=",.0f",
         ),
         yaxis2=dict(
             title='Growth (%)',

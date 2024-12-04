@@ -452,3 +452,67 @@ def process_grand_total_profile(df: pd.DataFrame, trx_type: str) -> pd.DataFrame
 def add_quarter_column(df: pd.DataFrame) -> pd.DataFrame:
     df['Quarter'] = (df['Month'] - 1) // 3 + 1
     return df
+
+def rename_format_growth_df(df: pd.DataFrame, trx_type: str):
+    if trx_type == "Inc":
+        trx_var = "Incoming"
+    elif trx_type == "Out":
+        trx_var = "Outgoing"
+    elif trx_type == "Dom":
+        trx_var = "Domestik"
+    else:
+        trx_var = "Total"
+
+    df.rename(columns={
+        f"Sum of Fin Jumlah {trx_type}": f"Total Frekuensi {trx_var}",
+        f"Sum of Fin Nilai {trx_type}": f"Total Nominal {trx_var}",
+        "%YoY Jumlah": "Year-on-Year Frekuensi",
+        "%QtQ Jumlah": "Quarter-to-Quarter Frekuensi",
+        "%YoY Nom": "Year-on-Year Nominal",
+        "%QtQ Nom": "Quarter-to-Quarter Nominal",
+    }, inplace=True)
+
+    df = df.style.format(
+        {
+            "Year": lambda x: "{:.0f}".format(x),
+            f"Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x),
+            f"Total Nominal {trx_var}": lambda x: '{:,.0f}'.format(x),
+            "Year-on-Year Frekuensi": lambda x: '{:,.2f} %'.format(x),
+            "Quarter-to-Quarter Frekuensi": lambda x: '{:,.2f} %'.format(x),
+            "Year-on-Year Nominal": lambda x: '{:,.2f} %'.format(x),
+            "Quarter-to-Quarter Nominal": lambda x: '{:,.2f} %'.format(x),
+        },
+        thousands=".",
+        decimal=",",
+    )
+    return df
+
+def rename_format_growth_monthly_df(df: pd.DataFrame, trx_type: str):
+    if trx_type == "Inc":
+        trx_var = "Incoming"
+    elif trx_type == "Out":
+        trx_var = "Outgoing"
+    elif trx_type == "Dom":
+        trx_var = "Domestik"
+    else:
+        trx_var = "Total"
+
+    df.rename(columns={
+        f"Sum of Fin Jumlah {trx_type}": f"Total Frekuensi {trx_var}",
+        f"Sum of Fin Nilai {trx_type}": f"Total Nominal {trx_var}",
+        "%MtM Jumlah": "Month-to-Month Frekuensi",
+        "%MtM Nom": "Month-to-Month Nominal",
+    }, inplace=True)
+
+    df = df.style.format(
+        {
+            "Year": lambda x: "{:.0f}".format(x),
+            f"Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x),
+            f"Total Nominal {trx_var}": lambda x: '{:,.0f}'.format(x),
+            "Month-to-Month Frekuensi": lambda x: '{:,.2f} %'.format(x),
+            "Month-to-Month Nominal": lambda x: '{:,.2f} %'.format(x),
+        },
+        thousands=".",
+        decimal=",",
+    )
+    return df
