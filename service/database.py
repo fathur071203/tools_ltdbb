@@ -16,6 +16,17 @@ def connect_db():
     key = st.secrets.connections.supabase["SUPABASE_KEY"]
     return create_client(url, key)
 
+# @st.cache_resource
+# def load_models(_db):
+#     url = "https://vepvyhefdqhszaywswaw.supabase.co/storage/v1/object/public/model_bucket/isolation_forest_model_dom_1.joblib?t=2024-12-04T09%3A41%3A40.486Z"
+#     models = {}
+#     response = _db.storage.from_("model_bucket")
+#     # for filename in os.listdir(folder_path):
+#     #     if filename.endswith(".joblib"):
+#     #         filepath = os.path.join(folder_path, filename)
+#     #         models[filename] = joblib.load(filepath)
+#     return models
+
 def get_user_logs_data(_db):
     response = _db.table("user_logs").select("data").eq("username", "Rakan").execute()
     return response.data

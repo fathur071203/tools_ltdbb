@@ -6,11 +6,14 @@ import io
 
 @st.cache_resource
 def load_models(folder_path="./models"):
+    url = "https://vepvyhefdqhszaywswaw.supabase.co/storage/v1/object/public/model_bucket/isolation_forest_model_dom_1.joblib?t=2024-12-04T09%3A41%3A40.486Z"
     models = {}
     for filename in os.listdir(folder_path):
         if filename.endswith(".joblib"):
+            print(filename)
             filepath = os.path.join(folder_path, filename)
             models[filename] = joblib.load(filepath)
+    print(models)
     return models
 
 @st.cache_data
