@@ -80,7 +80,7 @@ def set_page_settings():
     ]
     st.set_page_config(
         page_title="Tools Analisa Data LTDBB",
-        page_icon="static/favicon.png",
+        page_icon=".static/favicon.png",
         layout="wide",
         initial_sidebar_state="expanded")
     pg = st.navigation(pages=pages)
@@ -95,7 +95,7 @@ def set_page_visuals(condition):
     elif condition == "dm":
         st.title('Kelola Data Sistem')
     with st.sidebar:
-        st.image("static/Logo.png")
+        st.image(".static/Logo.png")
 
 def aggregate_data(df, is_trx=False):
     if is_trx:

@@ -189,7 +189,4 @@ fabric.properties
 
 test.py
 file/
-*.png
-*.jpg
-*.jpeg
 .streamlit/secrets.toml
