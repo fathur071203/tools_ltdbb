@@ -96,6 +96,7 @@ if st.session_state["uploaded_files"]:
         df = read_parquets(uploaded_files)
 
         df = df[df['SANDI_PELAPOR'].isin(list_pjp_code_dki)]
+        df.index += 1
 
         # Determine the report type based on FORM_NO
         form_no = df['FORM_NO'].iloc[0]
@@ -169,7 +170,11 @@ if st.session_state["uploaded_files"]:
             predictions = model_predict.predict(df[predict_cols])
             df['PREDICTED'] = predictions
         negative_predictions = df[df['PREDICTED'] == -1]
-        st.warning(f"Found {len(negative_predictions)} transactions with negative predictions (-1).")
+        negative_predictions['PREDICTED'] = negative_predictions['PREDICTED'].replace(-1, 'TKM')
+        negative_predictions = negative_predictions.reset_index(drop=True)
+        negative_predictions.index += 1
+        formatted_number = f"{len(negative_predictions):,}".replace(',', '.')
+        st.warning(f"Ditemukan {formatted_number} transaksi yang diduga mencurigakan.")
         st.dataframe(negative_predictions)
         st.divider()
         if not df_suspected_person_filter.empty:
@@ -181,6 +186,8 @@ if st.session_state["uploaded_files"]:
             pjp_df = pjp_df.sort_values(by="Count", ascending=False).reset_index(drop=True)
 
             st.write(f"**Jumlah Data Transaksi**: {len(df_suspected_person_filter):,}")
+            df_suspected_person_filter = df_suspected_person_filter.reset_index(drop=True)
+            df_suspected_person_filter.index += 1
             df_sus_person = st.data_editor(
                 df_suspected_person_filter,
                 key="df_suspected_person"
@@ -210,6 +217,8 @@ if st.session_state["uploaded_files"]:
             pjp_df = pd.DataFrame(pjp_counts.items(), columns=["PJP Name", "Count"])
             pjp_df = pjp_df.sort_values(by="Count", ascending=False).reset_index(drop=True)
             st.write(f"**Jumlah Data Transaksi**: {len(df_blacklisted_filter):,}")
+            df_blacklisted_filter = df_blacklisted_filter.reset_index(drop=True)
+            df_blacklisted_filter.index += 1
             df_blacklisted = st.data_editor(
                 df_blacklisted_filter,
                 key="df_blacklisted"
@@ -253,6 +262,8 @@ if st.session_state["uploaded_files"]:
             pjp_df = pd.DataFrame(pjp_counts.items(), columns=["PJP Name", "Count"])
             pjp_df = pjp_df.sort_values(by="Count", ascending=False).reset_index(drop=True)
             st.write(f"**Jumlah Data Transaksi**: {len(df_greylisted_filter):,}")
+            df_greylisted_filter = df_greylisted_filter.reset_index(drop=True)
+            df_greylisted_filter.index += 1
             df_greylisted = st.data_editor(
                 df_greylisted_filter,
                 key="df_greylisted"
