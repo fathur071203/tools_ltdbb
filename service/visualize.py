@@ -252,7 +252,7 @@ def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_p
     ))
 
     fig.update_layout(
-        title=f"Perkembangan Transaksi {trx_title} {nama_pjp} Tahun {selected_year} s.d. 2024",
+        title=f"Perkembangan Transaksi {trx_title} {nama_pjp} Tahun {selected_year}",
         xaxis=dict(title="Bulan"),
         yaxis=dict(
             title="Nilai (Rp Miliar)",
