@@ -178,7 +178,7 @@ if st.session_state["uploaded_files"]:
         st.dataframe(negative_predictions)
         st.divider()
         if not df_suspected_person_filter.empty:
-            st.markdown(f"### Informasi Transaksi dengan Nama Pengirim atau Nama Penerima Tersangka")
+            st.markdown(f"### Informasi Transaksi dengan Nama Pengirim atau Nama Penerima Terduga")
             list_pjp_name = get_pjp_suspected_blacklisted_greylisted(df_suspected_person_filter, list_pjp_dki)
             pjp_counts = Counter(list_pjp_name)
 
@@ -192,7 +192,7 @@ if st.session_state["uploaded_files"]:
                 df_suspected_person_filter,
                 key="df_suspected_person"
             )
-            st.write("**PJP Tersangka:**")
+            st.write("**PJP Terduga:**")
             st.data_editor(
                 pjp_df,
                 hide_index=True,

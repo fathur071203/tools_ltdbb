@@ -57,25 +57,25 @@ list_non_greylisted = sorted(list_non_greylisted, key=lambda x: x['name'])
 list_blacklisted = sorted(list_blacklisted, key=lambda x: x['name'])
 list_greylisted = sorted(list_greylisted, key=lambda x: x['name'])
 
-tab1, tab2 = st.tabs(["Kelola Data Tersangka/Mencurigakan", "Kelola Data Referensi"])
+tab1, tab2 = st.tabs(["Kelola Data Terduga Mencurigakan", "Kelola Data Referensi"])
 
 with tab1:
-    st.markdown("### Kelola Data Nama Tersangka")
+    st.markdown("### Kelola Data Nama Terduga Mencurigakan")
     if len(list_sus_people) > 0:
         df_sus_people = st.data_editor(
             list_sus_people,
             column_config={
-                "name": "Nama Tersangka"
+                "name": "Nama Terduga"
             },
             key="suspicious_person"
         )
     else:
-        st.warning("Tidak ada data nama Tersangka untuk ditampilkan.")
+        st.warning("Tidak ada data nama Terduga untuk ditampilkan.")
     col_sus1, col_sus2 = st.columns(2)
     with col_sus1:
-        st.markdown("#### Tambah Data Nama Tersangka Baru")
+        st.markdown("#### Tambah Data Nama Terduga Mencurigakan Baru")
         with st.form(key='add_sus_person_form', enter_to_submit=False):
-            person_name = st.text_input("Nama Orang Tersangka", key='person_name')
+            person_name = st.text_input("Nama Orang Terduga", key='person_name')
             submitted_suspected = st.form_submit_button("Submit", use_container_width=True, type="secondary")
             if submitted_suspected:
                 if not person_name:
@@ -83,18 +83,18 @@ with tab1:
                 else:
                     submit_add_sus_person(db, person_name_input=person_name)
     with col_sus2:
-        st.markdown("#### Update Data Nama Tersangka")
+        st.markdown("#### Update Data Nama Terduga Mencurigakan")
         options_sus_people = []
         if len(list_sus_people) > 0:
             for person in list_sus_people:
                 options_sus_people.append(person['name'])
-            selected_person_update = st.selectbox("Pilih Nama Tersangka yang ingin diubah: ",
+            selected_person_update = st.selectbox("Pilih Nama Terduga yang ingin diubah: ",
                                                   options=options_sus_people,
                                                   key="selected_person_update", index=0)
             if selected_person_update:
                 selected_person = get_selected_person(selected_person_update, list_sus_people)
             with st.form(key='update_person_form', enter_to_submit=False):
-                update_person_name = st.text_input("Nama Tersangka",
+                update_person_name = st.text_input("Nama Terduga",
                                                    key="update_person_name", value=selected_person['name'])
                 col_sus3, col_sus4 = st.columns(2)
                 with col_sus3:
@@ -110,7 +110,7 @@ with tab1:
                 elif submitted_delete:
                     submit_delete_sus_person(db, selected_person_update)
         else:
-            st.warning("Tidak ada data nama Tersangka untuk diubah atau dihapus.")
+            st.warning("Tidak ada data nama Terduga untuk diubah atau dihapus.")
     st.divider()
     # st.markdown("### Kelola Data Daerah Mencurigakan")
     # if len(list_sus_cities) > 0:
