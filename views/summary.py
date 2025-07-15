@@ -46,6 +46,14 @@ if df is not None and df_national is not None:
         list_pjp_code_dki.append(int(pjp['code']))
 
     df = df[df['Kode'].isin(list_pjp_code_dki)]
+    st.session_state['df'] = df
+
+    if not df['Year'].dtype == 'int64':
+        df['Year'] = df['Year'].astype('int64')
+    if not df['Quarter'].dtype == 'int64':
+        df['Quarter'] = df['Quarter'].astype('int64')
+    if not df['Month'].dtype == 'int64':
+        df['Month'] = df['Month'].astype('int64')
 
     pjp_list = ['All'] + df['Nama PJP'].unique().tolist()
     years = ['All'] + list(df['Year'].unique())
