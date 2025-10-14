@@ -4,6 +4,7 @@ import numpy as np
 import re
 import time
 from difflib import SequenceMatcher
+import unicodedata
 from service.preprocess import set_page_visuals
 from service.fds import load_models, read_excel, read_parquets, split_df, get_ml_model, \
     get_pjp_suspected_blacklisted_greylisted
@@ -683,6 +684,44 @@ if st.session_state["uploaded_files"]:
 
         df = read_parquets(uploaded_files)
 
+        # Sanitize text columns to avoid rendering/wrapping errors due to invalid encodings/control chars
+        def _clean_text(val):
+            try:
+                if pd.isna(val):
+                    return val
+                s = str(val)
+                # Normalize Unicode (compatibility decomposition -> composition)
+                try:
+                    s = unicodedata.normalize("NFKC", s)
+                except Exception:
+                    pass
+                # Replace NBSP with normal space
+                s = s.replace("\u00A0", " ")
+                # Remove control characters and non-printable ranges
+                s = re.sub(r"[\u0000-\u001F\u007F-\u009F]", "", s)
+                # Remove zero-width and BOM/word joiners
+                s = re.sub(r"[\u200B\u200C\u200D\u2060\uFEFF]", "", s)
+                # Remove bidi control chars and line/paragraph separators
+                s = re.sub(r"[\u2028\u2029\u202A-\u202E\u2066-\u2069\u200E\u200F]", "", s)
+                # Remove Unicode replacement character explicitly
+                s = s.replace("\uFFFD", "")
+                # Strip stray surrogate code units if any (defensive)
+                s = re.sub(r"[\uD800-\uDFFF]", "", s)
+                # Strip stray surrogate code units if any (defensive)
+                s = s.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
+                return s
+            except Exception:
+                # If anything goes wrong, fallback to safe string casting
+                try:
+                    return str(val)
+                except Exception:
+                    return ""
+
+        # Apply cleaning only to object/string dtype columns
+        for col in df.columns:
+            if df[col].dtype == object or str(df[col].dtype).startswith("string"):
+                df[col] = df[col].map(_clean_text)
+
         df = df[df['SANDI_PELAPOR'].isin(list_pjp_code_dki)]
         df.index += 1
 
@@ -1317,104 +1356,110 @@ if st.session_state["uploaded_files"]:
             st.divider()
 
         # ========== Fuzzy Matching (Paling Bawah) ==========
-        try:
-            st.markdown("### Pencocokan Nama (Fuzzy) terhadap Daftar known_names — Bagian Paling Bawah")
+        ENABLE_FUZZY = False  # Ubah ke True untuk mengaktifkan kembali fitur Fuzzy
+        if ENABLE_FUZZY:
+            try:
+                st.markdown("### Pencocokan Nama (Fuzzy) terhadap Daftar known_names — Bagian Paling Bawah")
 
-            # Helper normalize
-            def _norm(s: str) -> str:
-                s = (s or "").upper().strip()
-                s = re.sub(r"[^A-Z0-9 ]+", " ", s)
-                s = re.sub(r"\s+", " ", s).strip()
-                return s
+                # Helper normalize
+                def _norm(s: str) -> str:
+                    s = (s or "").upper().strip()
+                    s = re.sub(r"[^A-Z0-9 ]+", " ", s)
+                    s = re.sub(r"\s+", " ", s).strip()
+                    return s
 
-            def _token_sort(s: str) -> str:
-                toks = [t for t in _norm(s).split(" ") if t]
-                return " ".join(sorted(toks))
+                def _token_sort(s: str) -> str:
+                    toks = [t for t in _norm(s).split(" ") if t]
+                    return " ".join(sorted(toks))
 
-            # Precompute
-            KN = [(orig, _norm(orig), _token_sort(orig)) for orig in known_names]
+                # Precompute
+                KN = [(orig, _norm(orig), _token_sort(orig)) for orig in known_names]
 
-            # Ambil nama unik dari pengirim & penerima
-            uniq_pengirim = (
-                df["NAMA_PENGIRIM"].dropna().astype(str).str.strip().unique().tolist()
-                if "NAMA_PENGIRIM" in df.columns else []
-            )
-            uniq_penerima = (
-                df["NAMA_PENERIMA"].dropna().astype(str).str.strip().unique().tolist()
-                if "NAMA_PENERIMA" in df.columns else []
-            )
-
-            # Gabungkan dua set supaya proses sekali dengan peran
-            tasks = [("PENGIRIM", n) for n in uniq_pengirim] + [("PENERIMA", n) for n in uniq_penerima]
-
-            # Progress & ETA
-            prog = st.progress(0, text="Menghitung fuzzy score...")
-            eta = st.empty()
-            start = time.time()
-
-            cache = {}
-            def best_match(name: str):
-                nrm = _norm(name)
-                if not nrm or len(nrm) < 3:
-                    return ("", 0)
-                n_tok = _token_sort(nrm)
-                best_s, best_n = 0, ""
-                for orig, kn_nrm, kn_tok in KN:
-                    r1 = SequenceMatcher(None, nrm, kn_nrm).ratio()
-                    r2 = SequenceMatcher(None, n_tok, kn_tok).ratio()
-                    score = int(round(100 * max(r1, r2)))
-                    if score > best_s:
-                        best_s, best_n = score, orig
-                        if best_s == 100:
-                            break
-                return (best_n, best_s)
-
-            out_rows = []
-            total = len(tasks)
-            for i, (role, name) in enumerate(tasks, start=1):
-                if name in cache:
-                    match_name, score = cache[name]
-                else:
-                    match_name, score = best_match(name)
-                    cache[name] = (match_name, score)
-                out_rows.append({
-                    "Peran": role,
-                    "Nama_Asli": name,
-                    "Match_Dengan": match_name,
-                    "Score": score,
-                })
-                # progress
-                elapsed = time.time() - start
-                rate = elapsed / i if i else 0
-                remain = (total - i) * rate
-                prog.progress(min(i / max(total, 1), 1.0), text=f"Menghitung fuzzy score... {i}/{total}")
-                eta.caption(f"Perkiraan sisa waktu: {int(max(remain,0)//60)} menit {int(max(remain,0)%60)} detik")
-
-            prog.progress(1.0, text="Selesai fuzzy")
-            eta.empty()
-
-            fuzzy_df = pd.DataFrame(out_rows)
-            if not fuzzy_df.empty:
-                # Terapkan ambang minimal 80
-                fuzzy_df = fuzzy_df[fuzzy_df["Score"] >= 80].copy()
-                fuzzy_df = fuzzy_df.sort_values(by=["Score"], ascending=False).reset_index(drop=True)
-
-                st.data_editor(
-                    fuzzy_df,
-                    key="df_fuzzy_bottom",
-                    hide_index=True,
-                    use_container_width=True,
-                    column_config={
-                        "Peran": "Peran (Pengirim/Penerima)",
-                        "Nama_Asli": "Nama Dalam Data",
-                        "Match_Dengan": "Cocok Dengan Nama",
-                        "Score": st.column_config.NumberColumn("Skor", min_value=0, max_value=100),
-                    }
+                # Ambil nama unik dari pengirim & penerima
+                uniq_pengirim = (
+                    df["NAMA_PENGIRIM"].dropna().astype(str).str.strip().unique().tolist()
+                    if "NAMA_PENGIRIM" in df.columns else []
                 )
-            else:
-                st.info("Tidak ada nama untuk diproses fuzzy.")
+                uniq_penerima = (
+                    df["NAMA_PENERIMA"].dropna().astype(str).str.strip().unique().tolist()
+                    if "NAMA_PENERIMA" in df.columns else []
+                )
+
+                # Gabungkan dua set supaya proses sekali dengan peran
+                tasks = [("PENGIRIM", n) for n in uniq_pengirim] + [("PENERIMA", n) for n in uniq_penerima]
+
+                # Progress & ETA
+                prog = st.progress(0, text="Menghitung fuzzy score...")
+                eta = st.empty()
+                start = time.time()
+
+                cache = {}
+                def best_match(name: str):
+                    nrm = _norm(name)
+                    if not nrm or len(nrm) < 3:
+                        return ("", 0)
+                    n_tok = _token_sort(nrm)
+                    best_s, best_n = 0, ""
+                    for orig, kn_nrm, kn_tok in KN:
+                        r1 = SequenceMatcher(None, nrm, kn_nrm).ratio()
+                        r2 = SequenceMatcher(None, n_tok, kn_tok).ratio()
+                        score = int(round(100 * max(r1, r2)))
+                        if score > best_s:
+                            best_s, best_n = score, orig
+                            if best_s == 100:
+                                break
+                    return (best_n, best_s)
+
+                out_rows = []
+                total = len(tasks)
+                for i, (role, name) in enumerate(tasks, start=1):
+                    if name in cache:
+                        match_name, score = cache[name]
+                    else:
+                        match_name, score = best_match(name)
+                        cache[name] = (match_name, score)
+                    out_rows.append({
+                        "Peran": role,
+                        "Nama_Asli": name,
+                        "Match_Dengan": match_name,
+                        "Score": score,
+                    })
+                    # progress
+                    elapsed = time.time() - start
+                    rate = elapsed / i if i else 0
+                    remain = (total - i) * rate
+                    prog.progress(min(i / max(total, 1), 1.0), text=f"Menghitung fuzzy score... {i}/{total}")
+                    eta.caption(f"Perkiraan sisa waktu: {int(max(remain,0)//60)} menit {int(max(remain,0)%60)} detik")
+
+                prog.progress(1.0, text="Selesai fuzzy")
+                eta.empty()
+
+                fuzzy_df = pd.DataFrame(out_rows)
+                if not fuzzy_df.empty:
+                    # Terapkan ambang minimal 80
+                    fuzzy_df = fuzzy_df[fuzzy_df["Score"] >= 80].copy()
+                    fuzzy_df = fuzzy_df.sort_values(by=["Score"], ascending=False).reset_index(drop=True)
+
+                    st.data_editor(
+                        fuzzy_df,
+                        key="df_fuzzy_bottom",
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "Peran": "Peran (Pengirim/Penerima)",
+                            "Nama_Asli": "Nama Dalam Data",
+                            "Match_Dengan": "Cocok Dengan Nama",
+                            "Score": st.column_config.NumberColumn("Skor", min_value=0, max_value=100),
+                        }
+                    )
+                else:
+                    st.info("Tidak ada nama untuk diproses fuzzy.")
+                st.divider()
+            except Exception as _fuzzy_err:
+                st.warning(f"Gagal melakukan fuzzy matching: {_fuzzy_err}")
+        else:
+            st.markdown("### Pencocokan Nama (Fuzzy) terhadap Daftar known_names — Bagian Paling Bawah")
+            st.info("Fitur Fuzzy sementara dinonaktifkan karena berat. Aktifkan kembali bila dibutuhkan.")
             st.divider()
-        except Exception as _fuzzy_err:
-            st.warning(f"Gagal melakukan fuzzy matching: {_fuzzy_err}")
     except Exception as e:
         st.error(f"Error processing files: {e}")

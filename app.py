@@ -8,17 +8,13 @@ from service.preprocess import *
 from service.visualize import *
 from service.database import connect_db
 
-# WARNING: Hardcoded password (temporary as requested). For production, move to .streamlit/secrets.toml
-HARDCODED_PASSWORD = "dpsp2024"
-
 
 def check_password():
     """Returns True if the user had the correct password."""
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        # Compare against hardcoded password
-        if hmac.compare_digest(st.session_state["password"], HARDCODED_PASSWORD):
+        if hmac.compare_digest(st.session_state["password"], st.secrets["password"]):
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Don't store the password.
         else:
