@@ -6,4 +6,4 @@ textColor="#31333F"
 font="sans serif"
 
 [server]
-enableStaticServing = true
+enableStaticServing = false
