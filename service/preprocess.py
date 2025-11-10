@@ -420,17 +420,18 @@ def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_t
         frek_nasional = df_inc['Frekuensi (dalam jutaan)'].values[1] + df_out['Frekuensi (dalam jutaan)'].values[1] + \
                         df_dom['Frekuensi (dalam jutaan)'].values[1]
     else:
-        nominal_jkt = (df[f'Sum of Fin Nilai {trx_type}'].sum() / 1_000_000_000_000).round(2)
-        frek_jkt = (df[f'Sum of Fin Jumlah {trx_type}'].sum() / 1_000_000).round(2)
-        nominal_nasional = (df_national[f'Nom Nasional {trx_type}'].sum() / 1_000).round(2)
-        frek_nasional = (df_national[f'Frek Nasional {trx_type}'].sum() / 1_000_000).round(2)
+        # sums return Python/numpy scalars; use built-in round() to avoid AttributeError on float
+        nominal_jkt = round(df[f'Sum of Fin Nilai {trx_type}'].sum() / 1_000_000_000_000, 2)
+        frek_jkt = round(df[f'Sum of Fin Jumlah {trx_type}'].sum() / 1_000_000, 2)
+        nominal_nasional = round(df_national[f'Nom Nasional {trx_type}'].sum() / 1_000, 2)
+        frek_nasional = round(df_national[f'Frek Nasional {trx_type}'].sum() / 1_000_000, 2)
 
     data = {
         f"Transaksi {trx_word}": ['Jakarta', 'Nasional', 'Market Share (%)'],
-        "Nominal (dalam triliun)": [nominal_jkt, nominal_nasional,
-                                    ((nominal_jkt / nominal_nasional) * 100).round(2)],
-        "Frekuensi (dalam jutaan)": [frek_jkt, frek_nasional,
-                                     ((frek_jkt / frek_nasional) * 100).round(2)],
+    "Nominal (dalam triliun)": [nominal_jkt, nominal_nasional,
+                    round(((nominal_jkt / nominal_nasional) * 100), 2) if nominal_nasional else None],
+    "Frekuensi (dalam jutaan)": [frek_jkt, frek_nasional,
+                     round(((frek_jkt / frek_nasional) * 100), 2) if frek_nasional else None],
     }
     df_out = pd.DataFrame(data)
     return df_out
