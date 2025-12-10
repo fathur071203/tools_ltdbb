@@ -471,20 +471,33 @@ def rename_format_growth_df(df: pd.DataFrame, trx_type: str):
         "%QtQ Jumlah": "Quarter-to-Quarter Frekuensi",
         "%YoY Nom": "Year-on-Year Nominal",
         "%QtQ Nom": "Quarter-to-Quarter Nominal",
+        "%YoY Nilai": "Year-on-Year Nominal",
+        "%QtQ Nilai": "Quarter-to-Quarter Nominal",
     }, inplace=True)
+
+    # Ensure growth rate columns are numeric to avoid formatting issues
+    growth_cols = ["Year-on-Year Frekuensi", "Quarter-to-Quarter Frekuensi", 
+                   "Year-on-Year Nominal", "Quarter-to-Quarter Nominal"]
+    for col in growth_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # Format function that handles None/NaN gracefully
+    def format_percent(x):
+        if pd.isna(x):
+            return 'None'
+        return '{:,.2f} %'.format(x).replace(',', '#').replace('.', ',').replace('#', '.')
 
     df = df.style.format(
         {
-            "Year": lambda x: "{:.0f}".format(x),
-            f"Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x),
-            f"Total Nominal {trx_var}": lambda x: '{:,.0f}'.format(x),
-            "Year-on-Year Frekuensi": lambda x: '{:,.2f} %'.format(x),
-            "Quarter-to-Quarter Frekuensi": lambda x: '{:,.2f} %'.format(x),
-            "Year-on-Year Nominal": lambda x: '{:,.2f} %'.format(x),
-            "Quarter-to-Quarter Nominal": lambda x: '{:,.2f} %'.format(x),
-        },
-        thousands=".",
-        decimal=",",
+            "Year": lambda x: "{:.0f}".format(x) if pd.notna(x) else '',
+            f"Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x).replace(',', '#').replace('.', ',').replace('#', '.') if pd.notna(x) else '',
+            f"Total Nominal {trx_var}": lambda x: '{:,.0f}'.format(x).replace(',', '#').replace('.', ',').replace('#', '.') if pd.notna(x) else '',
+            "Year-on-Year Frekuensi": format_percent,
+            "Quarter-to-Quarter Frekuensi": format_percent,
+            "Year-on-Year Nominal": format_percent,
+            "Quarter-to-Quarter Nominal": format_percent,
+        }
     )
     return df
 
@@ -503,18 +516,29 @@ def rename_format_growth_monthly_df(df: pd.DataFrame, trx_type: str):
         f"Sum of Fin Nilai {trx_type}": f"Total Nominal {trx_var}",
         "%MtM Jumlah": "Month-to-Month Frekuensi",
         "%MtM Nom": "Month-to-Month Nominal",
+        "%MtM Nilai": "Month-to-Month Nominal",
     }, inplace=True)
+
+    # Ensure growth rate columns are numeric to avoid formatting issues
+    growth_cols = ["Month-to-Month Frekuensi", "Month-to-Month Nominal"]
+    for col in growth_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # Format function that handles None/NaN gracefully
+    def format_percent(x):
+        if pd.isna(x):
+            return 'None'
+        return '{:,.2f} %'.format(x).replace(',', '#').replace('.', ',').replace('#', '.')
 
     df = df.style.format(
         {
-            "Year": lambda x: "{:.0f}".format(x),
-            f"Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x),
-            f"Total Nominal {trx_var}": lambda x: '{:,.0f}'.format(x),
-            "Month-to-Month Frekuensi": lambda x: '{:,.2f} %'.format(x),
-            "Month-to-Month Nominal": lambda x: '{:,.2f} %'.format(x),
-        },
-        thousands=".",
-        decimal=",",
+            "Year": lambda x: "{:.0f}".format(x) if pd.notna(x) else '',
+            f"Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x).replace(',', '#').replace('.', ',').replace('#', '.') if pd.notna(x) else '',
+            f"Total Nominal {trx_var}": lambda x: '{:,.0f}'.format(x).replace(',', '#').replace('.', ',').replace('#', '.') if pd.notna(x) else '',
+            "Month-to-Month Frekuensi": format_percent,
+            "Month-to-Month Nominal": format_percent,
+        }
     )
     return df
 
