@@ -14,12 +14,19 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
 
     with st.sidebar:
         with st.expander("Filter Individu", True):
-            pjp_list = ['All'] + df['Nama PJP'].unique().tolist()
-            years = ['All'] + list(df['Year'].unique())
+            pjp_list = ['All'] + sorted(df['Nama PJP'].unique().tolist())
+            years = ['All'] + sorted(list(df['Year'].unique()))
 
-            selected_pjp = st.selectbox('Select PJP:', pjp_list)
-            selected_year_pjp = st.selectbox('Select Year:', years, key="key_year_pjp")
-        st.info("Use the filters to adjust the PJP name and transaction year.")
+            # Search filter untuk PJP
+            search_pjp = st.text_input("🔍 Cari PJP:", placeholder="Ketik nama PJP...")
+            if search_pjp:
+                filtered_pjp = [pjp for pjp in pjp_list if search_pjp.lower() in pjp.lower()]
+            else:
+                filtered_pjp = pjp_list
+            
+            selected_pjp = st.selectbox('Pilih PJP:', filtered_pjp)
+            selected_year_pjp = st.selectbox('Pilih Tahun:', years, key="key_year_pjp")
+        st.info("Gunakan filter untuk memilih nama PJP dan tahun transaksi.")
 
     df_national_preprocessed_year = preprocess_data_national(df_national, True)
     df_national_preprocessed_month = preprocess_data_national(df_national, False)
@@ -110,6 +117,87 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             - Simbol , (koma) berfungsi sebagai pemisah ribuan
             - Simbol . (titik) berfungsi sebagai pemisah desimal
             """)
+            
+            # Tambahkan section untuk Growth Data
+            st.divider()
+            st.subheader(f"📊 Data Pertumbuhan Transaksi - {selected_pjp} (Per Kuartal)")
+            
+            with st.spinner('Memproses data pertumbuhan...'):
+                # Get growth data untuk PJP
+                pjp_growth_data = get_pjp_growth_data(df_preprocessed, selected_pjp, is_month=False)
+                
+                if pjp_growth_data and 'total' in pjp_growth_data:
+                    df_total_growth = pjp_growth_data['total'].copy()
+                    
+                    # Format columns untuk display
+                    df_total_growth = df_total_growth.rename(columns={
+                        'Sum of Fin Jumlah Total': 'Total Frekuensi Total',
+                        'Sum of Fin Nilai Total': 'Total Nominal Total',
+                        '%YoY': 'Year-on-Year Nominal (%)',
+                        '%QtQ': 'Quarter-to-Quarter Nominal (%)',
+                    })
+                    
+                    # Reorder columns
+                    display_cols = ['Year', 'Quarter', 'Total Frekuensi Total', 'Total Nominal Total',
+                                    'Year-on-Year Nominal (%)', 'Quarter-to-Quarter Nominal (%)']
+                    df_total_growth_display = df_total_growth[display_cols].copy()
+                    
+                    # Format display
+                    df_total_growth_display = format_pjp_growth_table(df_total_growth_display, is_total=True)
+                    
+                    st.write("**Total (Incoming + Outgoing + Domestik)**")
+                    st.dataframe(df_total_growth_display, use_container_width=True, hide_index=True)
+                    
+                    # Tampilkan tabel per tipe transaksi
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.write("**Incoming**")
+                        df_inc = pjp_growth_data['incoming'].copy()
+                        df_inc = df_inc.rename(columns={
+                            'Frekuensi': 'Total Frekuensi',
+                            'Nominal': 'Total Nominal',
+                            '%YoY': 'Year-on-Year (%)',
+                            '%QtQ': 'Quarter-to-Quarter (%)',
+                        })
+                        # Reorder columns
+                        inc_cols = ['Year', 'Quarter', 'Total Frekuensi', 'Total Nominal', 'Year-on-Year (%)', 'Quarter-to-Quarter (%)']
+                        df_inc_display = df_inc[inc_cols].copy()
+                        df_inc_display = format_pjp_growth_table(df_inc_display, is_total=False)
+                        st.dataframe(df_inc_display, use_container_width=True, hide_index=True)
+                    
+                    with col2:
+                        st.write("**Outgoing**")
+                        df_out = pjp_growth_data['outgoing'].copy()
+                        df_out = df_out.rename(columns={
+                            'Frekuensi': 'Total Frekuensi',
+                            'Nominal': 'Total Nominal',
+                            '%YoY': 'Year-on-Year (%)',
+                            '%QtQ': 'Quarter-to-Quarter (%)',
+                        })
+                        # Reorder columns
+                        out_cols = ['Year', 'Quarter', 'Total Frekuensi', 'Total Nominal', 'Year-on-Year (%)', 'Quarter-to-Quarter (%)']
+                        df_out_display = df_out[out_cols].copy()
+                        df_out_display = format_pjp_growth_table(df_out_display, is_total=False)
+                        st.dataframe(df_out_display, use_container_width=True, hide_index=True)
+                    
+                    with col3:
+                        st.write("**Domestik**")
+                        df_dom = pjp_growth_data['domestik'].copy()
+                        df_dom = df_dom.rename(columns={
+                            'Frekuensi': 'Total Frekuensi',
+                            'Nominal': 'Total Nominal',
+                            '%YoY': 'Year-on-Year (%)',
+                            '%QtQ': 'Quarter-to-Quarter (%)',
+                        })
+                        # Reorder columns
+                        dom_cols = ['Year', 'Quarter', 'Total Frekuensi', 'Total Nominal', 'Year-on-Year (%)', 'Quarter-to-Quarter (%)']
+                        df_dom_display = df_dom[dom_cols].copy()
+                        df_dom_display = format_pjp_growth_table(df_dom_display, is_total=False)
+                        st.dataframe(df_dom_display, use_container_width=True, hide_index=True)
+            
+            st.divider()
+            
             make_combined_bar_line_chart_profile(df_domestic_month, "Dom", selected_pjp, selected_year_pjp)
             make_combined_bar_line_chart_profile(df_incoming_month, "Inc", selected_pjp, selected_year_pjp)
             make_combined_bar_line_chart_profile(df_outgoing_month, "Out", selected_pjp, selected_year_pjp)

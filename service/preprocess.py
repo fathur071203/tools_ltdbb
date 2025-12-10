@@ -598,3 +598,189 @@ def format_profile_df_grand_total(df: pd.DataFrame, trx_type: str):
         decimal=",",
     )
     return df
+
+
+def get_pjp_growth_data(df: pd.DataFrame, pjp_name: str, is_month: bool = False) -> dict:
+    """
+    Generate growth data untuk satu PJP dengan breakdown per Incoming/Outgoing/Domestik
+    """
+    # Filter data untuk PJP tertentu
+    df_pjp = df[df['Nama PJP'] == pjp_name].copy()
+    
+    if df_pjp.empty:
+        return {}
+    
+    first_year = df_pjp['Year'].min()
+    
+    if is_month:
+        group_cols = ['Year', 'Month']
+    else:
+        group_cols = ['Year', 'Quarter']
+    
+    # Aggregate per Year/Quarter
+    df_agg = df_pjp.groupby(group_cols, observed=False).agg({
+        'Sum of Fin Jumlah Inc': 'sum',
+        'Sum of Fin Jumlah Out': 'sum',
+        'Sum of Fin Jumlah Dom': 'sum',
+        'Sum of Fin Nilai Inc': 'sum',
+        'Sum of Fin Nilai Out': 'sum',
+        'Sum of Fin Nilai Dom': 'sum',
+    }).reset_index()
+    
+    # Buat combined total
+    df_agg['Sum of Fin Jumlah Total'] = (
+        df_agg['Sum of Fin Jumlah Inc'] + 
+        df_agg['Sum of Fin Jumlah Out'] + 
+        df_agg['Sum of Fin Jumlah Dom']
+    )
+    df_agg['Sum of Fin Nilai Total'] = (
+        df_agg['Sum of Fin Nilai Inc'] + 
+        df_agg['Sum of Fin Nilai Out'] + 
+        df_agg['Sum of Fin Nilai Dom']
+    )
+    
+    # Ensure numeric types
+    numeric_cols = [col for col in df_agg.columns if 'Sum of Fin' in col]
+    for col in numeric_cols:
+        df_agg[col] = pd.to_numeric(df_agg[col], errors='coerce')
+    
+    # Calculate growth rates untuk Total
+    if not is_month:
+        # YoY & QtQ untuk quarterly
+        df_agg['%YoY'] = np.nan
+        df_agg['%QtQ'] = np.nan
+        
+        # YoY calculation untuk total
+        for i in range(len(df_agg)):
+            if df_agg.iloc[i]['Year'] > first_year:
+                current_val = df_agg.iloc[i]['Sum of Fin Nilai Total']
+                prev_year_data = df_agg[
+                    (df_agg['Year'] == df_agg.iloc[i]['Year'] - 1) & 
+                    (df_agg['Quarter'] == df_agg.iloc[i]['Quarter'])
+                ]
+                if not prev_year_data.empty:
+                    prev_val = prev_year_data.iloc[0]['Sum of Fin Nilai Total']
+                    if prev_val != 0:
+                        df_agg.at[i, '%YoY'] = round(((current_val - prev_val) / prev_val) * 100, 2)
+        
+        # QtQ calculation untuk total
+        for i in range(len(df_agg)):
+            if i > 0:
+                current_val = df_agg.iloc[i]['Sum of Fin Nilai Total']
+                prev_val = df_agg.iloc[i - 1]['Sum of Fin Nilai Total']
+                if prev_val != 0:
+                    df_agg.at[i, '%QtQ'] = round(((current_val - prev_val) / prev_val) * 100, 2)
+    
+    # Prepare breakdown untuk setiap tipe transaksi dengan growth
+    def add_growth_to_breakdown(df_breakdown, col_base, group_cols, first_year):
+        """Helper function untuk tambah YoY & QtQ ke breakdown"""
+        df_breakdown['%YoY'] = np.nan
+        df_breakdown['%QtQ'] = np.nan
+        
+        # YoY calculation
+        for i in range(len(df_breakdown)):
+            if df_breakdown.iloc[i]['Year'] > first_year:
+                current_val = df_breakdown.iloc[i][col_base]
+                prev_year_data = df_breakdown[
+                    (df_breakdown['Year'] == df_breakdown.iloc[i]['Year'] - 1) & 
+                    (df_breakdown['Quarter'] == df_breakdown.iloc[i]['Quarter'])
+                ]
+                if not prev_year_data.empty:
+                    prev_val = prev_year_data.iloc[0][col_base]
+                    if pd.notna(prev_val) and prev_val != 0:
+                        df_breakdown.at[i, '%YoY'] = round(((current_val - prev_val) / prev_val) * 100, 2)
+        
+        # QtQ calculation
+        for i in range(len(df_breakdown)):
+            if i > 0:
+                current_val = df_breakdown.iloc[i][col_base]
+                prev_val = df_breakdown.iloc[i - 1][col_base]
+                if pd.notna(prev_val) and prev_val != 0:
+                    df_breakdown.at[i, '%QtQ'] = round(((current_val - prev_val) / prev_val) * 100, 2)
+        
+        return df_breakdown
+    
+    # Incoming breakdown dengan growth
+    df_inc = df_agg[group_cols + ['Sum of Fin Jumlah Inc', 'Sum of Fin Nilai Inc']].copy()
+    df_inc = df_inc.rename(columns={
+        'Sum of Fin Jumlah Inc': 'Frekuensi',
+        'Sum of Fin Nilai Inc': 'Nominal',
+    })
+    # Ensure numeric
+    df_inc['Frekuensi'] = pd.to_numeric(df_inc['Frekuensi'], errors='coerce')
+    df_inc['Nominal'] = pd.to_numeric(df_inc['Nominal'], errors='coerce')
+    df_inc = add_growth_to_breakdown(df_inc, 'Nominal', group_cols, first_year)
+    
+    # Outgoing breakdown dengan growth
+    df_out = df_agg[group_cols + ['Sum of Fin Jumlah Out', 'Sum of Fin Nilai Out']].copy()
+    df_out = df_out.rename(columns={
+        'Sum of Fin Jumlah Out': 'Frekuensi',
+        'Sum of Fin Nilai Out': 'Nominal',
+    })
+    # Ensure numeric
+    df_out['Frekuensi'] = pd.to_numeric(df_out['Frekuensi'], errors='coerce')
+    df_out['Nominal'] = pd.to_numeric(df_out['Nominal'], errors='coerce')
+    df_out = add_growth_to_breakdown(df_out, 'Nominal', group_cols, first_year)
+    
+    # Domestik breakdown dengan growth
+    df_dom = df_agg[group_cols + ['Sum of Fin Jumlah Dom', 'Sum of Fin Nilai Dom']].copy()
+    df_dom = df_dom.rename(columns={
+        'Sum of Fin Jumlah Dom': 'Frekuensi',
+        'Sum of Fin Nilai Dom': 'Nominal',
+    })
+    # Ensure numeric
+    df_dom['Frekuensi'] = pd.to_numeric(df_dom['Frekuensi'], errors='coerce')
+    df_dom['Nominal'] = pd.to_numeric(df_dom['Nominal'], errors='coerce')
+    df_dom = add_growth_to_breakdown(df_dom, 'Nominal', group_cols, first_year)
+    
+    # Prepare result dictionary dengan breakdown per tipe
+    result = {
+        'total': df_agg,
+        'incoming': df_inc,
+        'outgoing': df_out,
+        'domestik': df_dom,
+    }
+    
+    return result
+
+
+def format_pjp_growth_table(df: pd.DataFrame, is_total: bool = True):
+    """
+    Format tabel growth data untuk PJP dengan tipe data numerik yang tepat
+    """
+    df_copy = df.copy()
+    
+    # Convert ke numeric untuk semua kolom yang seharusnya numerik
+    numeric_cols = [col for col in df_copy.columns if any(x in col for x in ['Frekuensi', 'Nominal', '%', 'Year-on-Year', 'Quarter-to-Quarter'])]
+    for col in numeric_cols:
+        if col not in ['Year', 'Quarter', 'Month']:
+            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
+    
+    # Format function untuk percent
+    def format_percent(x):
+        if pd.isna(x):
+            return 'None'
+        return '{:,.2f} %'.format(x).replace(',', '#').replace('.', ',').replace('#', '.')
+    
+    # Format function untuk ribuan (dengan comma sebagai thousand separator)
+    def format_thousands(x):
+        if pd.isna(x):
+            return ''
+        return '{:,.0f}'.format(x).replace(',', '.').replace('#', ',')
+    
+    # Build format dict
+    format_dict = {}
+    for col in df_copy.columns:
+        if col in ['Year', 'Quarter', 'Month']:
+            # Year, Quarter, Month as integers
+            format_dict[col] = lambda x: str(int(x)) if pd.notna(x) else ''
+        elif any(pct in col for pct in ['%', 'Year-on-Year', 'Quarter-to-Quarter']):
+            # Percentage columns
+            format_dict[col] = format_percent
+        elif any(num in col for num in ['Frekuensi', 'Nominal', 'Total']):
+            # Numeric columns with thousands separator
+            format_dict[col] = format_thousands
+    
+    styled = df_copy.style.format(format_dict)
+    
+    return styled
