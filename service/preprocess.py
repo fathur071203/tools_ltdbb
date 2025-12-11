@@ -64,26 +64,44 @@ def filter_start_end_year(df, start_year, end_year, is_month: bool = False):
     return df_filtered
 
 
-def filter_by_quarter(df, start_quarter, end_quarter):
+def filter_by_quarter(df, start_year, start_quarter, end_year, end_quarter):
     """
-    Filter data berdasarkan quarter range (Q1-Q4)
+    Filter data berdasarkan Year-Quarter range yang kontinyu
+    Contoh: 2024-Q1 sampai 2025-Q3 akan include semua quarter dalam range itu
     """
+    import calendar
+    
     quarter_order = {'Q1': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4}
     start_q = quarter_order[start_quarter]
     end_q = quarter_order[end_quarter]
     
-    # Jika 'Quarter' column ada, gunakan itu, jika tidak, hitung dari Month
-    if 'Quarter' in df.columns:
-        df_filtered = df[(df['Quarter'] >= start_q) & (df['Quarter'] <= end_q)]
-    elif 'Month' in df.columns:
-        # Convert month to quarter
-        df_copy = df.copy()
-        df_copy['Quarter'] = (df_copy['Month'].astype(str).apply(
-            lambda m: list(calendar.month_name).index(m) if isinstance(m, str) else int(m)
-        ) - 1) // 3 + 1
-        df_filtered = df_copy[(df_copy['Quarter'] >= start_q) & (df_copy['Quarter'] <= end_q)].drop('Quarter', axis=1)
-    else:
-        df_filtered = df
+    df_copy = df.copy()
+    
+    # Hitung quarter dari month jika ada
+    if 'Month' in df_copy.columns:
+        # Convert Month ke month number dan pastikan integer
+        df_copy['MonthNum'] = df_copy['Month'].apply(
+            lambda m: list(calendar.month_name).index(str(m)) if str(m) in calendar.month_name else int(m)
+        ).astype(int)
+        df_copy['Quarter'] = ((df_copy['MonthNum'] - 1) // 3 + 1).astype(int)
+    elif 'Quarter' not in df_copy.columns:
+        # Jika tidak ada Quarter dan Month, return as-is
+        return df
+    
+    # Filter: kombinasi Year dan Quarter dengan range kontinu
+    # Start: Year == start_year dan Quarter >= start_q, atau Year > start_year
+    # End: Year == end_year dan Quarter <= end_q, atau Year < end_year
+    
+    start_condition = (df_copy['Year'] > start_year) | ((df_copy['Year'] == start_year) & (df_copy['Quarter'] >= start_q))
+    end_condition = (df_copy['Year'] < end_year) | ((df_copy['Year'] == end_year) & (df_copy['Quarter'] <= end_q))
+    
+    df_filtered = df_copy[start_condition & end_condition]
+    
+    # Hapus kolom helper
+    if 'MonthNum' in df_filtered.columns:
+        df_filtered = df_filtered.drop(['MonthNum'], axis=1, errors='ignore')
+    if 'Quarter' in df_filtered.columns and 'Quarter' not in df.columns:
+        df_filtered = df_filtered.drop(['Quarter'], axis=1, errors='ignore')
     
     return df_filtered
 
