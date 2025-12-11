@@ -41,12 +41,20 @@ def make_pie_chart_market_share(df: pd.DataFrame, trx_type: str, key: str ,is_no
         text = "Frekuensi"
 
     df_combined = pd.DataFrame(data)
+    
+    # Konsisten warna: Orange untuk Jakarta, Biru untuk National
+    color_map = {
+        'Jakarta': '#FF8C42',  # Orange
+        'National': '#4A90E2'  # Biru
+    }
 
     fig = px.pie(df_combined,
                  names='Market Share',
                  values='Percentage',
                  title=f'Market Share {text} {trx_type} Jakarta VS National',
-                 template='seaborn')
+                 template='seaborn',
+                 color='Market Share',
+                 color_discrete_map=color_map)
 
     fig.update_traces(hovertemplate='%{label}: %{value:.2f}%',
                       textfont=dict(color='white'))
