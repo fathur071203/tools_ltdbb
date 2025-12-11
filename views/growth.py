@@ -359,468 +359,291 @@ if st.session_state['df'] is not None:
         df_dom_combined_month = merge_df_growth(df_jumlah_dom_month_filtered, df_nom_dom_month_filtered, True)
 
         st.header("Growth in Transactions")
-        if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
-            st.markdown("### Transaksi Incoming")
+        
+        # Initialize default view mode
+        if 'view_mode' not in st.session_state:
+            st.session_state['view_mode'] = 'quarterly'
+        
+        # Toggle buttons dengan styling yang lebih menarik
+        col_space1, col_toggle1, col_toggle2, col_space2 = st.columns([2, 1.5, 1.5, 2])
+        
+        with col_toggle1:
+            is_quarterly = st.session_state['view_mode'] == 'quarterly'
+            if st.button("📊 Quarterly", key="toggle_quarterly", use_container_width=True):
+                st.session_state['view_mode'] = 'quarterly'
+                st.rerun()
+        
+        with col_toggle2:
+            is_monthly = st.session_state['view_mode'] == 'monthly'
+            if st.button("📅 Monthly", key="toggle_monthly", use_container_width=True):
+                st.session_state['view_mode'] = 'monthly'
+                st.rerun()
+        
+        st.divider()
+        
+        # QUARTERLY SECTION
+        if st.session_state['view_mode'] == 'quarterly':
+            st.subheader("📊 Data Transaksi Kuartalan")
             
-            # Display table with proper numeric sorting
-            df_inc_combined_display = rename_format_growth_df(df_inc_combined.copy(), "Inc")
-            st.dataframe(
-                df_inc_combined_display, 
-                use_container_width=True, 
-                hide_index=True,
-                column_config=_get_growth_column_config("Incoming")
-            )
-            
-            # Detail selection with dropdown
-            col_detail, col_empty = st.columns([3, 5])
-            with col_detail:
-                period_options = [f"Q{int(row['Quarter'])} {int(row['Year'])}" for _, row in df_inc_combined.iterrows()]
-                selected_period = st.selectbox("Pilih periode untuk detail", period_options, key="sel_inc_period", label_visibility="collapsed")
-                if selected_period:
-                    for idx, row in df_inc_combined.iterrows():
-                        if f"Q{int(row['Quarter'])} {int(row['Year'])}" == selected_period:
-                            year_val = int(row['Year'])
-                            quarter_val = int(row['Quarter'])
-                            
-                            with st.container(border=True):
-                                st.markdown(f"**📊 Detail per PJP - {selected_period} (Incoming)**")
-                                _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Incoming")
-                            break
-            
-            make_combined_bar_line_chart(df_jumlah_inc_filtered, "Jumlah", "Inc")
-            make_combined_bar_line_chart(df_nom_inc_filtered, "Nilai", "Inc")
-            st.divider()
-
-        if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
-            st.markdown("### Transaksi Outgoing")
-            
-            # Display table with proper numeric sorting
-            df_out_combined_display = rename_format_growth_df(df_out_combined.copy(), "Out")
-            st.dataframe(
-                df_out_combined_display, 
-                use_container_width=True, 
-                hide_index=True,
-                column_config=_get_growth_column_config("Outgoing")
-            )
-            
-            # Detail selection with dropdown
-            col_detail, col_empty = st.columns([3, 5])
-            with col_detail:
-                period_options = [f"Q{int(row['Quarter'])} {int(row['Year'])}" for _, row in df_out_combined.iterrows()]
-                selected_period = st.selectbox("Pilih periode untuk detail", period_options, key="sel_out_period", label_visibility="collapsed")
-                if selected_period:
-                    for idx, row in df_out_combined.iterrows():
-                        if f"Q{int(row['Quarter'])} {int(row['Year'])}" == selected_period:
-                            year_val = int(row['Year'])
-                            quarter_val = int(row['Quarter'])
-                            
-                            with st.container(border=True):
-                                st.markdown(f"**📊 Detail per PJP - {selected_period} (Outgoing)**")
-                                _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Outgoing")
-                            break
-            
-            make_combined_bar_line_chart(df_jumlah_out_filtered, "Jumlah", "Out")
-            make_combined_bar_line_chart(df_nom_out_filtered, "Nilai", "Out")
-            st.divider()
-            
-        if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
-            st.markdown("### Transaksi Domestik")
-            
-            # Display table with proper numeric sorting
-            df_dom_combined_display = rename_format_growth_df(df_dom_combined.copy(), "Dom")
-            st.dataframe(
-                df_dom_combined_display, 
-                use_container_width=True, 
-                hide_index=True,
-                column_config=_get_growth_column_config("Domestik")
-            )
-            
-            # Detail selection with dropdown
-            col_detail, col_empty = st.columns([3, 5])
-            with col_detail:
-                period_options = [f"Q{int(row['Quarter'])} {int(row['Year'])}" for _, row in df_dom_combined.iterrows()]
-                selected_period = st.selectbox("Pilih periode untuk detail", period_options, key="sel_dom_period", label_visibility="collapsed")
-                if selected_period:
-                    for idx, row in df_dom_combined.iterrows():
-                        if f"Q{int(row['Quarter'])} {int(row['Year'])}" == selected_period:
-                            year_val = int(row['Year'])
-                            quarter_val = int(row['Quarter'])
-                            
-                            with st.container(border=True):
-                                st.markdown(f"**📊 Detail per PJP - {selected_period} (Domestik)**")
-                                _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Domestik")
-                            break
-            
-            make_combined_bar_line_chart(df_jumlah_dom_filtered, "Jumlah", "Dom")
-            make_combined_bar_line_chart(df_nom_dom_filtered, "Nilai", "Dom")
-            st.divider()
-
-        st.subheader("Data Transaksi Bulanan")
-        col1, col2, col3 = st.columns(3)
-        if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
-            with col1:
-                st.markdown("### Incoming (Bulanan)")
+            if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
+                st.markdown("<h3 style='background-color: #f0f7ff; border-left: 5px solid #3b82f6; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px;'>📥 Data Transaksi Incoming</h3>", unsafe_allow_html=True)
                 
-                df_inc_combined_month_display = rename_format_growth_monthly_df(df_inc_combined_month.copy(), "Inc")
+                # Display table with proper numeric sorting
+                df_inc_combined_display = rename_format_growth_df(df_inc_combined.copy(), "Inc")
                 st.dataframe(
-                    df_inc_combined_month_display, 
+                    df_inc_combined_display, 
                     use_container_width=True, 
                     hide_index=True,
                     column_config=_get_growth_column_config("Incoming")
                 )
                 
                 # Detail selection with dropdown
-                period_options_m = [f"{row['Month']} {int(row['Year'])}" for _, row in df_inc_combined_month.iterrows()]
-                selected_period_m = st.selectbox("Detail:", period_options_m, key="sel_inc_m_period", label_visibility="collapsed")
-                if selected_period_m:
-                    for idx, row in df_inc_combined_month.iterrows():
-                        if f"{row['Month']} {int(row['Year'])}" == selected_period_m:
-                            year_val = int(row['Year'])
-                            month_val = row['Month']
-                            
-                            with st.container(border=True):
-                                st.markdown(f"**📊 Detail per PJP - {selected_period_m} (Incoming)**")
-                                _render_pjp_detail_month(df_preprocessed_time, year_val, str(month_val), "Incoming")
-                            break
-        if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
-            with col2:
-                st.markdown("### Outgoing (Bulanan)")
+                col_detail, col_empty = st.columns([3, 5])
+                with col_detail:
+                    period_options = [f"Q{int(row['Quarter'])} {int(row['Year'])}" for _, row in df_inc_combined.iterrows()]
+                    selected_period = st.selectbox("Pilih periode untuk detail", period_options, key="sel_inc_period", label_visibility="collapsed")
+                    if selected_period:
+                        for idx, row in df_inc_combined.iterrows():
+                            if f"Q{int(row['Quarter'])} {int(row['Year'])}" == selected_period:
+                                year_val = int(row['Year'])
+                                quarter_val = int(row['Quarter'])
+                                
+                                with st.container(border=True):
+                                    st.markdown(f"**📊 Detail per PJP - {selected_period} (Incoming)**")
+                                    _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Incoming")
+                                break
                 
-                df_out_combined_month_display = rename_format_growth_monthly_df(df_out_combined_month.copy(), "Out")
+                make_combined_bar_line_chart(df_jumlah_inc_filtered, "Jumlah", "Inc")
+                make_combined_bar_line_chart(df_nom_inc_filtered, "Nilai", "Inc")
+                st.divider()
+
+            if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
+                st.markdown("<h3 style='background-color: #fef2f2; border-left: 5px solid #ef4444; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px;'>📤 Data Transaksi Outgoing</h3>", unsafe_allow_html=True)
+                
+                # Display table with proper numeric sorting
+                df_out_combined_display = rename_format_growth_df(df_out_combined.copy(), "Out")
                 st.dataframe(
-                    df_out_combined_month_display, 
+                    df_out_combined_display, 
                     use_container_width=True, 
                     hide_index=True,
                     column_config=_get_growth_column_config("Outgoing")
                 )
                 
                 # Detail selection with dropdown
-                period_options_m = [f"{row['Month']} {int(row['Year'])}" for _, row in df_out_combined_month.iterrows()]
-                selected_period_m = st.selectbox("Detail:", period_options_m, key="sel_out_m_period", label_visibility="collapsed")
-                if selected_period_m:
-                    for idx, row in df_out_combined_month.iterrows():
-                        if f"{row['Month']} {int(row['Year'])}" == selected_period_m:
-                            year_val = int(row['Year'])
-                            month_val = row['Month']
-                            
-                            with st.container(border=True):
-                                st.markdown(f"**📊 Detail per PJP - {selected_period_m} (Outgoing)**")
-                                _render_pjp_detail_month(df_preprocessed_time, year_val, str(month_val), "Outgoing")
-                            break
-        if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
-            with col3:
-                st.markdown("### Domestik (Bulanan)")
+                col_detail, col_empty = st.columns([3, 5])
+                with col_detail:
+                    period_options = [f"Q{int(row['Quarter'])} {int(row['Year'])}" for _, row in df_out_combined.iterrows()]
+                    selected_period = st.selectbox("Pilih periode untuk detail", period_options, key="sel_out_period", label_visibility="collapsed")
+                    if selected_period:
+                        for idx, row in df_out_combined.iterrows():
+                            if f"Q{int(row['Quarter'])} {int(row['Year'])}" == selected_period:
+                                year_val = int(row['Year'])
+                                quarter_val = int(row['Quarter'])
+                                
+                                with st.container(border=True):
+                                    st.markdown(f"**📊 Detail per PJP - {selected_period} (Outgoing)**")
+                                    _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Outgoing")
+                                break
                 
-                df_dom_combined_month_display = rename_format_growth_monthly_df(df_dom_combined_month.copy(), "Dom")
+                make_combined_bar_line_chart(df_jumlah_out_filtered, "Jumlah", "Out")
+                make_combined_bar_line_chart(df_nom_out_filtered, "Nilai", "Out")
+                st.divider()
+                
+            if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
+                st.markdown("<h3 style='background-color: #f0fdf4; border-left: 5px solid #16a34a; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px;'>🏠 Data Transaksi Domestik</h3>", unsafe_allow_html=True)
+                
+                # Display table with proper numeric sorting
+                df_dom_combined_display = rename_format_growth_df(df_dom_combined.copy(), "Dom")
                 st.dataframe(
-                    df_dom_combined_month_display, 
+                    df_dom_combined_display, 
                     use_container_width=True, 
                     hide_index=True,
                     column_config=_get_growth_column_config("Domestik")
                 )
                 
                 # Detail selection with dropdown
-                period_options_m = [f"{row['Month']} {int(row['Year'])}" for _, row in df_dom_combined_month.iterrows()]
-                selected_period_m = st.selectbox("Detail:", period_options_m, key="sel_dom_m_period", label_visibility="collapsed")
+                col_detail, col_empty = st.columns([3, 5])
+                with col_detail:
+                    period_options = [f"Q{int(row['Quarter'])} {int(row['Year'])}" for _, row in df_dom_combined.iterrows()]
+                    selected_period = st.selectbox("Pilih periode untuk detail", period_options, key="sel_dom_period", label_visibility="collapsed")
+                    if selected_period:
+                        for idx, row in df_dom_combined.iterrows():
+                            if f"Q{int(row['Quarter'])} {int(row['Year'])}" == selected_period:
+                                year_val = int(row['Year'])
+                                quarter_val = int(row['Quarter'])
+                                
+                                with st.container(border=True):
+                                    st.markdown(f"**📊 Detail per PJP - {selected_period} (Domestik)**")
+                                    _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Domestik")
+                                break
+                
+                make_combined_bar_line_chart(df_jumlah_dom_filtered, "Jumlah", "Dom")
+                make_combined_bar_line_chart(df_nom_dom_filtered, "Nilai", "Dom")
+                st.divider()
+
+            st.markdown("<div style='background-color: #fef3c7; border: 2px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 30px 0;'>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin-top: 0;'>⭐ Summary Keseluruhan Data Transaksi (Kuartalan)</h3>", unsafe_allow_html=True)
+            st.markdown("Gabungan Data Transaksi **Incoming, Outgoing, dan Domestik** (Frekuensi & Nominal).")
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            df_total_combined_display = df_total_combined.copy()
+            df_total_combined_display = rename_format_growth_df(df_total_combined_display, "Total")
+            st.dataframe(
+                df_total_combined_display, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config=_get_growth_column_config("Total")
+            )
+            
+            # Detail selection with dropdown
+            col_detail, col_empty = st.columns([3, 5])
+            with col_detail:
+                period_options = [f"Q{int(row['Quarter'])} {int(row['Year'])}" for _, row in df_total_combined.iterrows()]
+                selected_period = st.selectbox("Pilih periode untuk detail", period_options, key="sel_total_period", label_visibility="collapsed")
+                if selected_period:
+                    for idx, row in df_total_combined.iterrows():
+                        if f"Q{int(row['Quarter'])} {int(row['Year'])}" == selected_period:
+                            year_val = int(row['Year'])
+                            quarter_val = int(row['Quarter'])
+                            
+                            with st.container(border=True):
+                                st.markdown(f"**📊 Detail per PJP - {selected_period} (Total)**")
+                                _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Total")
+                            break
+
+            st.markdown("<hr style='border-top: 2px dashed #f59e0b; margin: 20px 0;'>", unsafe_allow_html=True)
+            st.markdown("### 📊 Visualisasi Keseluruhan Data Transaksi (Frekuensi & Nominal Tergabung)")
+            make_combined_bar_line_chart(df_total_combined, "Jumlah", "Total", False, True)
+            make_combined_bar_line_chart(df_total_combined, "Nilai", "Total", False, True)
+
+        # MONTHLY SECTION
+        if st.session_state['view_mode'] == 'monthly':
+            st.subheader("📅 Data Transaksi Bulanan")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
+                with col1:
+                    st.markdown("<h4 style='background-color: #f0f7ff; border-left: 5px solid #3b82f6; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px;'>📥 Data Transaksi Incoming (Bulanan)</h4>", unsafe_allow_html=True)
+                    
+                    df_inc_combined_month_display = rename_format_growth_monthly_df(df_inc_combined_month.copy(), "Inc")
+                    st.dataframe(
+                        df_inc_combined_month_display, 
+                        use_container_width=True, 
+                        hide_index=True,
+                        column_config=_get_growth_column_config("Incoming")
+                    )
+                    
+                    # Detail selection with dropdown
+                    period_options_m = [f"{row['Month']} {int(row['Year'])}" for _, row in df_inc_combined_month.iterrows()]
+                    selected_period_m = st.selectbox("Detail:", period_options_m, key="sel_inc_m_period", label_visibility="collapsed")
+                    if selected_period_m:
+                        for idx, row in df_inc_combined_month.iterrows():
+                            if f"{row['Month']} {int(row['Year'])}" == selected_period_m:
+                                year_val = int(row['Year'])
+                                month_val = row['Month']
+                                
+                                with st.container(border=True):
+                                    st.markdown(f"**📊 Detail per PJP - {selected_period_m} (Incoming)**")
+                                    _render_pjp_detail_month(df_preprocessed_time, year_val, str(month_val), "Incoming")
+                                break
+            
+            if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
+                with col2:
+                    st.markdown("<h4 style='background-color: #fef2f2; border-left: 5px solid #ef4444; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px;'>📤 Data Transaksi Outgoing (Bulanan)</h4>", unsafe_allow_html=True)
+                    
+                    df_out_combined_month_display = rename_format_growth_monthly_df(df_out_combined_month.copy(), "Out")
+                    st.dataframe(
+                        df_out_combined_month_display, 
+                        use_container_width=True, 
+                        hide_index=True,
+                        column_config=_get_growth_column_config("Outgoing")
+                    )
+                    
+                    # Detail selection with dropdown
+                    period_options_m = [f"{row['Month']} {int(row['Year'])}" for _, row in df_out_combined_month.iterrows()]
+                    selected_period_m = st.selectbox("Detail:", period_options_m, key="sel_out_m_period", label_visibility="collapsed")
+                    if selected_period_m:
+                        for idx, row in df_out_combined_month.iterrows():
+                            if f"{row['Month']} {int(row['Year'])}" == selected_period_m:
+                                year_val = int(row['Year'])
+                                month_val = row['Month']
+                                
+                                with st.container(border=True):
+                                    st.markdown(f"**📊 Detail per PJP - {selected_period_m} (Outgoing)**")
+                                    _render_pjp_detail_month(df_preprocessed_time, year_val, str(month_val), "Outgoing")
+                                break
+            
+            if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
+                with col3:
+                    st.markdown("<h4 style='background-color: #f0fdf4; border-left: 5px solid #16a34a; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px;'>🏠 Data Transaksi Domestik (Bulanan)</h4>", unsafe_allow_html=True)
+                    
+                    df_dom_combined_month_display = rename_format_growth_monthly_df(df_dom_combined_month.copy(), "Dom")
+                    st.dataframe(
+                        df_dom_combined_month_display, 
+                        use_container_width=True, 
+                        hide_index=True,
+                        column_config=_get_growth_column_config("Domestik")
+                    )
+                    
+                    # Detail selection with dropdown
+                    period_options_m = [f"{row['Month']} {int(row['Year'])}" for _, row in df_dom_combined_month.iterrows()]
+                    selected_period_m = st.selectbox("Detail:", period_options_m, key="sel_dom_m_period", label_visibility="collapsed")
+                    if selected_period_m:
+                        for idx, row in df_dom_combined_month.iterrows():
+                            if f"{row['Month']} {int(row['Year'])}" == selected_period_m:
+                                year_val = int(row['Year'])
+                                month_val = row['Month']
+                                
+                                with st.container(border=True):
+                                    st.markdown(f"**📊 Detail per PJP - {selected_period_m} (Domestik)**")
+                                    _render_pjp_detail_month(df_preprocessed_time, year_val, str(month_val), "Domestik")
+                                break
+            
+            st.divider()
+            
+            make_combined_bar_line_chart(df_jumlah_inc_month_filtered, "Jumlah", "Inc", True)
+            make_combined_bar_line_chart(df_nom_inc_month_filtered, "Nilai", "Inc", True)
+
+            make_combined_bar_line_chart(df_jumlah_out_month_filtered, "Jumlah", "Out", True)
+            make_combined_bar_line_chart(df_nom_out_month_filtered, "Nilai", "Out", True)
+
+            make_combined_bar_line_chart(df_jumlah_dom_month_filtered, "Jumlah", "Dom", True)
+            make_combined_bar_line_chart(df_nom_dom_month_filtered, "Nilai", "Dom", True)
+
+            st.markdown("<div style='background-color: #fef3c7; border: 2px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 30px 0;'>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin-top: 0;'>⭐ Summary Keseluruhan Data Transaksi (Bulanan)</h3>", unsafe_allow_html=True)
+            st.markdown("Gabungan Data Transaksi **Incoming, Outgoing, dan Domestik** per Bulan (Frekuensi & Nominal).")
+            st.markdown("</div>", unsafe_allow_html=True)
+            df_total_month_combined_display = df_total_month_combined.copy()
+            df_total_month_combined_display = rename_format_growth_monthly_df(df_total_month_combined_display, "Total")
+            st.dataframe(
+                df_total_month_combined_display, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config=_get_growth_column_config("Total")
+            )
+            
+            # Detail selection with dropdown for monthly
+            col_detail_m, col_empty_m = st.columns([3, 5])
+            with col_detail_m:
+                period_options_m = [f"{row['Month']} {int(row['Year'])}" for _, row in df_total_month_combined.iterrows()]
+                selected_period_m = st.selectbox("Detail:", period_options_m, key="sel_total_m_period", label_visibility="collapsed")
                 if selected_period_m:
-                    for idx, row in df_dom_combined_month.iterrows():
+                    for idx, row in df_total_month_combined.iterrows():
                         if f"{row['Month']} {int(row['Year'])}" == selected_period_m:
                             year_val = int(row['Year'])
                             month_val = row['Month']
                             
                             with st.container(border=True):
-                                st.markdown(f"**📊 Detail per PJP - {selected_period_m} (Domestik)**")
-                                _render_pjp_detail_month(df_preprocessed_time, year_val, str(month_val), "Domestik")
+                                st.markdown(f"**📊 Detail per PJP - {selected_period_m} (Total)**")
+                                _render_pjp_detail_month(df_preprocessed_time, year_val, str(month_val), "Total")
                             break
 
-        make_combined_bar_line_chart(df_jumlah_inc_month_filtered, "Jumlah", "Inc", True)
-        make_combined_bar_line_chart(df_nom_inc_month_filtered, "Nilai", "Inc", True)
+            st.markdown("<hr style='border-top: 2px dashed #f59e0b; margin: 20px 0;'>", unsafe_allow_html=True)
+            st.markdown("### 📅 Visualisasi Keseluruhan Data Transaksi (Frekuensi & Nominal Tergabung)")
+            make_combined_bar_line_chart(df_total_month_combined, "Jumlah", "Total", True, True)
+            make_combined_bar_line_chart(df_total_month_combined, "Nilai", "Total", True, True)
 
-        make_combined_bar_line_chart(df_jumlah_out_month_filtered, "Jumlah", "Out", True)
-        make_combined_bar_line_chart(df_nom_out_month_filtered, "Nilai", "Out", True)
-
-        make_combined_bar_line_chart(df_jumlah_dom_month_filtered, "Jumlah", "Dom", True)
-        make_combined_bar_line_chart(df_nom_dom_month_filtered, "Nilai", "Dom", True)
-
-        st.subheader("Summary Keseluruhan Data Transaksi")
-        st.write("Gabungan Data Transaksi Incoming, Outgoing, dan Domestik.")
-        
-        df_total_combined_display = df_total_combined.copy()
-        df_total_combined_display = rename_format_growth_df(df_total_combined_display, "Total")
-        st.dataframe(
-            df_total_combined_display, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config=_get_growth_column_config("Total")
-        )
-        
-        # Detail selection with dropdown
-        col_detail, col_empty = st.columns([3, 5])
-        with col_detail:
-            period_options = [f"Q{int(row['Quarter'])} {int(row['Year'])}" for _, row in df_total_combined.iterrows()]
-            selected_period = st.selectbox("Pilih periode untuk detail", period_options, key="sel_total_period", label_visibility="collapsed")
-            if selected_period:
-                for idx, row in df_total_combined.iterrows():
-                    if f"Q{int(row['Quarter'])} {int(row['Year'])}" == selected_period:
-                        year_val = int(row['Year'])
-                        quarter_val = int(row['Quarter'])
-                        
-                        with st.container(border=True):
-                            st.markdown(f"**📊 Detail per PJP - {selected_period} (Total)**")
-                            _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Total")
-                        break
-
-        st.markdown("### Visualisasi Keseluruhan Data Transaksi")
-        make_combined_bar_line_chart(df_total_combined, "Jumlah", "Total", False, True)
-        make_combined_bar_line_chart(df_total_combined, "Nilai", "Total", False, True)
-
-        st.subheader("Summary Keseluruhan Data Transaksi (Bulanan)")
-        st.write("Gabungan Data Transaksi Incoming, Outgoing, dan Domestik per Bulan.")
-        df_total_month_combined_display = df_total_month_combined.copy()
-        df_total_month_combined_display = rename_format_growth_monthly_df(df_total_month_combined_display, "Total")
-        st.dataframe(
-            df_total_month_combined_display, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config=_get_growth_column_config("Total")
-        )
-        
-        # Detail selection with dropdown for monthly
-        col_detail_m, col_empty_m = st.columns([3, 5])
-        with col_detail_m:
-            period_options_m = [f"{row['Month']} {int(row['Year'])}" for _, row in df_total_month_combined.iterrows()]
-            selected_period_m = st.selectbox("Detail:", period_options_m, key="sel_total_m_period", label_visibility="collapsed")
-            if selected_period_m:
-                for idx, row in df_total_month_combined.iterrows():
-                    if f"{row['Month']} {int(row['Year'])}" == selected_period_m:
-                        year_val = int(row['Year'])
-                        month_val = row['Month']
-                        
-                        with st.container(border=True):
-                            st.markdown(f"**📊 Detail per PJP - {selected_period_m} (Total)**")
-                            _render_pjp_detail_month(df_preprocessed_time, year_val, str(month_val), "Total")
-                        break
-
-        st.markdown("### Visualisasi Keseluruhan Data Transaksi (Bulanan)")
-        make_combined_bar_line_chart(df_total_month_combined, "Jumlah", "Total", True, True)
-        make_combined_bar_line_chart(df_total_month_combined, "Nilai", "Total", True, True)
-
-        # Detail per PJP berdasarkan periode yang dipilih
-        st.divider()
-        st.subheader("🔍 Detail Growth per PJP (berdasarkan Year-Quarter)")
-        col_d1, col_d2, col_d3, col_d4 = st.columns(4)
-        with col_d1:
-            trx_choice = st.selectbox("Jenis Transaksi", ["Total", "Incoming", "Outgoing", "Domestik"], key="detail_trx")
-        with col_d2:
-            year_choice = st.selectbox("Year", sorted(df_preprocessed_time['Year'].unique()), key="detail_year")
-        with col_d3:
-            quarter_choice = st.selectbox("Quarter", sorted(df_preprocessed_time['Quarter'].unique()), key="detail_quarter")
-        with col_d4:
-            st.markdown("\u00a0")
-            if st.button("Lihat Detail", key="btn_detail_pjp"):
-                _render_pjp_detail(df_preprocessed_time, int(year_choice), int(quarter_choice), trx_choice)
-
-        # ============ GROWTH DETAIL ANALYSIS ============
-        st.divider()
-        st.header("📊 Analisis Detail Growth per PJP")
-        
-        with st.spinner('Mempersiapkan data detail growth...'):
-            # Ambil data preprocessed untuk analisis detail
-            df_preprocessed = preprocess_data(df, True)
-            
-            # Get unique periods dalam range yang dipilih
-            df_in_range = df_preprocessed[
-                (df_preprocessed['Year'] >= selected_start_year) & 
-                (df_preprocessed['Year'] <= selected_end_year)
-            ]
-            
-            unique_pjps = sorted(df_in_range['Nama PJP'].unique().tolist())
-            
-            st.subheader("Pilih Perbandingan")
-            comparison_type = st.radio(
-                "Tipe Perbandingan:",
-                ("Quarter to Quarter (QtQ)", "Year on Year (YoY)"),
-                horizontal=True
-            )
-            
-            if comparison_type == "Quarter to Quarter (QtQ)":
-                # QtQ Analysis
-                quarters_in_range = ['Q1', 'Q2', 'Q3', 'Q4']
-                col1, col2 = st.columns(2)
-                with col1:
-                    q1_select = st.selectbox('Quarter 1:', quarters_in_range, key='qtq_q1')
-                with col2:
-                    q2_select = st.selectbox('Quarter 2:', quarters_in_range, key='qtq_q2', index=1)
-                
-                # Hitung comparison year
-                year_select = st.selectbox('Tahun:', sorted(df_in_range['Year'].unique().tolist()), key='qtq_year')
-                
-                if q1_select != q2_select:
-                    # Prepare data untuk QtQ
-                    q1_num = int(q1_select[1])
-                    q2_num = int(q2_select[1])
-                    
-                    comparison_data = []
-                    
-                    for pjp in unique_pjps:
-                        # Q1 data
-                        q1_months = {1: ['January', 'February', 'March'],
-                                    2: ['April', 'May', 'June'],
-                                    3: ['July', 'August', 'September'],
-                                    4: ['October', 'November', 'December']}[q1_num]
-                        
-                        q1_data = df_in_range[
-                            (df_in_range['Nama PJP'] == pjp) &
-                            (df_in_range['Year'] == year_select) &
-                            (df_in_range['Month'].astype(str).isin(q1_months))
-                        ]
-                        
-                        q1_jumlah = q1_data['Sum of Fin Jumlah Inc'].sum() + q1_data['Sum of Fin Jumlah Out'].sum() + q1_data['Sum of Fin Jumlah Dom'].sum()
-                        q1_nilai = q1_data['Sum of Fin Nilai Inc'].sum() + q1_data['Sum of Fin Nilai Out'].sum() + q1_data['Sum of Fin Nilai Dom'].sum()
-                        
-                        # Q2 data
-                        q2_months = {1: ['January', 'February', 'March'],
-                                    2: ['April', 'May', 'June'],
-                                    3: ['July', 'August', 'September'],
-                                    4: ['October', 'November', 'December']}[q2_num]
-                        
-                        q2_data = df_in_range[
-                            (df_in_range['Nama PJP'] == pjp) &
-                            (df_in_range['Year'] == year_select) &
-                            (df_in_range['Month'].astype(str).isin(q2_months))
-                        ]
-                        
-                        q2_jumlah = q2_data['Sum of Fin Jumlah Inc'].sum() + q2_data['Sum of Fin Jumlah Out'].sum() + q2_data['Sum of Fin Jumlah Dom'].sum()
-                        q2_nilai = q2_data['Sum of Fin Nilai Inc'].sum() + q2_data['Sum of Fin Nilai Out'].sum() + q2_data['Sum of Fin Nilai Dom'].sum()
-                        
-                        # Calculate growth
-                        jumlah_growth = ((q2_jumlah - q1_jumlah) / q1_jumlah * 100) if q1_jumlah > 0 else 0
-                        nilai_growth = ((q2_nilai - q1_nilai) / q1_nilai * 100) if q1_nilai > 0 else 0
-                        
-                        comparison_data.append({
-                            'PJP': pjp,
-                            f'{q1_select} Jumlah': int(q1_jumlah),
-                            f'{q2_select} Jumlah': int(q2_jumlah),
-                            'Growth Jumlah (%)': jumlah_growth,
-                            f'{q1_select} Nilai': int(q1_nilai),
-                            f'{q2_select} Nilai': int(q2_nilai),
-                            'Growth Nilai (%)': nilai_growth,
-                        })
-                    
-                    df_comparison = pd.DataFrame(comparison_data)
-                    
-                    st.subheader(f"Perbandingan {q1_select} vs {q2_select} {year_select} - Per PJP")
-                    
-                    # Format for display
-                    df_display = df_comparison.copy()
-                    df_display[f'{q1_select} Jumlah'] = df_display[f'{q1_select} Jumlah'].apply(lambda x: f"{x:,}".replace(',', '.'))
-                    df_display[f'{q2_select} Jumlah'] = df_display[f'{q2_select} Jumlah'].apply(lambda x: f"{x:,}".replace(',', '.'))
-                    df_display['Growth Jumlah (%)'] = df_display['Growth Jumlah (%)'].apply(lambda x: f"{x:+.2f}%".replace('.', ',').replace(',00%', '%'))
-                    df_display[f'{q1_select} Nilai'] = df_display[f'{q1_select} Nilai'].apply(lambda x: f"{x:,}".replace(',', '.'))
-                    df_display[f'{q2_select} Nilai'] = df_display[f'{q2_select} Nilai'].apply(lambda x: f"{x:,}".replace(',', '.'))
-                    df_display['Growth Nilai (%)'] = df_display['Growth Nilai (%)'].apply(lambda x: f"{x:+.2f}%".replace('.', ',').replace(',00%', '%'))
-                    
-                    st.dataframe(df_display, use_container_width=True, hide_index=True)
-                    
-                    # Expander untuk detail per PJP
-                    for idx, row in df_comparison.iterrows():
-                        pjp_name = row['PJP']
-                        with st.expander(f"📈 {pjp_name} - Frekuensi: +{row['Growth Jumlah (%)']:+.1f}% | Nilai: +{row['Growth Nilai (%)']:+.1f}%"):
-                            st.write(f"**Perbandingan Detail {q1_select} vs {q2_select} {year_select}**")
-                            st.write(f"Frekuensi {q1_select}: {row[f'{q1_select} Jumlah']:,}")
-                            st.write(f"Frekuensi {q2_select}: {row[f'{q2_select} Jumlah']:,}")
-                            st.write(f"**Growth Frekuensi: {row['Growth Jumlah (%)']:+.2f}%**")
-                            st.divider()
-                            st.write(f"Nilai {q1_select}: Rp {row[f'{q1_select} Nilai']:,}")
-                            st.write(f"Nilai {q2_select}: Rp {row[f'{q2_select} Nilai']:,}")
-                            st.write(f"**Growth Nilai: {row['Growth Nilai (%)']:+.2f}%**")
-                else:
-                    st.warning("Pilih dua quarter yang berbeda untuk perbandingan")
-            
-            else:
-                # YoY Analysis
-                years_available = sorted(df_in_range['Year'].unique().tolist())
-                if len(years_available) >= 2:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        year1_select = st.selectbox('Tahun 1:', years_available, key='yoy_y1')
-                    with col2:
-                        year2_select = st.selectbox('Tahun 2:', years_available, key='yoy_y2', index=min(1, len(years_available)-1))
-                    
-                    quarter_select = st.selectbox('Quarter:', ['Q1', 'Q2', 'Q3', 'Q4'], key='yoy_q')
-                    
-                    if year1_select != year2_select:
-                        q_num = int(quarter_select[1])
-                        q_months = {1: ['January', 'February', 'March'],
-                                   2: ['April', 'May', 'June'],
-                                   3: ['July', 'August', 'September'],
-                                   4: ['October', 'November', 'December']}[q_num]
-                        
-                        comparison_data = []
-                        
-                        for pjp in unique_pjps:
-                            # Year 1 data
-                            y1_data = df_in_range[
-                                (df_in_range['Nama PJP'] == pjp) &
-                                (df_in_range['Year'] == year1_select) &
-                                (df_in_range['Month'].astype(str).isin(q_months))
-                            ]
-                            
-                            y1_jumlah = y1_data['Sum of Fin Jumlah Inc'].sum() + y1_data['Sum of Fin Jumlah Out'].sum() + y1_data['Sum of Fin Jumlah Dom'].sum()
-                            y1_nilai = y1_data['Sum of Fin Nilai Inc'].sum() + y1_data['Sum of Fin Nilai Out'].sum() + y1_data['Sum of Fin Nilai Dom'].sum()
-                            
-                            # Year 2 data
-                            y2_data = df_in_range[
-                                (df_in_range['Nama PJP'] == pjp) &
-                                (df_in_range['Year'] == year2_select) &
-                                (df_in_range['Month'].astype(str).isin(q_months))
-                            ]
-                            
-                            y2_jumlah = y2_data['Sum of Fin Jumlah Inc'].sum() + y2_data['Sum of Fin Jumlah Out'].sum() + y2_data['Sum of Fin Jumlah Dom'].sum()
-                            y2_nilai = y2_data['Sum of Fin Nilai Inc'].sum() + y2_data['Sum of Fin Nilai Out'].sum() + y2_data['Sum of Fin Nilai Dom'].sum()
-                            
-                            # Calculate growth
-                            jumlah_growth = ((y2_jumlah - y1_jumlah) / y1_jumlah * 100) if y1_jumlah > 0 else 0
-                            nilai_growth = ((y2_nilai - y1_nilai) / y1_nilai * 100) if y1_nilai > 0 else 0
-                            
-                            comparison_data.append({
-                                'PJP': pjp,
-                                f'{year1_select} Jumlah': int(y1_jumlah),
-                                f'{year2_select} Jumlah': int(y2_jumlah),
-                                'Growth Jumlah (%)': jumlah_growth,
-                                f'{year1_select} Nilai': int(y1_nilai),
-                                f'{year2_select} Nilai': int(y2_nilai),
-                                'Growth Nilai (%)': nilai_growth,
-                            })
-                        
-                        df_comparison = pd.DataFrame(comparison_data)
-                        
-                        st.subheader(f"Perbandingan YoY {quarter_select} {year1_select} vs {year2_select} - Per PJP")
-                        
-                        # Format for display
-                        df_display = df_comparison.copy()
-                        df_display[f'{year1_select} Jumlah'] = df_display[f'{year1_select} Jumlah'].apply(lambda x: f"{x:,}".replace(',', '.'))
-                        df_display[f'{year2_select} Jumlah'] = df_display[f'{year2_select} Jumlah'].apply(lambda x: f"{x:,}".replace(',', '.'))
-                        df_display['Growth Jumlah (%)'] = df_display['Growth Jumlah (%)'].apply(lambda x: f"{x:+.2f}%".replace('.', ',').replace(',00%', '%'))
-                        df_display[f'{year1_select} Nilai'] = df_display[f'{year1_select} Nilai'].apply(lambda x: f"{x:,}".replace(',', '.'))
-                        df_display[f'{year2_select} Nilai'] = df_display[f'{year2_select} Nilai'].apply(lambda x: f"{x:,}".replace(',', '.'))
-                        df_display['Growth Nilai (%)'] = df_display['Growth Nilai (%)'].apply(lambda x: f"{x:+.2f}%".replace('.', ',').replace(',00%', '%'))
-                        
-                        st.dataframe(df_display, use_container_width=True, hide_index=True)
-                        
-                        # Expander untuk detail per PJP
-                        for idx, row in df_comparison.iterrows():
-                            pjp_name = row['PJP']
-                            with st.expander(f"📈 {pjp_name} - Frekuensi: +{row['Growth Jumlah (%)']:+.1f}% | Nilai: +{row['Growth Nilai (%)']:+.1f}%"):
-                                st.write(f"**Perbandingan Detail {quarter_select} {year1_select} vs {year2_select}**")
-                                st.write(f"Frekuensi {year1_select}: {row[f'{year1_select} Jumlah']:,}")
-                                st.write(f"Frekuensi {year2_select}: {row[f'{year2_select} Jumlah']:,}")
-                                st.write(f"**Growth Frekuensi: {row['Growth Jumlah (%)']:+.2f}%**")
-                                st.divider()
-                                st.write(f"Nilai {year1_select}: Rp {row[f'{year1_select} Nilai']:,}")
-                                st.write(f"Nilai {year2_select}: Rp {row[f'{year2_select} Nilai']:,}")
-                                st.write(f"**Growth Nilai: {row['Growth Nilai (%)']:+.2f}%**")
-                else:
-                    st.warning("Butuh minimal 2 tahun data untuk analisis YoY")
 else:
     st.warning("Please Upload the Main Excel File first in the Summary Section.")

@@ -128,8 +128,10 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
         jenis_trx = "Outgoing"
     elif trx_type == "Inc":
         jenis_trx = "Incoming"
-    else:
+    elif trx_type == "Dom":
         jenis_trx = "Domestik"
+    else:  # trx_type == "Total"
+        jenis_trx = "Keseluruhan (Incoming, Outgoing, Domestik)"
 
     bar_col = f'Sum of Fin {sum_trx_type} {trx_type}'
     bar_title = f"Transactions Volume & Growth untuk {variabel_trx} {jenis_trx}"
