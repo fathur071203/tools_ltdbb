@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import calendar
 
 
 def make_pie_chart_summary(df, top_n):
@@ -232,6 +233,15 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
     st.plotly_chart(fig, use_container_width=True)
 
 def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_pjp: str, selected_year: str):
+    # Buat label time-series lintas tahun: YYYY-MM dan urutkan kronologis
+    df_copy = df.copy()
+    if 'Year' in df_copy.columns and 'Month' in df_copy.columns:
+        df_copy['MonthNum'] = df_copy['Month'].apply(lambda m: list(calendar.month_name).index(m) if isinstance(m, str) else int(m))
+        df_copy['YearMonth'] = df_copy['Year'].astype(int).astype(str) + '-' + df_copy['MonthNum'].astype(int).astype(str).str.zfill(2)
+        df_copy = df_copy.sort_values(['Year', 'MonthNum'])
+    else:
+        df_copy['YearMonth'] = df_copy.index.astype(str)
+
     if trx_type == 'Inc':
         trx_title = "Incoming"
     elif trx_type == 'Out':
@@ -242,26 +252,26 @@ def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_p
     fig = go.Figure()
 
     fig.add_trace(go.Bar(
-        x=df['Month'],
-        y=df[f'Sum of Fin Nilai {trx_type}'],
+        x=df_copy['YearMonth'],
+        y=df_copy[f'Sum of Fin Nilai {trx_type}'],
         name="Nilai",
         yaxis='y1',
-        hovertemplate="%{y:,.0f} <extra></extra>"
+        hovertemplate="%{x}<br>Nilai: %{y:,.0f} <extra></extra>"
     ))
 
     # Line trace
     fig.add_trace(go.Scatter(
-        x=df['Month'],
-        y=df[f'Sum of Fin Jumlah {trx_type}'],
+        x=df_copy['YearMonth'],
+        y=df_copy[f'Sum of Fin Jumlah {trx_type}'],
         name='Frekuensi',
         yaxis='y2',
         mode='lines+markers',
-        hovertemplate="%{y:,.0f} <extra></extra>"
+        hovertemplate="%{x}<br>Frekuensi: %{y:,.0f} <extra></extra>"
     ))
 
     fig.update_layout(
-        title=f"Perkembangan Transaksi {trx_title} {nama_pjp} Tahun {selected_year}",
-        xaxis=dict(title="Bulan"),
+        title=f"Perkembangan Transaksi {trx_title} {nama_pjp} ({selected_year})",
+        xaxis=dict(title="Periode (YYYY-MM)", tickangle=-45),
         yaxis=dict(
             title="Nilai (Rp Miliar)",
             tickformat=",.0f",

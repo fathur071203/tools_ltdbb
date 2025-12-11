@@ -15,8 +15,8 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     with st.sidebar:
         with st.expander("Filter Individu", True):
             pjp_list = ['All'] + sorted(df['Nama PJP'].unique().tolist())
-            years = ['All'] + sorted(list(df['Year'].unique()))
-
+            years_list = sorted(list(df['Year'].unique()))
+            
             # Search filter untuk PJP
             search_pjp = st.text_input("🔍 Cari PJP:", placeholder="Ketik nama PJP...")
             if search_pjp:
@@ -25,8 +25,20 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
                 filtered_pjp = pjp_list
             
             selected_pjp = st.selectbox('Pilih PJP:', filtered_pjp)
-            selected_year_pjp = st.selectbox('Pilih Tahun:', years, key="key_year_pjp")
-        st.info("Gunakan filter untuk memilih nama PJP dan tahun transaksi.")
+            
+            # Range tahun
+            col1, col2 = st.columns(2)
+            with col1:
+                start_year = st.selectbox('Tahun Mulai:', years_list, key="key_start_year")
+            with col2:
+                # Filter tahun akhir hanya menampilkan tahun >= tahun mulai
+                end_years = [y for y in years_list if y >= start_year]
+                end_year = st.selectbox('Tahun Akhir:', end_years, key="key_end_year")
+            
+            # Pastikan end_year >= start_year
+            if end_year < start_year:
+                end_year = start_year
+        st.info("Gunakan filter untuk memilih nama PJP dan rentang tahun transaksi.")
 
     df_national_preprocessed_year = preprocess_data_national(df_national, True)
     df_national_preprocessed_month = preprocess_data_national(df_national, False)
@@ -51,12 +63,26 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         'Sum of Total Nom': 'sum'
     }).reset_index()
 
-    if selected_pjp == 'All' or selected_year_pjp == 'All':
-        st.warning("Please Select PJP and Year to show the PJP's Profile.")
+    if selected_pjp == 'All':
+        st.warning("Silakan pilih PJP untuk menampilkan profil.")
     else:
-        df_grouped_filtered_year = filter_data(df_preprocessed_grouped_year, selected_pjp, selected_year_pjp)
-        df_grouped_national_filtered_year = filter_data(df_national_preprocessed_year, selected_year=selected_year_pjp)
-        df_grouped_filtered_month = filter_data(df_preprocessed_grouped_month, selected_pjp, selected_year_pjp)
+        # Filter data berdasarkan range tahun
+        df_grouped_filtered_year = df_preprocessed_grouped_year[
+            (df_preprocessed_grouped_year['Nama PJP'] == selected_pjp) &
+            (df_preprocessed_grouped_year['Year'] >= start_year) &
+            (df_preprocessed_grouped_year['Year'] <= end_year)
+        ]
+        
+        df_grouped_national_filtered_year = df_national_preprocessed_year[
+            (df_national_preprocessed_year['Year'] >= start_year) &
+            (df_national_preprocessed_year['Year'] <= end_year)
+        ]
+        
+        df_grouped_filtered_month = df_preprocessed_grouped_month[
+            (df_preprocessed_grouped_month['Nama PJP'] == selected_pjp) &
+            (df_preprocessed_grouped_month['Year'] >= start_year) &
+            (df_preprocessed_grouped_month['Year'] <= end_year)
+        ]
 
         df_incoming_month = process_data_profile_month(df_grouped_filtered_month, "Inc")
         df_outgoing_month = process_data_profile_month(df_grouped_filtered_month, "Out")
@@ -88,7 +114,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             df_grand_total_inc = process_grand_total_profile(df_incoming_month, "Inc")
             df_grand_total_out = process_grand_total_profile(df_outgoing_month, "Out")
 
-            st.subheader(f"Profil Transaksi - PT {selected_pjp} Tahun {selected_year_pjp}")
+            st.subheader(f"Profil Transaksi - PT {selected_pjp} Tahun {start_year} - {end_year}")
             merged_data = format_profile_df(merged_data)
             st.dataframe(merged_data, use_container_width=True, hide_index=True)
             st.info(
@@ -120,7 +146,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             
             # Tambahkan section untuk Growth Data
             st.divider()
-            st.subheader(f"📊 Data Pertumbuhan Transaksi - {selected_pjp} (Per Kuartal)")
+            st.subheader(f"📊 Data Pertumbuhan Transaksi - {selected_pjp} (Per Kuartal) Tahun {start_year} - {end_year}")
             
             with st.spinner('Memproses data pertumbuhan...'):
                 # Get growth data untuk PJP
@@ -145,8 +171,25 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
                     # Format display
                     df_total_growth_display = format_pjp_growth_table(df_total_growth_display, is_total=True)
                     
+                    # Buat versi untuk download dengan number yang bersih
+                    df_total_growth_download = df_total_growth[display_cols].copy()
+                    df_total_growth_download['Year'] = df_total_growth_download['Year'].astype(int)
+                    df_total_growth_download['Quarter'] = df_total_growth_download['Quarter'].astype(int)
+                    df_total_growth_download['Total Frekuensi Total'] = df_total_growth_download['Total Frekuensi Total'].astype(int)
+                    df_total_growth_download['Total Nominal Total'] = df_total_growth_download['Total Nominal Total'].astype(int)
+                    
                     st.write("**Total (Incoming + Outgoing + Domestik)**")
-                    st.dataframe(df_total_growth_display, use_container_width=True, hide_index=True)
+                    col_display, col_download = st.columns([3, 1])
+                    with col_display:
+                        st.dataframe(df_total_growth_display, use_container_width=True, hide_index=True)
+                    with col_download:
+                        csv_total = df_total_growth_download.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Total",
+                            data=csv_total,
+                            file_name=f"pertumbuhan_total_{selected_pjp}_{start_year}_{end_year}.csv",
+                            mime="text/csv"
+                        )
                     
                     # Tampilkan tabel per tipe transaksi
                     col1, col2, col3 = st.columns(3)
@@ -165,6 +208,21 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
                         df_inc_display = df_inc[inc_cols].copy()
                         df_inc_display = format_pjp_growth_table(df_inc_display, is_total=False)
                         st.dataframe(df_inc_display, use_container_width=True, hide_index=True)
+                        
+                        # Download untuk Incoming
+                        df_inc_download = df_inc[inc_cols].copy()
+                        df_inc_download['Year'] = df_inc_download['Year'].astype(int)
+                        df_inc_download['Quarter'] = df_inc_download['Quarter'].astype(int)
+                        df_inc_download['Total Frekuensi'] = df_inc_download['Total Frekuensi'].astype(int)
+                        df_inc_download['Total Nominal'] = df_inc_download['Total Nominal'].astype(int)
+                        csv_inc = df_inc_download.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Incoming",
+                            data=csv_inc,
+                            file_name=f"pertumbuhan_incoming_{selected_pjp}_{start_year}_{end_year}.csv",
+                            mime="text/csv",
+                            key="btn_download_incoming"
+                        )
                     
                     with col2:
                         st.write("**Outgoing**")
@@ -180,6 +238,21 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
                         df_out_display = df_out[out_cols].copy()
                         df_out_display = format_pjp_growth_table(df_out_display, is_total=False)
                         st.dataframe(df_out_display, use_container_width=True, hide_index=True)
+                        
+                        # Download untuk Outgoing
+                        df_out_download = df_out[out_cols].copy()
+                        df_out_download['Year'] = df_out_download['Year'].astype(int)
+                        df_out_download['Quarter'] = df_out_download['Quarter'].astype(int)
+                        df_out_download['Total Frekuensi'] = df_out_download['Total Frekuensi'].astype(int)
+                        df_out_download['Total Nominal'] = df_out_download['Total Nominal'].astype(int)
+                        csv_out = df_out_download.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Outgoing",
+                            data=csv_out,
+                            file_name=f"pertumbuhan_outgoing_{selected_pjp}_{start_year}_{end_year}.csv",
+                            mime="text/csv",
+                            key="btn_download_outgoing"
+                        )
                     
                     with col3:
                         st.write("**Domestik**")
@@ -195,12 +268,27 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
                         df_dom_display = df_dom[dom_cols].copy()
                         df_dom_display = format_pjp_growth_table(df_dom_display, is_total=False)
                         st.dataframe(df_dom_display, use_container_width=True, hide_index=True)
+                        
+                        # Download untuk Domestik
+                        df_dom_download = df_dom[dom_cols].copy()
+                        df_dom_download['Year'] = df_dom_download['Year'].astype(int)
+                        df_dom_download['Quarter'] = df_dom_download['Quarter'].astype(int)
+                        df_dom_download['Total Frekuensi'] = df_dom_download['Total Frekuensi'].astype(int)
+                        df_dom_download['Total Nominal'] = df_dom_download['Total Nominal'].astype(int)
+                        csv_dom = df_dom_download.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Domestik",
+                            data=csv_dom,
+                            file_name=f"pertumbuhan_domestik_{selected_pjp}_{start_year}_{end_year}.csv",
+                            mime="text/csv",
+                            key="btn_download_domestik"
+                        )
             
             st.divider()
             
-            make_combined_bar_line_chart_profile(df_domestic_month, "Dom", selected_pjp, selected_year_pjp)
-            make_combined_bar_line_chart_profile(df_incoming_month, "Inc", selected_pjp, selected_year_pjp)
-            make_combined_bar_line_chart_profile(df_outgoing_month, "Out", selected_pjp, selected_year_pjp)
+            make_combined_bar_line_chart_profile(df_domestic_month, "Dom", selected_pjp, f"{start_year}-{end_year}")
+            make_combined_bar_line_chart_profile(df_incoming_month, "Inc", selected_pjp, f"{start_year}-{end_year}")
+            make_combined_bar_line_chart_profile(df_outgoing_month, "Out", selected_pjp, f"{start_year}-{end_year}")
         else:
             st.error("Tidak terdapat Data Nasional dari tahun yang dipilih")
 else:

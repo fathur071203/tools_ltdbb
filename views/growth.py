@@ -15,9 +15,17 @@ if st.session_state['df'] is not None:
             selected_start_year = st.selectbox('Select Start Year:', unique_years)
             selected_end_year = st.selectbox('Select End Year:', unique_years, index=len(unique_years) - 1)
 
+            # Quarter filter
+            quarters = ['Q1', 'Q2', 'Q3', 'Q4']
+            col_q1, col_q2 = st.columns(2)
+            with col_q1:
+                selected_start_quarter = st.selectbox('Select Start Quarter:', quarters)
+            with col_q2:
+                selected_end_quarter = st.selectbox('Select End Quarter:', quarters, index=3)
+
             jenis_transaksi = ['All', 'Incoming', 'Outgoing', 'Domestik']
             selected_jenis_transaksi = st.selectbox('Select Jenis Transaksi:', jenis_transaksi)
-        st.info("Use the filters to adjust the year range and transaction type.")
+        st.info("Use the filters to adjust the year range, quarter range, and transaction type.")
 
     with (st.spinner('Loading and filtering data...')):
         df_preprocessed_time = preprocess_data(df, True)
@@ -48,31 +56,56 @@ if st.session_state['df'] is not None:
         df_total_month_combined = process_growth_combined(df_jumlah_total_month, df_nom_total_month,
                                                           df_preprocessed_time['Year'].min(), True)
 
+        # Filter by year and quarter
         df_total_combined = filter_start_end_year(df_total_combined, selected_start_year, selected_end_year)
+        df_total_combined = filter_by_quarter(df_total_combined, selected_start_quarter, selected_end_quarter)
+        
         df_total_month_combined = filter_start_end_year(df_total_month_combined, selected_start_year, selected_end_year,
                                                         True)
+        # Quarter filter for monthly data
+        df_total_month_combined = filter_by_quarter(df_total_month_combined, selected_start_quarter, selected_end_quarter)
 
         df_jumlah_inc_filtered = filter_start_end_year(df_jumlah_inc, selected_start_year, selected_end_year)
+        df_jumlah_inc_filtered = filter_by_quarter(df_jumlah_inc_filtered, selected_start_quarter, selected_end_quarter)
+        
         df_jumlah_out_filtered = filter_start_end_year(df_jumlah_out, selected_start_year, selected_end_year)
+        df_jumlah_out_filtered = filter_by_quarter(df_jumlah_out_filtered, selected_start_quarter, selected_end_quarter)
+        
         df_jumlah_dom_filtered = filter_start_end_year(df_jumlah_dom, selected_start_year, selected_end_year)
+        df_jumlah_dom_filtered = filter_by_quarter(df_jumlah_dom_filtered, selected_start_quarter, selected_end_quarter)
 
         df_nom_inc_filtered = filter_start_end_year(df_nom_inc, selected_start_year, selected_end_year)
+        df_nom_inc_filtered = filter_by_quarter(df_nom_inc_filtered, selected_start_quarter, selected_end_quarter)
+        
         df_nom_out_filtered = filter_start_end_year(df_nom_out, selected_start_year, selected_end_year)
+        df_nom_out_filtered = filter_by_quarter(df_nom_out_filtered, selected_start_quarter, selected_end_quarter)
+        
         df_nom_dom_filtered = filter_start_end_year(df_nom_dom, selected_start_year, selected_end_year)
+        df_nom_dom_filtered = filter_by_quarter(df_nom_dom_filtered, selected_start_quarter, selected_end_quarter)
 
         df_jumlah_inc_month_filtered = filter_start_end_year(df_jumlah_inc_month, selected_start_year,
                                                              selected_end_year, True)
+        df_jumlah_inc_month_filtered = filter_by_quarter(df_jumlah_inc_month_filtered, selected_start_quarter, selected_end_quarter)
+        
         df_jumlah_out_month_filtered = filter_start_end_year(df_jumlah_out_month, selected_start_year,
                                                              selected_end_year, True)
+        df_jumlah_out_month_filtered = filter_by_quarter(df_jumlah_out_month_filtered, selected_start_quarter, selected_end_quarter)
+        
         df_jumlah_dom_month_filtered = filter_start_end_year(df_jumlah_dom_month, selected_start_year,
                                                              selected_end_year, True)
+        df_jumlah_dom_month_filtered = filter_by_quarter(df_jumlah_dom_month_filtered, selected_start_quarter, selected_end_quarter)
 
         df_nom_inc_month_filtered = filter_start_end_year(df_nom_inc_month, selected_start_year, selected_end_year,
                                                           True)
+        df_nom_inc_month_filtered = filter_by_quarter(df_nom_inc_month_filtered, selected_start_quarter, selected_end_quarter)
+        
         df_nom_out_month_filtered = filter_start_end_year(df_nom_out_month, selected_start_year, selected_end_year,
                                                           True)
+        df_nom_out_month_filtered = filter_by_quarter(df_nom_out_month_filtered, selected_start_quarter, selected_end_quarter)
+        
         df_nom_dom_month_filtered = filter_start_end_year(df_nom_dom_month, selected_start_year, selected_end_year,
                                                           True)
+        df_nom_dom_month_filtered = filter_by_quarter(df_nom_dom_month_filtered, selected_start_quarter, selected_end_quarter)
 
         df_inc_combined = merge_df_growth(df_jumlah_inc_filtered, df_nom_inc_filtered)
         df_out_combined = merge_df_growth(df_jumlah_out_filtered, df_nom_out_filtered)

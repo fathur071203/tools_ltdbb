@@ -64,6 +64,30 @@ def filter_start_end_year(df, start_year, end_year, is_month: bool = False):
     return df_filtered
 
 
+def filter_by_quarter(df, start_quarter, end_quarter):
+    """
+    Filter data berdasarkan quarter range (Q1-Q4)
+    """
+    quarter_order = {'Q1': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4}
+    start_q = quarter_order[start_quarter]
+    end_q = quarter_order[end_quarter]
+    
+    # Jika 'Quarter' column ada, gunakan itu, jika tidak, hitung dari Month
+    if 'Quarter' in df.columns:
+        df_filtered = df[(df['Quarter'] >= start_q) & (df['Quarter'] <= end_q)]
+    elif 'Month' in df.columns:
+        # Convert month to quarter
+        df_copy = df.copy()
+        df_copy['Quarter'] = (df_copy['Month'].astype(str).apply(
+            lambda m: list(calendar.month_name).index(m) if isinstance(m, str) else int(m)
+        ) - 1) // 3 + 1
+        df_filtered = df_copy[(df_copy['Quarter'] >= start_q) & (df_copy['Quarter'] <= end_q)].drop('Quarter', axis=1)
+    else:
+        df_filtered = df
+    
+    return df_filtered
+
+
 def set_data_settings():
     pd.set_option('display.float_format', '{:,.2f}'.format)
     return
@@ -750,37 +774,31 @@ def format_pjp_growth_table(df: pd.DataFrame, is_total: bool = True):
     """
     df_copy = df.copy()
     
-    # Convert ke numeric untuk semua kolom yang seharusnya numerik
-    numeric_cols = [col for col in df_copy.columns if any(x in col for x in ['Frekuensi', 'Nominal', '%', 'Year-on-Year', 'Quarter-to-Quarter'])]
-    for col in numeric_cols:
-        if col not in ['Year', 'Quarter', 'Month']:
-            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
-    
     # Format function untuk percent
     def format_percent(x):
         if pd.isna(x):
             return 'None'
         return '{:,.2f} %'.format(x).replace(',', '#').replace('.', ',').replace('#', '.')
     
-    # Format function untuk ribuan (dengan comma sebagai thousand separator)
+    # Format function untuk ribuan (dengan titik sebagai thousand separator, tanpa desimal)
     def format_thousands(x):
         if pd.isna(x):
             return ''
-        return '{:,.0f}'.format(x).replace(',', '.').replace('#', ',')
+        # Bulatkan ke angka terdekat sebelum format
+        rounded = int(round(x))
+        # Format dengan thousand separator
+        return '{:,}'.format(rounded).replace(',', '.')
     
-    # Build format dict
-    format_dict = {}
+    # Format setiap kolom langsung di DataFrame
     for col in df_copy.columns:
         if col in ['Year', 'Quarter', 'Month']:
-            # Year, Quarter, Month as integers
-            format_dict[col] = lambda x: str(int(x)) if pd.notna(x) else ''
+            # Year, Quarter, Month as strings
+            df_copy[col] = df_copy[col].astype(str)
         elif any(pct in col for pct in ['%', 'Year-on-Year', 'Quarter-to-Quarter']):
-            # Percentage columns
-            format_dict[col] = format_percent
+            # Percentage columns - format langsung sebagai string
+            df_copy[col] = df_copy[col].apply(format_percent).astype(str)
         elif any(num in col for num in ['Frekuensi', 'Nominal', 'Total']):
-            # Numeric columns with thousands separator
-            format_dict[col] = format_thousands
+            # Numeric columns - format langsung sebagai string
+            df_copy[col] = df_copy[col].apply(format_thousands).astype(str)
     
-    styled = df_copy.style.format(format_dict)
-    
-    return styled
+    return df_copy
