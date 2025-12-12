@@ -16,6 +16,8 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         with st.expander("Filter Individu", True):
             pjp_list = ['All'] + sorted(df['Nama PJP'].unique().tolist())
             years_list = sorted(list(df['Year'].unique()))
+            months_list = ['January', 'February', 'March', 'April', 'May', 'June', 
+                          'July', 'August', 'September', 'October', 'November', 'December']
             
             # Search filter untuk PJP
             search_pjp = st.text_input("🔍 Cari PJP:", placeholder="Ketik nama PJP...")
@@ -26,19 +28,30 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             
             selected_pjp = st.selectbox('Pilih PJP:', filtered_pjp)
             
-            # Range tahun
+            # Range tahun dan bulan
+            st.markdown("**Tanggal Mulai:**")
             col1, col2 = st.columns(2)
             with col1:
                 start_year = st.selectbox('Tahun Mulai:', years_list, key="key_start_year")
             with col2:
+                start_month = st.selectbox('Bulan Mulai:', months_list, key="key_start_month", index=0)
+            
+            st.markdown("**Tanggal Akhir:**")
+            col3, col4 = st.columns(2)
+            with col3:
                 # Filter tahun akhir hanya menampilkan tahun >= tahun mulai
                 end_years = [y for y in years_list if y >= start_year]
                 end_year = st.selectbox('Tahun Akhir:', end_years, key="key_end_year")
+            with col4:
+                end_month = st.selectbox('Bulan Akhir:', months_list, key="key_end_month", index=11)
             
             # Pastikan end_year >= start_year
             if end_year < start_year:
                 end_year = start_year
-        st.info("Gunakan filter untuk memilih nama PJP dan rentang tahun transaksi.")
+                end_month = start_month
+            elif end_year == start_year and months_list.index(end_month) < months_list.index(start_month):
+                end_month = start_month
+        st.info("Gunakan filter untuk memilih nama PJP dan rentang tanggal transaksi.")
 
     df_national_preprocessed_year = preprocess_data_national(df_national, True)
     df_national_preprocessed_month = preprocess_data_national(df_national, False)
@@ -53,7 +66,7 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         'Sum of Fin Nilai Dom': 'sum',
         'Sum of Total Nom': 'sum'
     }).reset_index()
-    df_preprocessed_grouped_month = df_preprocessed.groupby(['Nama PJP', 'Year', 'Month'], observed=False).agg({
+    df_preprocessed_grouped_month = df_preprocessed.groupby(['Nama PJP', 'Year', 'Month'], observed=True).agg({
         'Sum of Fin Jumlah Inc': 'sum',
         'Sum of Fin Jumlah Out': 'sum',
         'Sum of Fin Jumlah Dom': 'sum',
@@ -66,7 +79,6 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     if selected_pjp == 'All':
         st.warning("Silakan pilih PJP untuk menampilkan profil.")
     else:
-        # Filter data berdasarkan range tahun
         df_grouped_filtered_year = df_preprocessed_grouped_year[
             (df_preprocessed_grouped_year['Nama PJP'] == selected_pjp) &
             (df_preprocessed_grouped_year['Year'] >= start_year) &
@@ -78,15 +90,61 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             (df_national_preprocessed_year['Year'] <= end_year)
         ]
         
+        # Filter monthly data dengan range tahun dan bulan yang tepat
         df_grouped_filtered_month = df_preprocessed_grouped_month[
             (df_preprocessed_grouped_month['Nama PJP'] == selected_pjp) &
             (df_preprocessed_grouped_month['Year'] >= start_year) &
             (df_preprocessed_grouped_month['Year'] <= end_year)
         ]
+        
+        # Apply month filtering berdasarkan tahun
+        # Jika start_year == end_year, filter bulan antara start_month sampai end_month
+        # Jika start_year < end_year, filter: bulan >= start_month untuk start_year, bulan <= end_month untuk end_year, semua bulan untuk tahun di tengah
+        
+        # Get list of months between start and end
+        start_month_idx = months_list.index(start_month)
+        end_month_idx = months_list.index(end_month)
+        months_in_range_start = months_list[start_month_idx:]  # From start_month to December
+        months_in_range_end = months_list[:end_month_idx+1]    # From January to end_month
+        
+        if start_year == end_year:
+            # Same year - filter month between start and end
+            df_grouped_filtered_month = df_grouped_filtered_month[
+                df_grouped_filtered_month['Month'].isin(months_list[start_month_idx:end_month_idx+1])
+            ]
+        else:
+            # Different years - apply smart month filtering
+            condition = (
+                ((df_grouped_filtered_month['Year'] == start_year) & (df_grouped_filtered_month['Month'].isin(months_in_range_start))) |
+                ((df_grouped_filtered_month['Year'] == end_year) & (df_grouped_filtered_month['Month'].isin(months_in_range_end))) |
+                ((df_grouped_filtered_month['Year'] > start_year) & (df_grouped_filtered_month['Year'] < end_year))
+            )
+            df_grouped_filtered_month = df_grouped_filtered_month[condition]
 
         df_incoming_month = process_data_profile_month(df_grouped_filtered_month, "Inc")
         df_outgoing_month = process_data_profile_month(df_grouped_filtered_month, "Out")
         df_domestic_month = process_data_profile_month(df_grouped_filtered_month, "Dom")
+        
+        # Re-apply month filtering setelah processing untuk memastikan tidak ada data di luar range
+        if start_year == end_year:
+            df_incoming_month = df_incoming_month[
+                df_incoming_month['Month'].isin(months_list[start_month_idx:end_month_idx+1])
+            ]
+            df_outgoing_month = df_outgoing_month[
+                df_outgoing_month['Month'].isin(months_list[start_month_idx:end_month_idx+1])
+            ]
+            df_domestic_month = df_domestic_month[
+                df_domestic_month['Month'].isin(months_list[start_month_idx:end_month_idx+1])
+            ]
+        else:
+            condition_refilter = (
+                ((df_incoming_month['Year'] == start_year) & (df_incoming_month['Month'].isin(months_in_range_start))) |
+                ((df_incoming_month['Year'] == end_year) & (df_incoming_month['Month'].isin(months_in_range_end))) |
+                ((df_incoming_month['Year'] > start_year) & (df_incoming_month['Year'] < end_year))
+            )
+            df_incoming_month = df_incoming_month[condition_refilter]
+            df_outgoing_month = df_outgoing_month[condition_refilter]
+            df_domestic_month = df_domestic_month[condition_refilter]
 
         data_jumlah_inc = compile_data_profile(df_grouped_filtered_year, df_grouped_national_filtered_year, "Jumlah",
                                                "Inc")

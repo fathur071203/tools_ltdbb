@@ -237,6 +237,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
 def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_pjp: str, selected_year: str):
     # Buat label time-series lintas tahun: YYYY-MM dan urutkan kronologis
     df_copy = df.copy()
+    
     if 'Year' in df_copy.columns and 'Month' in df_copy.columns:
         df_copy['MonthNum'] = df_copy['Month'].apply(lambda m: list(calendar.month_name).index(m) if isinstance(m, str) else int(m))
         df_copy['YearMonth'] = df_copy['Year'].astype(int).astype(str) + '-' + df_copy['MonthNum'].astype(int).astype(str).str.zfill(2)
