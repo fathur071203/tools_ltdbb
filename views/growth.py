@@ -364,18 +364,124 @@ if st.session_state['df'] is not None:
         if 'view_mode' not in st.session_state:
             st.session_state['view_mode'] = 'quarterly'
         
-        # Toggle buttons dengan styling yang lebih menarik
+        # Toggle buttons dengan styling modern
         col_space1, col_toggle1, col_toggle2, col_space2 = st.columns([2, 1.5, 1.5, 2])
         
-        with col_toggle1:
+        # CSS styling untuk toggle buttons
+        toggle_css = """
+        <style>
+            .toggle-container {
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+                margin-bottom: 20px;
+            }
+            
+            .toggle-btn {
+                padding: 10px 20px;
+                border-radius: 8px;
+                border: 2px solid #e0e0e0;
+                background-color: #f8f9fa;
+                color: #333;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                font-size: 15px;
+                min-width: 140px;
+            }
+            
+            .toggle-btn:hover {
+                border-color: #3b82f6;
+                background-color: #eff6ff;
+                color: #1e40af;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(59, 130, 246, 0.15);
+            }
+            
+            .toggle-btn.active {
+                background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+                color: white;
+                border-color: #1e40af;
+                box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            }
+            
+            .toggle-btn.active:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+            }
+        </style>
+        """
+        st.markdown(toggle_css, unsafe_allow_html=True)
+        
+        # Render modern toggle slider
+        col_space1, col_toggle, col_space2 = st.columns([1.5, 3, 1.5])
+        
+        with col_toggle:
+            # Custom CSS untuk segmented control
+            segmented_css = """
+            <style>
+                .segmented-control {
+                    display: flex;
+                    background: linear-gradient(to bottom, #f5f5f5, #efefef);
+                    border-radius: 50px;
+                    padding: 3px;
+                    width: fit-content;
+                    margin: 20px auto;
+                    box-shadow: 
+                        inset 0 2px 4px rgba(255,255,255,0.5),
+                        inset 0 -2px 4px rgba(0,0,0,0.05),
+                        0 4px 12px rgba(0,0,0,0.08);
+                    gap: 4px;
+                }
+                
+                .segmented-control button {
+                    flex: 1;
+                    padding: 12px 24px;
+                    border: none;
+                    background: transparent;
+                    color: #666;
+                    font-weight: 500;
+                    font-size: 15px;
+                    cursor: pointer;
+                    border-radius: 48px;
+                    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    min-width: 130px;
+                    white-space: nowrap;
+                }
+                
+                .segmented-control button:hover {
+                    background: rgba(59, 130, 246, 0.08);
+                    color: #3b82f6;
+                }
+                
+                .segmented-control button.active {
+                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                    color: white;
+                    font-weight: 600;
+                    box-shadow: 
+                        0 4px 12px rgba(59, 130, 246, 0.35),
+                        inset 0 1px 2px rgba(255,255,255,0.2);
+                }
+            </style>
+            """
+            st.markdown(segmented_css, unsafe_allow_html=True)
+        
+        # Create button group
+        col_q, col_m = st.columns([1, 1], gap="small")
+        
+        with col_q:
             is_quarterly = st.session_state['view_mode'] == 'quarterly'
-            if st.button("📊 Quarterly", key="toggle_quarterly", use_container_width=True):
+            btn_style = "primary" if is_quarterly else "secondary"
+            if st.button("📊 Quarterly", key="toggle_quarterly", use_container_width=True, 
+                        type=btn_style):
                 st.session_state['view_mode'] = 'quarterly'
                 st.rerun()
         
-        with col_toggle2:
+        with col_m:
             is_monthly = st.session_state['view_mode'] == 'monthly'
-            if st.button("📅 Monthly", key="toggle_monthly", use_container_width=True):
+            btn_style = "primary" if is_monthly else "secondary"
+            if st.button("📅 Monthly", key="toggle_monthly", use_container_width=True,
+                        type=btn_style):
                 st.session_state['view_mode'] = 'monthly'
                 st.rerun()
         
@@ -385,8 +491,110 @@ if st.session_state['df'] is not None:
         if st.session_state['view_mode'] == 'quarterly':
             st.subheader("📊 Data Transaksi Kuartalan")
             
+            # KPI Cards - Tampilkan total dari semua data
+            st.markdown("<h3 style='margin-top: 20px; margin-bottom: 15px;'>📈 Ringkasan Transaksi</h3>", unsafe_allow_html=True)
+            
+            # Calculate totals
+            total_inc_freq = df_inc_combined['Sum of Fin Jumlah Inc'].sum()
+            total_inc_value = df_inc_combined['Sum of Fin Nilai Inc'].sum()
+            total_out_freq = df_out_combined['Sum of Fin Jumlah Out'].sum()
+            total_out_value = df_out_combined['Sum of Fin Nilai Out'].sum()
+            total_dom_freq = df_dom_combined['Sum of Fin Jumlah Dom'].sum()
+            total_dom_value = df_dom_combined['Sum of Fin Nilai Dom'].sum()
+            total_all_freq = total_inc_freq + total_out_freq + total_dom_freq
+            total_all_value = total_inc_value + total_out_value + total_dom_value
+            
+            # KPI Cards CSS
+            kpi_css = """
+            <style>
+                .kpi-card {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 20px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    border-left: 5px solid;
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                }
+                .kpi-card:hover {
+                    transform: translateY(-4px);
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+                }
+                .kpi-title {
+                    font-size: 14px;
+                    color: #6b7280;
+                    font-weight: 600;
+                    margin-bottom: 8px;
+                }
+                .kpi-value-main {
+                    font-size: 28px;
+                    font-weight: 700;
+                    margin-bottom: 4px;
+                }
+                .kpi-value-sub {
+                    font-size: 16px;
+                    color: #6b7280;
+                    font-weight: 500;
+                }
+            </style>
+            """
+            st.markdown(kpi_css, unsafe_allow_html=True)
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left-color: #F5B0CB;">
+                    <div class="kpi-title">📥 INCOMING</div>
+                    <div class="kpi-value-main" style="color: #F5B0CB;">{total_inc_freq:,.0f}</div>
+                    <div class="kpi-value-sub">Frekuensi</div>
+                    <div class="kpi-value-main" style="color: #F5B0CB; margin-top: 12px;">Rp {total_inc_value/1e12:,.2f} T</div>
+                    <div class="kpi-value-sub">Nilai</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left-color: #F5CBA7;">
+                    <div class="kpi-title">📤 OUTGOING</div>
+                    <div class="kpi-value-main" style="color: #F5CBA7;">{total_out_freq:,.0f}</div>
+                    <div class="kpi-value-sub">Frekuensi</div>
+                    <div class="kpi-value-main" style="color: #F5CBA7; margin-top: 12px;">Rp {total_out_value/1e12:,.2f} T</div>
+                    <div class="kpi-value-sub">Nilai</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left-color: #5DADE2;">
+                    <div class="kpi-title">🏠 DOMESTIK</div>
+                    <div class="kpi-value-main" style="color: #5DADE2;">{total_dom_freq:,.0f}</div>
+                    <div class="kpi-value-sub">Frekuensi</div>
+                    <div class="kpi-value-main" style="color: #5DADE2; margin-top: 12px;">Rp {total_dom_value/1e12:,.2f} T</div>
+                    <div class="kpi-value-sub">Nilai</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left-color: #6366f1;">
+                    <div class="kpi-title">💰 TOTAL</div>
+                    <div class="kpi-value-main" style="color: #6366f1;">{total_all_freq:,.0f}</div>
+                    <div class="kpi-value-sub">Frekuensi</div>
+                    <div class="kpi-value-main" style="color: #6366f1; margin-top: 12px;">Rp {total_all_value/1e12:,.2f} T</div>
+                    <div class="kpi-value-sub">Nilai</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+            
+            # Grafik Gabungan (Stacked Bar + Line)
+            st.markdown("<h3 style='margin-bottom: 15px;'>📊 Grafik Gabungan - Nilai Transaksi</h3>", unsafe_allow_html=True)
+            make_stacked_bar_line_chart_combined(df_inc_combined, df_out_combined, df_dom_combined, is_month=False)
+            
+            st.divider()
+            
             if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
-                st.markdown("<h3 style='background-color: #f0f7ff; border-left: 5px solid #3b82f6; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px;'>📥 Data Transaksi Incoming</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='background-color: #f0f7ff; border-left: 5px solid #3b82f6; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px;'>📥 INCOMING - Data Transaksi</h3>", unsafe_allow_html=True)
                 
                 # Display table with proper numeric sorting
                 df_inc_combined_display = rename_format_growth_df(df_inc_combined.copy(), "Inc")
@@ -418,7 +626,7 @@ if st.session_state['df'] is not None:
                 st.divider()
 
             if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
-                st.markdown("<h3 style='background-color: #fef2f2; border-left: 5px solid #ef4444; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px;'>📤 Data Transaksi Outgoing</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='background-color: #fef2f2; border-left: 5px solid #ef4444; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px;'>📤 OUTGOING - Data Transaksi</h3>", unsafe_allow_html=True)
                 
                 # Display table with proper numeric sorting
                 df_out_combined_display = rename_format_growth_df(df_out_combined.copy(), "Out")
@@ -450,7 +658,7 @@ if st.session_state['df'] is not None:
                 st.divider()
                 
             if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
-                st.markdown("<h3 style='background-color: #f0fdf4; border-left: 5px solid #16a34a; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px;'>🏠 Data Transaksi Domestik</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='background-color: #f0fdf4; border-left: 5px solid #16a34a; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px;'>🏠 DOMESTIK - Data Transaksi</h3>", unsafe_allow_html=True)
                 
                 # Display table with proper numeric sorting
                 df_dom_combined_display = rename_format_growth_df(df_dom_combined.copy(), "Dom")
@@ -481,10 +689,8 @@ if st.session_state['df'] is not None:
                 make_combined_bar_line_chart(df_nom_dom_filtered, "Nilai", "Dom")
                 st.divider()
 
-            st.markdown("<div style='background-color: #fef3c7; border: 2px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 30px 0;'>", unsafe_allow_html=True)
-            st.markdown("<h3 style='margin-top: 0;'>⭐ Summary Keseluruhan Data Transaksi (Kuartalan)</h3>", unsafe_allow_html=True)
-            st.markdown("Gabungan Data Transaksi **Incoming, Outgoing, dan Domestik** (Frekuensi & Nominal).")
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<h3 style='background-color: #fef3c7; border-left: 5px solid #f59e0b; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px; margin-top: 30px;'>💰 TOTAL KESELURUHAN - Data Transaksi (Kuartalan)</h3>", unsafe_allow_html=True)
+            st.markdown("<p style='color: #92400e; font-weight: 500; margin-bottom: 15px;'>Gabungan Data Transaksi Incoming + Outgoing + Domestik (Frekuensi & Nominal)</p>", unsafe_allow_html=True)
             
             df_total_combined_display = df_total_combined.copy()
             df_total_combined_display = rename_format_growth_df(df_total_combined_display, "Total")
@@ -520,11 +726,78 @@ if st.session_state['df'] is not None:
         if st.session_state['view_mode'] == 'monthly':
             st.subheader("📅 Data Transaksi Bulanan")
             
+            # KPI Cards - Monthly
+            st.markdown("<h3 style='margin-top: 20px; margin-bottom: 15px;'>📈 Ringkasan Transaksi</h3>", unsafe_allow_html=True)
+            
+            # Calculate totals
+            total_inc_freq_m = df_inc_combined_month['Sum of Fin Jumlah Inc'].sum()
+            total_inc_value_m = df_inc_combined_month['Sum of Fin Nilai Inc'].sum()
+            total_out_freq_m = df_out_combined_month['Sum of Fin Jumlah Out'].sum()
+            total_out_value_m = df_out_combined_month['Sum of Fin Nilai Out'].sum()
+            total_dom_freq_m = df_dom_combined_month['Sum of Fin Jumlah Dom'].sum()
+            total_dom_value_m = df_dom_combined_month['Sum of Fin Nilai Dom'].sum()
+            total_all_freq_m = total_inc_freq_m + total_out_freq_m + total_dom_freq_m
+            total_all_value_m = total_inc_value_m + total_out_value_m + total_dom_value_m
+            
+            col1_kpi, col2_kpi, col3_kpi, col4_kpi = st.columns(4)
+            
+            with col1_kpi:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left-color: #F5B0CB;">
+                    <div class="kpi-title">📥 INCOMING</div>
+                    <div class="kpi-value-main" style="color: #F5B0CB;">{total_inc_freq_m:,.0f}</div>
+                    <div class="kpi-value-sub">Frekuensi</div>
+                    <div class="kpi-value-main" style="color: #F5B0CB; margin-top: 12px;">Rp {total_inc_value_m/1e12:,.2f} T</div>
+                    <div class="kpi-value-sub">Nilai</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2_kpi:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left-color: #F5CBA7;">
+                    <div class="kpi-title">📤 OUTGOING</div>
+                    <div class="kpi-value-main" style="color: #F5CBA7;">{total_out_freq_m:,.0f}</div>
+                    <div class="kpi-value-sub">Frekuensi</div>
+                    <div class="kpi-value-main" style="color: #F5CBA7; margin-top: 12px;">Rp {total_out_value_m/1e12:,.2f} T</div>
+                    <div class="kpi-value-sub">Nilai</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3_kpi:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left-color: #5DADE2;">
+                    <div class="kpi-title">🏠 DOMESTIK</div>
+                    <div class="kpi-value-main" style="color: #5DADE2;">{total_dom_freq_m:,.0f}</div>
+                    <div class="kpi-value-sub">Frekuensi</div>
+                    <div class="kpi-value-main" style="color: #5DADE2; margin-top: 12px;">Rp {total_dom_value_m/1e12:,.2f} T</div>
+                    <div class="kpi-value-sub">Nilai</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4_kpi:
+                st.markdown(f"""
+                <div class="kpi-card" style="border-left-color: #6366f1;">
+                    <div class="kpi-title">💰 TOTAL</div>
+                    <div class="kpi-value-main" style="color: #6366f1;">{total_all_freq_m:,.0f}</div>
+                    <div class="kpi-value-sub">Frekuensi</div>
+                    <div class="kpi-value-main" style="color: #6366f1; margin-top: 12px;">Rp {total_all_value_m/1e12:,.2f} T</div>
+                    <div class="kpi-value-sub">Nilai</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+            
+            # Grafik Gabungan (Stacked Bar + Line) - Monthly
+            st.markdown("<h3 style='margin-bottom: 15px;'>📊 Grafik Gabungan - Nilai Transaksi</h3>", unsafe_allow_html=True)
+            make_stacked_bar_line_chart_combined(df_inc_combined_month, df_out_combined_month, df_dom_combined_month, is_month=True)
+            
+            st.divider()
+            
             col1, col2, col3 = st.columns(3)
             
             if selected_jenis_transaksi == 'Incoming' or selected_jenis_transaksi == 'All':
                 with col1:
-                    st.markdown("<h4 style='background-color: #f0f7ff; border-left: 5px solid #3b82f6; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px;'>📥 Data Transaksi Incoming (Bulanan)</h4>", unsafe_allow_html=True)
+                    st.markdown("<h4 style='background-color: #f0f7ff; border-left: 5px solid #3b82f6; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px;'>📥 INCOMING (Bulanan)</h4>", unsafe_allow_html=True)
                     
                     df_inc_combined_month_display = rename_format_growth_monthly_df(df_inc_combined_month.copy(), "Inc")
                     st.dataframe(
@@ -550,7 +823,7 @@ if st.session_state['df'] is not None:
             
             if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
                 with col2:
-                    st.markdown("<h4 style='background-color: #fef2f2; border-left: 5px solid #ef4444; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px;'>📤 Data Transaksi Outgoing (Bulanan)</h4>", unsafe_allow_html=True)
+                    st.markdown("<h4 style='background-color: #fef2f2; border-left: 5px solid #ef4444; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px;'>📤 OUTGOING (Bulanan)</h4>", unsafe_allow_html=True)
                     
                     df_out_combined_month_display = rename_format_growth_monthly_df(df_out_combined_month.copy(), "Out")
                     st.dataframe(
@@ -576,7 +849,7 @@ if st.session_state['df'] is not None:
             
             if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
                 with col3:
-                    st.markdown("<h4 style='background-color: #f0fdf4; border-left: 5px solid #16a34a; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px;'>🏠 Data Transaksi Domestik (Bulanan)</h4>", unsafe_allow_html=True)
+                    st.markdown("<h4 style='background-color: #f0fdf4; border-left: 5px solid #16a34a; padding: 10px 12px; border-radius: 5px; margin-bottom: 15px;'>🏠 DOMESTIK (Bulanan)</h4>", unsafe_allow_html=True)
                     
                     df_dom_combined_month_display = rename_format_growth_monthly_df(df_dom_combined_month.copy(), "Dom")
                     st.dataframe(
@@ -611,10 +884,8 @@ if st.session_state['df'] is not None:
             make_combined_bar_line_chart(df_jumlah_dom_month_filtered, "Jumlah", "Dom", True)
             make_combined_bar_line_chart(df_nom_dom_month_filtered, "Nilai", "Dom", True)
 
-            st.markdown("<div style='background-color: #fef3c7; border: 2px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 30px 0;'>", unsafe_allow_html=True)
-            st.markdown("<h3 style='margin-top: 0;'>⭐ Summary Keseluruhan Data Transaksi (Bulanan)</h3>", unsafe_allow_html=True)
-            st.markdown("Gabungan Data Transaksi **Incoming, Outgoing, dan Domestik** per Bulan (Frekuensi & Nominal).")
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<h3 style='background-color: #fef3c7; border-left: 5px solid #f59e0b; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px; margin-top: 30px;'>💰 TOTAL KESELURUHAN - Data Transaksi (Bulanan)</h3>", unsafe_allow_html=True)
+            st.markdown("<p style='color: #92400e; font-weight: 500; margin-bottom: 15px;'>Gabungan Data Transaksi Incoming + Outgoing + Domestik per Bulan (Frekuensi & Nominal)</p>", unsafe_allow_html=True)
             df_total_month_combined_display = df_total_month_combined.copy()
             df_total_month_combined_display = rename_format_growth_monthly_df(df_total_month_combined_display, "Total")
             st.dataframe(
