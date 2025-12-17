@@ -146,6 +146,325 @@ def make_stacked_bar_line_chart_combined(df_inc, df_out, df_dom, is_month: bool 
     st.plotly_chart(fig, use_container_width=True)
 
 
+def make_quarter_across_years_chart(
+    df: pd.DataFrame,
+    quarter: int,
+    sum_trx_type: str,
+    trx_type: str,
+    is_combined: bool = False,
+):
+    """Bandingkan kuartal yang sama (Q1/Q2/Q3/Q4) antar tahun.
+
+    - Bar: nilai/frekuensi pada kuartal terpilih untuk setiap tahun
+    - Line: Growth YoY (%) untuk kuartal yang sama
+
+    Args:
+        df: dataframe yang minimal punya kolom Year, Quarter, dan kolom nilai yang relevan.
+        quarter: 1-4
+        sum_trx_type: "Jumlah" atau "Nilai"
+        trx_type: "Inc"|"Out"|"Dom"|"Total"
+        is_combined: True untuk df total yang memakai kolom %YoY Jumlah/%YoY Nilai
+    """
+
+    if df is None or df.empty:
+        st.info("Data kosong.")
+        return
+
+    required_cols = {"Year", "Quarter"}
+    if not required_cols.issubset(set(df.columns)):
+        st.warning("Kolom Year/Quarter tidak ditemukan.")
+        return
+
+    if sum_trx_type not in ("Jumlah", "Nilai"):
+        st.warning("sum_trx_type harus 'Jumlah' atau 'Nilai'.")
+        return
+
+    if trx_type not in ("Inc", "Out", "Dom", "Total"):
+        st.warning("trx_type harus salah satu dari Inc/Out/Dom/Total.")
+        return
+
+    bar_col = f"Sum of Fin {sum_trx_type} {trx_type}"
+    if is_combined:
+        growth_col = f"%YoY {sum_trx_type}"
+    else:
+        growth_col = "%YoY"
+
+    if bar_col not in df.columns:
+        st.warning(f"Kolom '{bar_col}' tidak ditemukan.")
+        return
+
+    if growth_col not in df.columns:
+        st.warning(f"Kolom '{growth_col}' tidak ditemukan.")
+        return
+
+    dfc = df.copy()
+    dfc = dfc[dfc["Quarter"].astype(int) == int(quarter)].copy()
+    if dfc.empty:
+        st.info(f"Tidak ada data untuk Q{int(quarter)} pada filter saat ini.")
+        return
+
+    dfc["Year"] = dfc["Year"].astype(int)
+    dfc = dfc.sort_values("Year")
+
+    # Scale mengikuti style chart lain
+    if sum_trx_type == "Jumlah":
+        bar_yaxis_title = "Volume (Jutaan)"
+        scale_factor = 1e6
+    else:
+        bar_yaxis_title = "Nilai (Rp Miliar)"
+        scale_factor = 1e9
+
+    # Palet konsisten
+    if trx_type == "Inc":
+        jenis_trx = "INCOMING"
+        bar_color = "#F5B0CB"
+    elif trx_type == "Out":
+        jenis_trx = "OUTGOING"
+        bar_color = "#F5CBA7"
+    elif trx_type == "Dom":
+        jenis_trx = "DOMESTIK"
+        bar_color = "#5DADE2"
+    else:
+        jenis_trx = "TOTAL"
+        bar_color = "#6366f1"
+
+    title = f"Perbandingan Q{int(quarter)} Antar Tahun - {bar_yaxis_title} {jenis_trx}"
+
+    years = dfc["Year"].tolist()
+    values = pd.to_numeric(dfc[bar_col], errors="coerce") / scale_factor
+    yoy = pd.to_numeric(dfc[growth_col], errors="coerce")
+    yoy_text = [f"{v:.1f}%" if pd.notna(v) else "" for v in yoy.tolist()]
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Bar(
+            x=years,
+            y=values,
+            name=bar_yaxis_title,
+            marker=dict(color=bar_color, line=dict(width=0)),
+            hovertemplate="Year %{x}<br>" + bar_yaxis_title + ": %{y:,.2f}<extra></extra>",
+            yaxis="y1",
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=years,
+            y=yoy,
+            name="Growth YoY (%)",
+            yaxis="y2",
+            mode="lines+markers+text",
+            line=dict(color="#1E8449", width=3),
+            marker=dict(size=8, color="#1E8449", line=dict(color="white", width=2)),
+            text=yoy_text,
+            textposition="top center",
+            textfont=dict(size=11, color="#1E8449", family="Inter, Arial, sans-serif"),
+            hovertemplate="Year %{x}<br>Growth YoY: %{y:.2f}%<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        title=dict(
+            text=title,
+            font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+        ),
+        xaxis=dict(
+            title=dict(text=f"Tahun (Q{int(quarter)})", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            showgrid=False,
+            showline=True,
+            linewidth=2,
+            linecolor="#d1d5db",
+            tickfont=dict(size=12, family="Inter, Arial, sans-serif"),
+        ),
+        yaxis=dict(
+            title=dict(text=bar_yaxis_title, font=dict(size=14, family="Inter, Arial, sans-serif")),
+            tickformat=",.0f",
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="#e5e7eb",
+            zeroline=True,
+            zerolinewidth=2,
+            zerolinecolor="#d1d5db",
+        ),
+        yaxis2=dict(
+            title=dict(text="Growth (%)", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            overlaying="y",
+            side="right",
+            tickformat=".1f",
+            showgrid=False,
+        ),
+        template="plotly_white",
+        paper_bgcolor="white",
+        plot_bgcolor="#f9fafb",
+        font=dict(family="Inter, Arial, sans-serif", size=12),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="#e5e7eb",
+            borderwidth=1,
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def make_quarter_vs_quarter_chart(
+    df: pd.DataFrame,
+    year_a: int,
+    quarter_a: int,
+    year_b: int,
+    quarter_b: int,
+    sum_trx_type: str,
+    trx_type: str,
+    is_combined: bool = False,
+):
+    """Bandingkan 2 periode kuartal (Year, Quarter) vs (Year, Quarter)."""
+
+    if df is None or df.empty:
+        st.info("Data kosong.")
+        return
+
+    required_cols = {"Year", "Quarter"}
+    if not required_cols.issubset(set(df.columns)):
+        st.warning("Kolom Year/Quarter tidak ditemukan.")
+        return
+
+    if sum_trx_type not in ("Jumlah", "Nilai"):
+        st.warning("sum_trx_type harus 'Jumlah' atau 'Nilai'.")
+        return
+
+    if trx_type not in ("Inc", "Out", "Dom", "Total"):
+        st.warning("trx_type harus salah satu dari Inc/Out/Dom/Total.")
+        return
+
+    bar_col = f"Sum of Fin {sum_trx_type} {trx_type}"
+    if bar_col not in df.columns:
+        st.warning(f"Kolom '{bar_col}' tidak ditemukan.")
+        return
+
+    dfa = df[(df["Year"].astype(int) == int(year_a)) & (df["Quarter"].astype(int) == int(quarter_a))].copy()
+    dfb = df[(df["Year"].astype(int) == int(year_b)) & (df["Quarter"].astype(int) == int(quarter_b))].copy()
+
+    if dfa.empty or dfb.empty:
+        st.info("Data untuk salah satu periode tidak ditemukan.")
+        return
+
+    val_a = pd.to_numeric(dfa[bar_col].iloc[0], errors="coerce")
+    val_b = pd.to_numeric(dfb[bar_col].iloc[0], errors="coerce")
+
+    if sum_trx_type == "Jumlah":
+        y_title = "Volume (Jutaan)"
+        scale_factor = 1e6
+    else:
+        # Khusus chart VS: tampilkan dalam Triliun agar lebih mudah dibaca
+        y_title = "Nilai (Rp Triliun)"
+        scale_factor = 1e12
+
+    # Palet konsisten
+    if trx_type == "Inc":
+        jenis_trx = "INCOMING"
+        bar_color = "#F5B0CB"
+    elif trx_type == "Out":
+        jenis_trx = "OUTGOING"
+        bar_color = "#F5CBA7"
+    elif trx_type == "Dom":
+        jenis_trx = "DOMESTIK"
+        bar_color = "#5DADE2"
+    else:
+        jenis_trx = "TOTAL"
+        bar_color = "#6366f1"
+
+    label_a = f"Q{int(quarter_a)} {int(year_a)}"
+    label_b = f"Q{int(quarter_b)} {int(year_b)}"
+
+    y_vals = [val_a / scale_factor, val_b / scale_factor]
+
+    delta_pct = None
+    if pd.notna(val_a) and pd.notna(val_b) and float(val_a) != 0:
+        delta_pct = ((float(val_b) - float(val_a)) / float(val_a)) * 100
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Bar(
+            x=[label_a, label_b],
+            y=y_vals,
+            name=jenis_trx,
+            marker=dict(color=bar_color, line=dict(width=0)),
+            hovertemplate="%{x}<br>" + y_title + ": %{y:,.2f}<extra></extra>",
+        )
+    )
+
+    # Garis trend (samakan gaya garis dengan chart lain)
+    if pd.notna(y_vals[0]) and pd.notna(y_vals[1]):
+        fig.add_trace(
+            go.Scatter(
+                x=[label_a, label_b],
+                y=y_vals,
+                name="Perubahan",
+                mode="lines+markers+text",
+                line=dict(color="#1E8449", width=3),
+                marker=dict(size=8, color="#1E8449", line=dict(color="white", width=2)),
+                text=["", f"{delta_pct:+.1f}%"] if delta_pct is not None and pd.notna(delta_pct) else ["", ""],
+                textposition="top center",
+                textfont=dict(size=11, color="#1E8449", family="Inter, Arial, sans-serif"),
+                hovertemplate="%{x}<br>" + y_title + ": %{y:,.2f}<extra></extra>",
+            )
+        )
+
+    # (Delta sudah ditampilkan sebagai text pada garis)
+
+    fig.update_layout(
+        title=dict(
+            text=f"Perbandingan Periode - {y_title} {jenis_trx}",
+            font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+        ),
+        xaxis=dict(
+            title=dict(text="Periode", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            showgrid=False,
+            showline=True,
+            linewidth=2,
+            linecolor="#d1d5db",
+            tickfont=dict(size=12, family="Inter, Arial, sans-serif"),
+        ),
+        yaxis=dict(
+            title=dict(text=y_title, font=dict(size=14, family="Inter, Arial, sans-serif")),
+            tickformat=",.0f",
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="#e5e7eb",
+            zeroline=True,
+            zerolinewidth=2,
+            zerolinecolor="#d1d5db",
+        ),
+        template="plotly_white",
+        paper_bgcolor="white",
+        plot_bgcolor="#f9fafb",
+        font=dict(family="Inter, Arial, sans-serif", size=12),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="#e5e7eb",
+            borderwidth=1,
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
 def make_pie_chart_summary(df, top_n):
     df_sorted = df.sort_values('Market Share (%)', ascending=False)
 

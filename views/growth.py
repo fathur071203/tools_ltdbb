@@ -590,6 +590,127 @@ if st.session_state['df'] is not None:
             # Grafik Gabungan (Stacked Bar + Line)
             st.markdown("<h3 style='margin-bottom: 15px;'>📊 Grafik Gabungan - Nilai Transaksi</h3>", unsafe_allow_html=True)
             make_stacked_bar_line_chart_combined(df_inc_combined, df_out_combined, df_dom_combined, is_month=False)
+
+            # Perbandingan Periode (Quarter) - VS
+            st.markdown("<h3 style='margin-top: 25px; margin-bottom: 10px;'>🆚 Perbandingan Periode (Kuartal)</h3>", unsafe_allow_html=True)
+            st.markdown(
+                "<p style='color:#6b7280; margin-top:-6px; margin-bottom:12px;'>Pilih 2 periode (tahun & kuartal) untuk dibandingkan. Grafik hanya menampilkan 2 batang yang relevan.</p>",
+                unsafe_allow_html=True,
+            )
+
+            # Sinkronkan default Periode A/B dengan filter sidebar (Start/End)
+            _start_q_int = int(str(selected_start_quarter).replace("Q", ""))
+            _end_q_int = int(str(selected_end_quarter).replace("Q", ""))
+            _vs_filter_sig = (int(selected_start_year), _start_q_int, int(selected_end_year), _end_q_int)
+            if st.session_state.get("_vs_filter_sig") != _vs_filter_sig:
+                st.session_state["_vs_filter_sig"] = _vs_filter_sig
+                st.session_state["vs_year_a"] = int(selected_start_year)
+                st.session_state["vs_q_a"] = int(_start_q_int)
+                st.session_state["vs_year_b"] = int(selected_end_year)
+                st.session_state["vs_q_b"] = int(_end_q_int)
+
+            cmp_years = sorted(df_total_combined['Year'].unique().tolist()) if not df_total_combined.empty else sorted(df_preprocessed_time['Year'].unique().tolist())
+            cmp_quarters = [1, 2, 3, 4]
+
+            c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.2, 1.2])
+            with c1:
+                vs_year_a = st.selectbox("Tahun A", cmp_years, key="vs_year_a")
+            with c2:
+                vs_q_a = st.selectbox("Kuartal A", cmp_quarters, format_func=lambda q: f"Q{q}", key="vs_q_a")
+            with c3:
+                vs_year_b = st.selectbox("Tahun B", cmp_years, key="vs_year_b")
+            with c4:
+                vs_q_b = st.selectbox("Kuartal B", cmp_quarters, format_func=lambda q: f"Q{q}", key="vs_q_b")
+
+            c5, c6 = st.columns([1.2, 1.6])
+            with c5:
+                vs_metric = st.selectbox("Metrik", ["Nominal", "Frekuensi"], key="vs_metric")
+            with c6:
+                vs_trx = st.selectbox("Jenis Transaksi", ["Incoming", "Outgoing", "Domestik", "Total"], key="vs_trx")
+
+            sum_trx_type = "Nilai" if vs_metric == "Nominal" else "Jumlah"
+
+            if vs_trx == "Incoming":
+                df_vs_src = df_nom_inc_filtered if sum_trx_type == "Nilai" else df_jumlah_inc_filtered
+                trx_code = "Inc"
+                is_combined = False
+            elif vs_trx == "Outgoing":
+                df_vs_src = df_nom_out_filtered if sum_trx_type == "Nilai" else df_jumlah_out_filtered
+                trx_code = "Out"
+                is_combined = False
+            elif vs_trx == "Domestik":
+                df_vs_src = df_nom_dom_filtered if sum_trx_type == "Nilai" else df_jumlah_dom_filtered
+                trx_code = "Dom"
+                is_combined = False
+            else:
+                df_vs_src = df_total_combined
+                trx_code = "Total"
+                is_combined = True
+
+            make_quarter_vs_quarter_chart(
+                df=df_vs_src,
+                year_a=int(vs_year_a),
+                quarter_a=int(vs_q_a),
+                year_b=int(vs_year_b),
+                quarter_b=int(vs_q_b),
+                sum_trx_type=sum_trx_type,
+                trx_type=trx_code,
+                is_combined=is_combined,
+            )
+
+            # Tabel VS Market Share (Jakarta vs Nasional)
+            df_national_raw = st.session_state.get('df_national')
+            if df_national_raw is None:
+                st.info("Upload data nasional (Raw_JKTNasional) di Summary dulu untuk menampilkan tabel market share vs nasional.")
+            else:
+                try:
+                    df_national_q = add_quarter_column(df_national_raw.copy())
+                    df_national_grouped = preprocess_data_national(df_national_q, True, True)
+
+                    jkt_a = df_sum_time[(df_sum_time['Year'] == int(vs_year_a)) & (df_sum_time['Quarter'] == int(vs_q_a))].copy()
+                    nat_a = df_national_grouped[(df_national_grouped['Year'] == int(vs_year_a)) & (df_national_grouped['Quarter'] == int(vs_q_a))].copy()
+
+                    jkt_b = df_sum_time[(df_sum_time['Year'] == int(vs_year_b)) & (df_sum_time['Quarter'] == int(vs_q_b))].copy()
+                    nat_b = df_national_grouped[(df_national_grouped['Year'] == int(vs_year_b)) & (df_national_grouped['Quarter'] == int(vs_q_b))].copy()
+
+                    if jkt_a.empty or nat_a.empty or jkt_b.empty or nat_b.empty:
+                        st.warning("Data market share tidak lengkap untuk salah satu periode (A/B).")
+                    else:
+                        def _build_ms_row(df_ms: pd.DataFrame, label: str) -> dict:
+                            # df_ms: output compile_data_market_share
+                            return {
+                                "Periode": label,
+                                "Jakarta Nom (T)": df_ms["Nominal (dalam triliun)"].iloc[0],
+                                "Nasional Nom (T)": df_ms["Nominal (dalam triliun)"].iloc[1],
+                                "Market Share Nom (%)": df_ms["Nominal (dalam triliun)"].iloc[2],
+                                "Jakarta Frek (Juta)": df_ms["Frekuensi (dalam jutaan)"].iloc[0],
+                                "Nasional Frek (Juta)": df_ms["Frekuensi (dalam jutaan)"].iloc[1],
+                                "Market Share Frek (%)": df_ms["Frekuensi (dalam jutaan)"].iloc[2],
+                            }
+
+                        if trx_code == "Total":
+                            ms_a_inc = compile_data_market_share(jkt_a, nat_a, "Inc")
+                            ms_a_out = compile_data_market_share(jkt_a, nat_a, "Out")
+                            ms_a_dom = compile_data_market_share(jkt_a, nat_a, "Dom")
+                            ms_a = compile_data_market_share(jkt_a, nat_a, "Total", ms_a_inc, ms_a_out, ms_a_dom)
+
+                            ms_b_inc = compile_data_market_share(jkt_b, nat_b, "Inc")
+                            ms_b_out = compile_data_market_share(jkt_b, nat_b, "Out")
+                            ms_b_dom = compile_data_market_share(jkt_b, nat_b, "Dom")
+                            ms_b = compile_data_market_share(jkt_b, nat_b, "Total", ms_b_inc, ms_b_out, ms_b_dom)
+                        else:
+                            ms_a = compile_data_market_share(jkt_a, nat_a, trx_code)
+                            ms_b = compile_data_market_share(jkt_b, nat_b, trx_code)
+
+                        st.markdown("<h4 style='margin-top: 10px; margin-bottom: 10px;'>📋 Tabel VS - Market Share Jakarta vs Nasional</h4>", unsafe_allow_html=True)
+                        df_ms_vs = pd.DataFrame([
+                            _build_ms_row(ms_a, f"Q{int(vs_q_a)} {int(vs_year_a)}"),
+                            _build_ms_row(ms_b, f"Q{int(vs_q_b)} {int(vs_year_b)}"),
+                        ])
+                        st.dataframe(df_ms_vs, use_container_width=True, hide_index=True)
+                        st.caption("Market Share = (Jakarta / Nasional) × 100. Nominal dalam triliun, Frekuensi dalam jutaan.")
+                except Exception as e:
+                    st.warning(f"Gagal memproses market share vs nasional: {e}")
             
             st.divider()
             
