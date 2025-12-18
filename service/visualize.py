@@ -1029,6 +1029,7 @@ def make_overall_total_stacked_growth_chart(
     sum_trx_type: str,
     is_month: bool = False,
     show_breakdown_growth: bool = False,
+    visible_periods: list[str] | None = None,
 ):
     """Visualisasi Keseluruhan TOTAL: stacked bar (Inc/Out/Dom) + Growth YoY & QtQ.
 
@@ -1137,6 +1138,18 @@ def make_overall_total_stacked_growth_chart(
         st.info("Data breakdown Inc/Out/Dom tidak tersedia.")
         return
 
+    # Visual-only filter: sembunyikan periode tertentu tanpa mengubah nilai growth
+    df_show = df_plot
+    if visible_periods is not None:
+        visible = [p for p in visible_periods if isinstance(p, str) and p.strip()]
+        if len(visible) == 0:
+            st.info("Tidak ada periode yang dipilih untuk ditampilkan.")
+            return
+        df_show = df_plot[df_plot[target_col].isin(visible)].copy()
+        if df_show.empty:
+            st.info("Tidak ada data pada periode yang dipilih.")
+            return
+
     # Skala sumbu utama
     if sum_trx_type == "Jumlah":
         y_title = "Volume (Jutaan)"
@@ -1148,154 +1161,231 @@ def make_overall_total_stacked_growth_chart(
 
     fig = go.Figure()
 
+    def _lighten_hex(hex_color: str, amount: float = 0.35) -> str:
+        """Lighten hex color by mixing with white (amount 0..1)."""
+        try:
+            h = hex_color.lstrip("#")
+            r = int(h[0:2], 16)
+            g = int(h[2:4], 16)
+            b = int(h[4:6], 16)
+            r = int(r + (255 - r) * amount)
+            g = int(g + (255 - g) * amount)
+            b = int(b + (255 - b) * amount)
+            return f"#{r:02X}{g:02X}{b:02X}"
+        except Exception:
+            return hex_color
+
+    def _calc_y2_offset_unit() -> float:
+        series_list: list[pd.Series] = []
+        try:
+            series_list.extend([yoy, qoq])
+        except Exception:
+            pass
+
+        if show_breakdown_growth and (not is_month):
+            for col in ("_inc_yoy", "_inc_qoq", "_out_yoy", "_out_qoq", "_dom_yoy", "_dom_qoq"):
+                if col in df_show.columns:
+                    series_list.append(pd.to_numeric(df_show[col], errors="coerce"))
+
+        vals = []
+        for s in series_list:
+            try:
+                vals.extend(pd.to_numeric(s, errors="coerce").dropna().tolist())
+            except Exception:
+                continue
+
+        if not vals:
+            return 1.0
+
+        vmin = float(min(vals))
+        vmax = float(max(vals))
+        span = vmax - vmin
+        return span * 0.06 if span > 0 else 1.0
+
+    def _add_last_point_label_trace(
+        *,
+        x_val: str,
+        y_val: float,
+        text: str,
+        legend_group: str,
+        border_color: str,
+        y_offset: float = 0.0,
+    ):
+        """Tambahkan label di titik terakhir sebagai trace agar ikut hide saat legend-toggle."""
+
+        try:
+            y_num = float(y_val)
+        except Exception:
+            return
+
+        fig.add_trace(
+            go.Scatter(
+                x=[x_val],
+                y=[y_num + float(y_offset)],
+                name=text,
+                legendgroup=legend_group,
+                showlegend=False,
+                yaxis="y2",
+                mode="markers+text",
+                marker=dict(
+                    symbol="square",
+                    size=34,
+                    color="rgba(255, 255, 255, 0.92)",
+                    line=dict(color=border_color, width=1),
+                ),
+                text=[text],
+                textposition="middle center",
+                textfont=dict(size=10, color="#111827", family="Inter, Arial, sans-serif"),
+                hoverinfo="skip",
+            )
+        )
+
     # Stacked bars (tetap pakai warna pastel untuk breakdown)
     fig.add_trace(go.Bar(
-        x=df_plot[target_col],
-        y=pd.to_numeric(df_plot[inc_col], errors="coerce") / scale_factor,
+        x=df_show[target_col],
+        y=pd.to_numeric(df_show[inc_col], errors="coerce") / scale_factor,
         name="Incoming",
         marker=dict(color="#F5B0CB", line=dict(width=0)),
         hovertemplate="%{x}<br>Incoming: %{y:,.2f}<extra></extra>",
         yaxis="y1",
     ))
     fig.add_trace(go.Bar(
-        x=df_plot[target_col],
-        y=pd.to_numeric(df_plot[out_col], errors="coerce") / scale_factor,
+        x=df_show[target_col],
+        y=pd.to_numeric(df_show[out_col], errors="coerce") / scale_factor,
         name="Outgoing",
         marker=dict(color="#F5CBA7", line=dict(width=0)),
         hovertemplate="%{x}<br>Outgoing: %{y:,.2f}<extra></extra>",
         yaxis="y1",
     ))
     fig.add_trace(go.Bar(
-        x=df_plot[target_col],
-        y=pd.to_numeric(df_plot[dom_col], errors="coerce") / scale_factor,
+        x=df_show[target_col],
+        y=pd.to_numeric(df_show[dom_col], errors="coerce") / scale_factor,
         name="Domestik",
         marker=dict(color="#5DADE2", line=dict(width=0)),
         hovertemplate="%{x}<br>Domestik: %{y:,.2f}<extra></extra>",
         yaxis="y1",
     ))
 
-    yoy = pd.to_numeric(df_plot[growth_yoy_col], errors="coerce")
-    qoq = pd.to_numeric(df_plot[growth_qoq_col], errors="coerce")
+    yoy = pd.to_numeric(df_show[growth_yoy_col], errors="coerce")
+    qoq = pd.to_numeric(df_show[growth_qoq_col], errors="coerce")
 
-    # Garis growth dibuat kontras (hindari biru/ungu/merah/orange)
-    yoy_color = "#111827"  # gray-900
-    qoq_color = "#0F766E"  # teal-700
+    # Garis growth dibuat gelap tapi kontras (hindari hitam tua & biru tua)
+    yoy_color = "#14532D"  # green-900
+    qoq_color = "#7F1D1D"  # red-900
+
+    total_yoy_group = "overall_total_yoy"
+    total_qoq_group = "overall_total_qoq"
 
     fig.add_trace(go.Scatter(
-        x=df_plot[target_col],
+        x=df_show[target_col],
         y=yoy,
         name=yoy_label,
+        legendgroup=total_yoy_group,
         yaxis="y2",
         mode="lines+markers",
         line=dict(color=yoy_color, width=4),
-        marker=dict(size=9, color=yoy_color, line=dict(color="white", width=2)),
+        marker=dict(size=9, color=yoy_color, line=dict(color="white", width=2), symbol="circle"),
         hovertemplate="%{x}<br>YoY Growth: %{y:.2f}%<extra></extra>",
     ))
 
     fig.add_trace(go.Scatter(
-        x=df_plot[target_col],
+        x=df_show[target_col],
         y=qoq,
         name=qoq_label,
+        legendgroup=total_qoq_group,
         yaxis="y2",
         mode="lines+markers",
-        line=dict(color=qoq_color, width=4, dash="dot"),
-        marker=dict(size=9, color=qoq_color, line=dict(color="white", width=2)),
+        line=dict(color=qoq_color, width=4, dash="dash"),
+        marker=dict(size=9, color=qoq_color, line=dict(color="white", width=2), symbol="diamond"),
         hovertemplate="%{x}<br>QtQ Growth: %{y:.2f}%<extra></extra>",
     ))
+
+    y2_offset_unit = _calc_y2_offset_unit()
 
     def _add_breakdown_growth(prefix: str, label: str, base_color: str, dash_qoq: str, yshift_base: int):
         yoy_col = f"_{prefix}_yoy"
         qoq_col = f"_{prefix}_qoq"
-        if yoy_col not in df_plot.columns or qoq_col not in df_plot.columns:
+        if yoy_col not in df_show.columns or qoq_col not in df_show.columns:
             return
 
-        s_yoy = pd.to_numeric(df_plot[yoy_col], errors="coerce")
-        s_qoq = pd.to_numeric(df_plot[qoq_col], errors="coerce")
+        s_yoy = pd.to_numeric(df_show[yoy_col], errors="coerce")
+        s_qoq = pd.to_numeric(df_show[qoq_col], errors="coerce")
+
+        group_yoy = f"overall_{prefix}_yoy"
+        group_qoq = f"overall_{prefix}_qoq"
+
+        qoq_line_color = base_color
 
         fig.add_trace(go.Scatter(
-            x=df_plot[target_col],
+            x=df_show[target_col],
             y=s_yoy,
             name=f"{label} YoY (%)",
+            legendgroup=group_yoy,
             yaxis="y2",
             mode="lines+markers",
             line=dict(color=base_color, width=2),
-            marker=dict(size=7, color=base_color, line=dict(color="white", width=1.5)),
+            marker=dict(size=7, color=base_color, line=dict(color="white", width=1.5), symbol="circle"),
             hovertemplate="%{x}<br>" + label + " YoY: %{y:.2f}%<extra></extra>",
         ))
 
         fig.add_trace(go.Scatter(
-            x=df_plot[target_col],
+            x=df_show[target_col],
             y=s_qoq,
             name=f"{label} QtQ (%)",
+            legendgroup=group_qoq,
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color=base_color, width=2, dash=dash_qoq),
-            marker=dict(size=7, color=base_color, line=dict(color="white", width=1.5)),
+            line=dict(color=qoq_line_color, width=2, dash=dash_qoq),
+            marker=dict(size=7, color=qoq_line_color, line=dict(color="white", width=1.5), symbol="diamond"),
             hovertemplate="%{x}<br>" + label + " QtQ: %{y:.2f}%<extra></extra>",
         ))
 
-        # Tambahkan badge di titik terakhir (lebih ringkas daripada label di semua titik)
-        last_x_local = df_plot[target_col].iloc[-1]
+        # Label di titik terakhir sebagai trace (biar ikut hide kalau legend di-click)
+        last_x_local = df_show[target_col].iloc[-1]
         if pd.notna(s_yoy.iloc[-1]):
-            fig.add_annotation(
-                x=last_x_local,
-                y=float(s_yoy.iloc[-1]),
-                yref="y2",
+            _add_last_point_label_trace(
+                x_val=last_x_local,
+                y_val=float(s_yoy.iloc[-1]),
                 text=f"{label[:3]} YoY {float(s_yoy.iloc[-1]):+.1f}%",
-                showarrow=False,
-                yshift=yshift_base,
-                bgcolor="rgba(255, 255, 255, 0.92)",
-                bordercolor=base_color,
-                borderwidth=1,
-                font=dict(size=11, color="#111827", family="Inter, Arial, sans-serif"),
+                legend_group=group_yoy,
+                border_color=base_color,
+                y_offset=float(yshift_base) * y2_offset_unit,
             )
         if pd.notna(s_qoq.iloc[-1]):
-            fig.add_annotation(
-                x=last_x_local,
-                y=float(s_qoq.iloc[-1]),
-                yref="y2",
+            _add_last_point_label_trace(
+                x_val=last_x_local,
+                y_val=float(s_qoq.iloc[-1]),
                 text=f"{label[:3]} QtQ {float(s_qoq.iloc[-1]):+.1f}%",
-                showarrow=False,
-                yshift=yshift_base - 18,
-                bgcolor="rgba(255, 255, 255, 0.92)",
-                bordercolor=base_color,
-                borderwidth=1,
-                font=dict(size=11, color="#111827", family="Inter, Arial, sans-serif"),
+                legend_group=group_qoq,
+                border_color=qoq_line_color,
+                y_offset=(float(yshift_base) - 0.8) * y2_offset_unit,
             )
 
     if show_breakdown_growth and (not is_month):
-        # Warna garis dibuat kontras dan tidak memakai merah/oranye terang
-        _add_breakdown_growth("inc", "Incoming", base_color="#A21CAF", dash_qoq="dot", yshift_base=54)
-        _add_breakdown_growth("out", "Outgoing", base_color="#334155", dash_qoq="dot", yshift_base=18)
-        _add_breakdown_growth("dom", "Domestik", base_color="#065F46", dash_qoq="dot", yshift_base=-18)
+        # Warna & pola dibuat beda jelas antara YoY vs QtQ
+        _add_breakdown_growth("inc", "Incoming", base_color="#701A75", dash_qoq="dot", yshift_base=3)
+        _add_breakdown_growth("out", "Outgoing", base_color="#7C2D12", dash_qoq="dot", yshift_base=1)
+        _add_breakdown_growth("dom", "Domestik", base_color="#0F766E", dash_qoq="dot", yshift_base=-1)
 
-    # Badge label di titik terakhir supaya jelas tapi tidak penuh tulisan
-    last_x = df_plot[target_col].iloc[-1]
+    # Badge/label di titik terakhir (sebagai trace supaya ikut toggle)
+    last_x = df_show[target_col].iloc[-1]
     if pd.notna(yoy.iloc[-1]):
-        fig.add_annotation(
-            x=last_x,
-            y=float(yoy.iloc[-1]),
-            yref="y2",
+        _add_last_point_label_trace(
+            x_val=last_x,
+            y_val=float(yoy.iloc[-1]),
             text=f"YoY {float(yoy.iloc[-1]):+.1f}%",
-            showarrow=False,
-            yshift=18,
-            bgcolor="rgba(255, 255, 255, 0.95)",
-            bordercolor=yoy_color,
-            borderwidth=1,
-            font=dict(size=12, color="#111827", family="Inter, Arial, sans-serif"),
+            legend_group=total_yoy_group,
+            border_color=yoy_color,
+            y_offset=1.5 * y2_offset_unit,
         )
     if pd.notna(qoq.iloc[-1]):
-        fig.add_annotation(
-            x=last_x,
-            y=float(qoq.iloc[-1]),
-            yref="y2",
+        _add_last_point_label_trace(
+            x_val=last_x,
+            y_val=float(qoq.iloc[-1]),
             text=f"{'MtM' if is_month else 'QtQ'} {float(qoq.iloc[-1]):+.1f}%",
-            showarrow=False,
-            yshift=-18,
-            bgcolor="rgba(255, 255, 255, 0.95)",
-            bordercolor=qoq_color,
-            borderwidth=1,
-            font=dict(size=12, color="#111827", family="Inter, Arial, sans-serif"),
+            legend_group=total_qoq_group,
+            border_color=qoq_color,
+            y_offset=-1.5 * y2_offset_unit,
         )
 
     fig.update_layout(
@@ -1343,6 +1433,7 @@ def make_overall_total_stacked_growth_chart(
             bgcolor="rgba(255, 255, 255, 0.8)",
             bordercolor="#e5e7eb",
             borderwidth=1,
+            groupclick="togglegroup",
         ),
         hovermode="x unified",
         hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),

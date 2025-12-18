@@ -250,6 +250,142 @@ def _render_pjp_detail_month(df_base: pd.DataFrame, year: int, month: str, trx_t
 
     st.dataframe(disp[[c for c in disp.columns if not c.endswith("_PrevM") and not c.endswith("_PrevY")]], use_container_width=True, hide_index=True)
 
+
+def _render_overall_growth_detail_table_quarterly(
+    *,
+    df_total_combined: pd.DataFrame,
+    df_inc: pd.DataFrame,
+    df_out: pd.DataFrame,
+    df_dom: pd.DataFrame,
+    sum_trx_type: str,
+    visible_periods: list[str] | None,
+    ordered_periods: list[str],
+):
+    """Tabel detail YoY/QtQ untuk semua periode yang sedang ditampilkan (visual-only)."""
+
+    if sum_trx_type not in ("Jumlah", "Nilai"):
+        return
+
+    if df_total_combined is None or df_total_combined.empty:
+        return
+
+    # Tentukan periode yang benar-benar ditampilkan (urut sesuai pilihan)
+    visible_set = set(visible_periods or [])
+    shown_periods = [p for p in ordered_periods if p in visible_set] if visible_set else list(ordered_periods)
+    if not shown_periods:
+        st.info("Tidak ada periode yang dipilih untuk tabel detail.")
+        return
+
+    # Parse "YYYY Qn" menjadi list (Year, Quarter) berurutan
+    parsed = []
+    for p in shown_periods:
+        try:
+            parts = str(p).split()
+            if len(parts) >= 2 and parts[1].upper().startswith("Q"):
+                y = int(parts[0])
+                q = int(parts[1].upper().replace("Q", ""))
+                if 1 <= q <= 4:
+                    parsed.append((y, q))
+        except Exception:
+            continue
+
+    if not parsed:
+        return
+
+    if sum_trx_type == "Jumlah":
+        value_unit = "Volume (Jutaan)"
+        scale = 1e6
+    else:
+        value_unit = "Nilai (Rp Triliun)"
+        scale = 1e12
+
+    periods_df = pd.DataFrame(parsed, columns=["Year", "Quarter"]).drop_duplicates()
+
+    total_val_col = f"Sum of Fin {sum_trx_type} Total"
+    total_yoy_col = f"%YoY {sum_trx_type}"
+    total_qoq_col = f"%QtQ {sum_trx_type}"
+
+    inc_val_col = f"Sum of Fin {sum_trx_type} Inc"
+    out_val_col = f"Sum of Fin {sum_trx_type} Out"
+    dom_val_col = f"Sum of Fin {sum_trx_type} Dom"
+
+    def _num(v):
+        return pd.to_numeric(v, errors="coerce")
+
+    def _build_block(
+        df_src: pd.DataFrame,
+        *,
+        jenis: str,
+        value_col: str,
+        yoy_col: str,
+        qoq_col: str,
+    ) -> pd.DataFrame:
+        if df_src is None or df_src.empty:
+            return pd.DataFrame()
+        if not {"Year", "Quarter"}.issubset(set(df_src.columns)):
+            return pd.DataFrame()
+        needed = {value_col, yoy_col, qoq_col}
+        if not needed.issubset(set(df_src.columns)):
+            return pd.DataFrame()
+
+        dfc = df_src[["Year", "Quarter", value_col, yoy_col, qoq_col]].copy()
+        dfc["Year"] = dfc["Year"].astype(int)
+        dfc["Quarter"] = dfc["Quarter"].astype(int)
+
+        # Join ke daftar periode yg sedang ditampilkan agar urut & hanya yg dipilih
+        dfc = periods_df.merge(dfc, on=["Year", "Quarter"], how="left")
+        dfc["Periode"] = "Q" + dfc["Quarter"].astype(int).astype(str) + " " + dfc["Year"].astype(int).astype(str)
+        dfc["Jenis"] = jenis
+        dfc[value_unit] = _num(dfc[value_col]) / scale
+        dfc["YoY (%)"] = _num(dfc[yoy_col])
+        dfc["QtQ (%)"] = _num(dfc[qoq_col])
+        return dfc[["Periode", "Jenis", value_unit, "YoY (%)", "QtQ (%)"]]
+
+    df_total_block = _build_block(
+        df_total_combined,
+        jenis="Total",
+        value_col=total_val_col,
+        yoy_col=total_yoy_col,
+        qoq_col=total_qoq_col,
+    )
+    df_inc_block = _build_block(
+        df_inc,
+        jenis="Incoming",
+        value_col=inc_val_col,
+        yoy_col="%YoY",
+        qoq_col="%QtQ",
+    )
+    df_out_block = _build_block(
+        df_out,
+        jenis="Outgoing",
+        value_col=out_val_col,
+        yoy_col="%YoY",
+        qoq_col="%QtQ",
+    )
+    df_dom_block = _build_block(
+        df_dom,
+        jenis="Domestik",
+        value_col=dom_val_col,
+        yoy_col="%YoY",
+        qoq_col="%QtQ",
+    )
+
+    df_detail = pd.concat([df_total_block, df_inc_block, df_out_block, df_dom_block], ignore_index=True)
+    if df_detail.empty:
+        return
+
+    st.caption("Detail perbandingan untuk semua periode yang sedang ditampilkan pada chart (sesuai filter 'Tampilkan Kuartal').")
+    st.dataframe(
+        df_detail,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            value_unit: st.column_config.NumberColumn(value_unit, format="%.2f"),
+            "YoY (%)": st.column_config.NumberColumn("YoY (%)", format="%+.2f%%"),
+            "QtQ (%)": st.column_config.NumberColumn("QtQ (%)", format="%+.2f%%"),
+        },
+    )
+
 # Initial Page Setup
 set_page_visuals("viz")
 
@@ -856,6 +992,30 @@ if st.session_state['df'] is not None:
 
             st.markdown("<hr style='border-top: 2px dashed #f59e0b; margin: 20px 0;'>", unsafe_allow_html=True)
             st.markdown("### 📊 Visualisasi Keseluruhan Data Transaksi (Frekuensi & Nominal Tergabung)")
+
+            # Visual-only filter: tampilkan/sematikan kuartal tertentu (growth tidak dihitung ulang)
+            overall_period_options = (
+                df_total_combined.assign(
+                    _period=lambda d: d["Year"].astype(int).astype(str) + " Q" + d["Quarter"].astype(int).astype(str)
+                )
+                .sort_values(["Year", "Quarter"])
+                ["_period"]
+                .dropna()
+                .astype(str)
+                .tolist()
+            )
+            overall_period_sig = "|".join(overall_period_options)
+            if st.session_state.get("overall_visible_period_sig") != overall_period_sig:
+                st.session_state["overall_visible_period_sig"] = overall_period_sig
+                st.session_state["overall_visible_periods"] = overall_period_options
+
+            st.multiselect(
+                "Tampilkan Kuartal",
+                options=overall_period_options,
+                key="overall_visible_periods",
+                help="Hanya menyaring tampilan chart. Nilai YoY/QtQ tetap nilai asli dari perhitungan data.",
+            )
+
             make_overall_total_stacked_growth_chart(
                 df_total=df_total_combined,
                 df_inc=df_jumlah_inc_filtered,
@@ -864,6 +1024,16 @@ if st.session_state['df'] is not None:
                 sum_trx_type="Jumlah",
                 is_month=False,
                 show_breakdown_growth=True,
+                visible_periods=st.session_state.get("overall_visible_periods"),
+            )
+            _render_overall_growth_detail_table_quarterly(
+                df_total_combined=df_total_combined,
+                df_inc=df_jumlah_inc_filtered,
+                df_out=df_jumlah_out_filtered,
+                df_dom=df_jumlah_dom_filtered,
+                sum_trx_type="Jumlah",
+                visible_periods=st.session_state.get("overall_visible_periods"),
+                ordered_periods=overall_period_options,
             )
             make_overall_total_stacked_growth_chart(
                 df_total=df_total_combined,
@@ -873,6 +1043,16 @@ if st.session_state['df'] is not None:
                 sum_trx_type="Nilai",
                 is_month=False,
                 show_breakdown_growth=True,
+                visible_periods=st.session_state.get("overall_visible_periods"),
+            )
+            _render_overall_growth_detail_table_quarterly(
+                df_total_combined=df_total_combined,
+                df_inc=df_nom_inc_filtered,
+                df_out=df_nom_out_filtered,
+                df_dom=df_nom_dom_filtered,
+                sum_trx_type="Nilai",
+                visible_periods=st.session_state.get("overall_visible_periods"),
+                ordered_periods=overall_period_options,
             )
 
         # MONTHLY SECTION
