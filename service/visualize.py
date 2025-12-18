@@ -1045,6 +1045,16 @@ def make_overall_total_stacked_growth_chart(
         st.warning("sum_trx_type harus 'Jumlah' atau 'Nilai'.")
         return
 
+    # Styling knobs (ubah di sini untuk atur ketebalan garis, marker, dan label %)
+    TOTAL_GROWTH_LINE_WIDTH = 5
+    BREAKDOWN_GROWTH_LINE_WIDTH = 6
+    TOTAL_GROWTH_MARKER_SIZE = 10
+    BREAKDOWN_GROWTH_MARKER_SIZE = 8
+    LABEL_BORDER_WIDTH = 2
+    LABEL_FONT_SIZE = 12
+    LABEL_OFFSET_TOTAL = 0.65
+    LABEL_OFFSET_BREAKDOWN_STEP = 0.45
+
     # Tentukan kolom periode
     if is_month:
         required = {"Year", "Month"}
@@ -1200,7 +1210,7 @@ def make_overall_total_stacked_growth_chart(
         vmin = float(min(vals))
         vmax = float(max(vals))
         span = vmax - vmin
-        return span * 0.06 if span > 0 else 1.0
+        return span * 0.035 if span > 0 else 1.0
 
     def _add_last_point_label_trace(
         *,
@@ -1218,6 +1228,9 @@ def make_overall_total_stacked_growth_chart(
         except Exception:
             return
 
+        # Sesuaikan ukuran kotak dengan panjang teks agar tulisan tidak "keluar" dari box
+        safe_text = str(text)
+        # Teks saja (tanpa kotak putih) supaya tidak "beleber"
         fig.add_trace(
             go.Scatter(
                 x=[x_val],
@@ -1226,16 +1239,11 @@ def make_overall_total_stacked_growth_chart(
                 legendgroup=legend_group,
                 showlegend=False,
                 yaxis="y2",
-                mode="markers+text",
-                marker=dict(
-                    symbol="square",
-                    size=34,
-                    color="rgba(255, 255, 255, 0.92)",
-                    line=dict(color=border_color, width=1),
-                ),
-                text=[text],
+                mode="text",
+                cliponaxis=False,
+                text=[f"<b>{safe_text}</b>"],
                 textposition="middle center",
-                textfont=dict(size=10, color="#111827", family="Inter, Arial, sans-serif"),
+                textfont=dict(size=LABEL_FONT_SIZE, color=border_color, family="Inter, Arial, sans-serif"),
                 hoverinfo="skip",
             )
         )
@@ -1283,8 +1291,8 @@ def make_overall_total_stacked_growth_chart(
         legendgroup=total_yoy_group,
         yaxis="y2",
         mode="lines+markers",
-        line=dict(color=yoy_color, width=4),
-        marker=dict(size=9, color=yoy_color, line=dict(color="white", width=2), symbol="circle"),
+        line=dict(color=yoy_color, width=TOTAL_GROWTH_LINE_WIDTH),
+        marker=dict(size=TOTAL_GROWTH_MARKER_SIZE, color=yoy_color, line=dict(color="white", width=2), symbol="circle"),
         hovertemplate="%{x}<br>YoY Growth: %{y:.2f}%<extra></extra>",
     ))
 
@@ -1295,8 +1303,8 @@ def make_overall_total_stacked_growth_chart(
         legendgroup=total_qoq_group,
         yaxis="y2",
         mode="lines+markers",
-        line=dict(color=qoq_color, width=4, dash="dash"),
-        marker=dict(size=9, color=qoq_color, line=dict(color="white", width=2), symbol="diamond"),
+        line=dict(color=qoq_color, width=TOTAL_GROWTH_LINE_WIDTH, dash="dash"),
+        marker=dict(size=TOTAL_GROWTH_MARKER_SIZE, color=qoq_color, line=dict(color="white", width=2), symbol="diamond"),
         hovertemplate="%{x}<br>QtQ Growth: %{y:.2f}%<extra></extra>",
     ))
 
@@ -1323,8 +1331,8 @@ def make_overall_total_stacked_growth_chart(
             legendgroup=group_yoy,
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color=base_color, width=2),
-            marker=dict(size=7, color=base_color, line=dict(color="white", width=1.5), symbol="circle"),
+            line=dict(color=base_color, width=BREAKDOWN_GROWTH_LINE_WIDTH),
+            marker=dict(size=BREAKDOWN_GROWTH_MARKER_SIZE, color=base_color, line=dict(color="white", width=1.5), symbol="circle"),
             hovertemplate="%{x}<br>" + label + " YoY: %{y:.2f}%<extra></extra>",
         ))
 
@@ -1335,8 +1343,8 @@ def make_overall_total_stacked_growth_chart(
             legendgroup=group_qoq,
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color=qoq_line_color, width=2, dash=dash_qoq),
-            marker=dict(size=7, color=qoq_line_color, line=dict(color="white", width=1.5), symbol="diamond"),
+            line=dict(color=qoq_line_color, width=BREAKDOWN_GROWTH_LINE_WIDTH, dash=dash_qoq),
+            marker=dict(size=BREAKDOWN_GROWTH_MARKER_SIZE, color=qoq_line_color, line=dict(color="white", width=1.5), symbol="diamond"),
             hovertemplate="%{x}<br>" + label + " QtQ: %{y:.2f}%<extra></extra>",
         ))
 
@@ -1349,7 +1357,7 @@ def make_overall_total_stacked_growth_chart(
                 text=f"{label[:3]} YoY {float(s_yoy.iloc[-1]):+.1f}%",
                 legend_group=group_yoy,
                 border_color=base_color,
-                y_offset=float(yshift_base) * y2_offset_unit,
+                y_offset=float(yshift_base) * LABEL_OFFSET_BREAKDOWN_STEP * y2_offset_unit,
             )
         if pd.notna(s_qoq.iloc[-1]):
             _add_last_point_label_trace(
@@ -1358,13 +1366,13 @@ def make_overall_total_stacked_growth_chart(
                 text=f"{label[:3]} QtQ {float(s_qoq.iloc[-1]):+.1f}%",
                 legend_group=group_qoq,
                 border_color=qoq_line_color,
-                y_offset=(float(yshift_base) - 0.8) * y2_offset_unit,
+                y_offset=(float(yshift_base) - 0.6) * LABEL_OFFSET_BREAKDOWN_STEP * y2_offset_unit,
             )
 
     if show_breakdown_growth and (not is_month):
         # Warna & pola dibuat beda jelas antara YoY vs QtQ
         _add_breakdown_growth("inc", "Incoming", base_color="#701A75", dash_qoq="dot", yshift_base=3)
-        _add_breakdown_growth("out", "Outgoing", base_color="#7C2D12", dash_qoq="dot", yshift_base=1)
+        _add_breakdown_growth("out", "Outgoing", base_color="#7C7812", dash_qoq="dot", yshift_base=1)
         _add_breakdown_growth("dom", "Domestik", base_color="#0F766E", dash_qoq="dot", yshift_base=-1)
 
     # Badge/label di titik terakhir (sebagai trace supaya ikut toggle)
@@ -1376,7 +1384,7 @@ def make_overall_total_stacked_growth_chart(
             text=f"YoY {float(yoy.iloc[-1]):+.1f}%",
             legend_group=total_yoy_group,
             border_color=yoy_color,
-            y_offset=1.5 * y2_offset_unit,
+            y_offset=LABEL_OFFSET_TOTAL * y2_offset_unit,
         )
     if pd.notna(qoq.iloc[-1]):
         _add_last_point_label_trace(
@@ -1385,12 +1393,12 @@ def make_overall_total_stacked_growth_chart(
             text=f"{'MtM' if is_month else 'QtQ'} {float(qoq.iloc[-1]):+.1f}%",
             legend_group=total_qoq_group,
             border_color=qoq_color,
-            y_offset=-1.5 * y2_offset_unit,
+            y_offset=-LABEL_OFFSET_TOTAL * y2_offset_unit,
         )
 
     fig.update_layout(
         title=dict(
-            text=f"Visualisasi Keseluruhan Data Transaksi (Per {period_label})",
+            text=f"Visualisasi Keseluruhan Data Transaksi - {y_title} (Per {period_label})",
             font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
         ),
         barmode="stack",

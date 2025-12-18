@@ -993,6 +993,11 @@ if st.session_state['df'] is not None:
             st.markdown("<hr style='border-top: 2px dashed #f59e0b; margin: 20px 0;'>", unsafe_allow_html=True)
             st.markdown("### 📊 Visualisasi Keseluruhan Data Transaksi (Frekuensi & Nominal Tergabung)")
 
+            st.caption(
+                "Grafik berikut menampilkan stacked bar (Incoming/Outgoing/Domestik) pada sumbu kiri dan garis Growth (YoY & QtQ) pada sumbu kanan. "
+                "Gunakan legend untuk menyembunyikan/menampilkan garis tertentu; label % akan ikut hilang saat garis di-hide."
+            )
+
             # Visual-only filter: tampilkan/sematikan kuartal tertentu (growth tidak dihitung ulang)
             overall_period_options = (
                 df_total_combined.assign(
@@ -1016,6 +1021,9 @@ if st.session_state['df'] is not None:
                 help="Hanya menyaring tampilan chart. Nilai YoY/QtQ tetap nilai asli dari perhitungan data.",
             )
 
+            st.markdown("#### 📦 Volume / Frekuensi")
+            st.caption("Sumbu kiri: Volume (Jutaan). Sumbu kanan: Growth YoY & QtQ (%).")
+
             make_overall_total_stacked_growth_chart(
                 df_total=df_total_combined,
                 df_inc=df_jumlah_inc_filtered,
@@ -1035,6 +1043,9 @@ if st.session_state['df'] is not None:
                 visible_periods=st.session_state.get("overall_visible_periods"),
                 ordered_periods=overall_period_options,
             )
+
+            st.markdown("#### 💰 Nominal")
+            st.caption("Sumbu kiri: Nilai (Rp Triliun). Sumbu kanan: Growth YoY & QtQ (%).")
             make_overall_total_stacked_growth_chart(
                 df_total=df_total_combined,
                 df_inc=df_nom_inc_filtered,
