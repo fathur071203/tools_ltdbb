@@ -402,22 +402,33 @@ def make_quarter_vs_quarter_chart(
         )
     )
 
-    # Garis trend (samakan gaya garis dengan chart lain)
+    # Garis trend (dibuat sangat kontras + label % pakai badge putih)
     if pd.notna(y_vals[0]) and pd.notna(y_vals[1]):
+        trend_color = "#111827"  # gray-900 (kontras, bukan ungu/biru)
         fig.add_trace(
             go.Scatter(
                 x=[label_a, label_b],
                 y=y_vals,
                 name="Perubahan",
-                mode="lines+markers+text",
-                line=dict(color="#1E8449", width=3),
-                marker=dict(size=8, color="#1E8449", line=dict(color="white", width=2)),
-                text=["", f"{delta_pct:+.1f}%"] if delta_pct is not None and pd.notna(delta_pct) else ["", ""],
-                textposition="top center",
-                textfont=dict(size=11, color="#1E8449", family="Inter, Arial, sans-serif"),
+                mode="lines+markers",
+                line=dict(color=trend_color, width=4),
+                marker=dict(size=10, color=trend_color, line=dict(color="white", width=2)),
                 hovertemplate="%{x}<br>" + y_title + ": %{y:,.2f}<extra></extra>",
             )
         )
+
+        if delta_pct is not None and pd.notna(delta_pct):
+            fig.add_annotation(
+                x=label_b,
+                y=y_vals[1],
+                text=f"{delta_pct:+.1f}%",
+                showarrow=False,
+                yshift=18,
+                bgcolor="rgba(255, 255, 255, 0.95)",
+                bordercolor=trend_color,
+                borderwidth=1,
+                font=dict(size=12, color="#111827", family="Inter, Arial, sans-serif"),
+            )
 
     # (Delta sudah ditampilkan sebagai text pada garis)
 
@@ -426,6 +437,210 @@ def make_quarter_vs_quarter_chart(
             text=f"Perbandingan Periode - {y_title} {jenis_trx}",
             font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
         ),
+        xaxis=dict(
+            title=dict(text="Periode", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            showgrid=False,
+            showline=True,
+            linewidth=2,
+            linecolor="#d1d5db",
+            tickfont=dict(size=12, family="Inter, Arial, sans-serif"),
+        ),
+        yaxis=dict(
+            title=dict(text=y_title, font=dict(size=14, family="Inter, Arial, sans-serif")),
+            tickformat=",.0f",
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="#e5e7eb",
+            zeroline=True,
+            zerolinewidth=2,
+            zerolinecolor="#d1d5db",
+        ),
+        template="plotly_white",
+        paper_bgcolor="white",
+        plot_bgcolor="#f9fafb",
+        font=dict(family="Inter, Arial, sans-serif", size=12),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="#e5e7eb",
+            borderwidth=1,
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def make_quarter_vs_quarter_chart_total_breakdown(
+    df_inc: pd.DataFrame,
+    df_out: pd.DataFrame,
+    df_dom: pd.DataFrame,
+    year_a: int,
+    quarter_a: int,
+    year_b: int,
+    quarter_b: int,
+    sum_trx_type: str,
+):
+    """VS chart khusus TOTAL: tampilkan stacked bar Inc/Out/Dom + garis perubahan untuk masing-masing + total."""
+
+    if df_inc is None or df_out is None or df_dom is None:
+        st.info("Data kosong.")
+        return
+
+    required_cols = {"Year", "Quarter"}
+    if not (required_cols.issubset(set(df_inc.columns)) and required_cols.issubset(set(df_out.columns)) and required_cols.issubset(set(df_dom.columns))):
+        st.warning("Kolom Year/Quarter tidak lengkap untuk membuat grafik.")
+        return
+
+    if sum_trx_type not in ("Jumlah", "Nilai"):
+        st.warning("sum_trx_type harus 'Jumlah' atau 'Nilai'.")
+        return
+
+    col_inc = f"Sum of Fin {sum_trx_type} Inc"
+    col_out = f"Sum of Fin {sum_trx_type} Out"
+    col_dom = f"Sum of Fin {sum_trx_type} Dom"
+
+    for c, name in [(col_inc, "Inc"), (col_out, "Out"), (col_dom, "Dom")]:
+        if c not in df_inc.columns and name == "Inc":
+            st.warning(f"Kolom '{c}' tidak ditemukan.")
+            return
+        if c not in df_out.columns and name == "Out":
+            st.warning(f"Kolom '{c}' tidak ditemukan.")
+            return
+        if c not in df_dom.columns and name == "Dom":
+            st.warning(f"Kolom '{c}' tidak ditemukan.")
+            return
+
+    def _get_val(df_src: pd.DataFrame, col: str, y: int, q: int):
+        dfx = df_src[(df_src["Year"].astype(int) == int(y)) & (df_src["Quarter"].astype(int) == int(q))]
+        if dfx.empty:
+            return None
+        return pd.to_numeric(dfx[col].iloc[0], errors="coerce")
+
+    inc_a = _get_val(df_inc, col_inc, year_a, quarter_a)
+    out_a = _get_val(df_out, col_out, year_a, quarter_a)
+    dom_a = _get_val(df_dom, col_dom, year_a, quarter_a)
+
+    inc_b = _get_val(df_inc, col_inc, year_b, quarter_b)
+    out_b = _get_val(df_out, col_out, year_b, quarter_b)
+    dom_b = _get_val(df_dom, col_dom, year_b, quarter_b)
+
+    if any(v is None for v in [inc_a, out_a, dom_a, inc_b, out_b, dom_b]):
+        st.info("Data untuk salah satu periode tidak ditemukan (A/B).")
+        return
+
+    total_a = (inc_a or 0) + (out_a or 0) + (dom_a or 0)
+    total_b = (inc_b or 0) + (out_b or 0) + (dom_b or 0)
+
+    def _delta_pct(a, b):
+        if a is None or b is None:
+            return None
+        try:
+            a = float(a)
+            b = float(b)
+        except Exception:
+            return None
+        if a == 0:
+            return None
+        return ((b - a) / a) * 100
+
+    d_inc = _delta_pct(inc_a, inc_b)
+    d_out = _delta_pct(out_a, out_b)
+    d_dom = _delta_pct(dom_a, dom_b)
+    d_tot = _delta_pct(total_a, total_b)
+
+    if sum_trx_type == "Jumlah":
+        y_title = "Volume (Jutaan)"
+        scale_factor = 1e6
+    else:
+        y_title = "Nilai (Rp Triliun)"
+        scale_factor = 1e12
+
+    label_a = f"Q{int(quarter_a)} {int(year_a)}"
+    label_b = f"Q{int(quarter_b)} {int(year_b)}"
+    x = [label_a, label_b]
+
+    y_inc = [inc_a / scale_factor, inc_b / scale_factor]
+    y_out = [out_a / scale_factor, out_b / scale_factor]
+    y_dom = [dom_a / scale_factor, dom_b / scale_factor]
+    y_tot = [total_a / scale_factor, total_b / scale_factor]
+
+    fig = go.Figure()
+
+    # Stacked bars seperti Grafik Gabungan
+    fig.add_trace(go.Bar(
+        x=x,
+        y=y_inc,
+        name="Incoming",
+        marker=dict(color="#F5B0CB", line=dict(width=0)),
+        hovertemplate="%{x}<br>Incoming: %{y:,.2f}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        x=x,
+        y=y_out,
+        name="Outgoing",
+        marker=dict(color="#F5CBA7", line=dict(width=0)),
+        hovertemplate="%{x}<br>Outgoing: %{y:,.2f}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        x=x,
+        y=y_dom,
+        name="Domestik",
+        marker=dict(color="#5DADE2", line=dict(width=0)),
+        hovertemplate="%{x}<br>Domestik: %{y:,.2f}<extra></extra>",
+    ))
+
+    # Garis perubahan untuk masing-masing + total
+    # Pakai warna garis yang lebih gelap (lebih kontras) + badge label % (bg putih) supaya tidak "nyaru".
+    line_colors = {
+        # Hindari merah/orange/biru/ungu: pakai netral + hijau/teal yang kontras
+        "Incoming": "#374151",  # gray-700
+        "Outgoing": "#065F46",  # emerald-800
+        "Domestik": "#0F766E",  # teal-700
+        "Total": "#111827",     # gray-900
+    }
+
+    def _line(series: str, y_vals, delta, yshift: int):
+        color = line_colors[series]
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=y_vals,
+            name=f"Δ {series}",
+            mode="lines+markers",
+            line=dict(color=color, width=4),
+            marker=dict(size=10, color=color, line=dict(color="white", width=2)),
+            hovertemplate="%{x}<br>" + series + ": %{y:,.2f}<extra></extra>",
+        ))
+
+        if delta is not None:
+            fig.add_annotation(
+                x=label_b,
+                y=y_vals[1],
+                text=f"{delta:+.1f}%",
+                showarrow=False,
+                yshift=yshift,
+                bgcolor="rgba(255, 255, 255, 0.95)",
+                bordercolor=color,
+                borderwidth=1,
+                font=dict(size=12, color="#111827", family="Inter, Arial, sans-serif"),
+            )
+
+    _line("Incoming", y_inc, d_inc, 18)
+    _line("Outgoing", y_out, d_out, 0)
+    _line("Domestik", y_dom, d_dom, -18)
+    _line("Total", y_tot, d_tot, 30)
+
+    fig.update_layout(
+        title=dict(
+            text=f"Perbandingan Periode - {y_title} TOTAL (Breakdown Inc/Out/Dom)",
+            font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+        ),
+        barmode="stack",
         xaxis=dict(
             title=dict(text="Periode", font=dict(size=14, family="Inter, Arial, sans-serif")),
             showgrid=False,
@@ -801,6 +1016,336 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
             font_size=12,
             font_family="Inter, Arial, sans-serif"
         )
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def make_overall_total_stacked_growth_chart(
+    df_total: pd.DataFrame,
+    df_inc: pd.DataFrame,
+    df_out: pd.DataFrame,
+    df_dom: pd.DataFrame,
+    sum_trx_type: str,
+    is_month: bool = False,
+    show_breakdown_growth: bool = False,
+):
+    """Visualisasi Keseluruhan TOTAL: stacked bar (Inc/Out/Dom) + Growth YoY & QtQ.
+
+    Disamakan gaya grafiknya dengan chart TOTAL di Perbandingan Periode (stacked breakdown),
+    tapi tetap mempertahankan garis Growth YoY dan Growth QtQ.
+    """
+
+    if df_total is None or df_total.empty:
+        st.info("Data kosong.")
+        return
+
+    if sum_trx_type not in ("Jumlah", "Nilai"):
+        st.warning("sum_trx_type harus 'Jumlah' atau 'Nilai'.")
+        return
+
+    # Tentukan kolom periode
+    if is_month:
+        required = {"Year", "Month"}
+        if not required.issubset(set(df_total.columns)):
+            st.warning("Kolom Year/Month tidak ditemukan.")
+            return
+        target_col = "Year-Month"
+        df_plot = df_total.copy()
+        df_plot[target_col] = df_plot["Year"].astype(str) + "-" + df_plot["Month"].astype(str)
+        df_plot = df_plot.sort_values(["Year", "Month"])
+        growth_yoy_col = f"%YoY {sum_trx_type}" if f"%YoY {sum_trx_type}" in df_plot.columns else "%YoY"
+        growth_qoq_col = f"%MtM {sum_trx_type}" if f"%MtM {sum_trx_type}" in df_plot.columns else "%MtM"
+        yoy_label = "Growth YoY (%)"
+        qoq_label = "Growth MtM (%)"
+        period_label = "Bulan"
+    else:
+        required = {"Year", "Quarter"}
+        if not required.issubset(set(df_total.columns)):
+            st.warning("Kolom Year/Quarter tidak ditemukan.")
+            return
+        target_col = "Year-Quarter"
+        df_plot = df_total.copy()
+        df_plot[target_col] = df_plot["Year"].astype(str) + " Q" + df_plot["Quarter"].astype(str)
+        df_plot = df_plot.sort_values(["Year", "Quarter"])
+        growth_yoy_col = f"%YoY {sum_trx_type}" if f"%YoY {sum_trx_type}" in df_plot.columns else "%YoY"
+        growth_qoq_col = f"%QtQ {sum_trx_type}" if f"%QtQ {sum_trx_type}" in df_plot.columns else "%QtQ"
+        yoy_label = "Growth YoY (%)"
+        qoq_label = "Growth QtQ (%)"
+        period_label = "Kuartal"
+
+    if growth_yoy_col not in df_plot.columns or growth_qoq_col not in df_plot.columns:
+        st.warning("Kolom growth (YoY/QtQ) tidak ditemukan untuk Total.")
+        return
+
+    # Filter agar garis growth tidak putus-putus
+    df_plot = df_plot[df_plot[growth_yoy_col].notnull() & df_plot[growth_qoq_col].notnull()].copy()
+    if df_plot.empty:
+        st.info("Data growth (YoY/QtQ) tidak tersedia pada rentang periode ini.")
+        return
+
+    # Kolom nilai untuk bar
+    inc_col = f"Sum of Fin {sum_trx_type} Inc"
+    out_col = f"Sum of Fin {sum_trx_type} Out"
+    dom_col = f"Sum of Fin {sum_trx_type} Dom"
+
+    for src, col_name in [(df_inc, inc_col), (df_out, out_col), (df_dom, dom_col)]:
+        if src is None or src.empty or col_name not in src.columns:
+            st.warning(f"Kolom '{col_name}' tidak ditemukan untuk stacked breakdown.")
+            return
+
+    # Build lookup per periode agar align dengan df_plot
+    if is_month:
+        key_cols = ["Year", "Month"]
+        def _key(df_):
+            return df_["Year"].astype(int).astype(str) + "-" + df_["Month"].astype(str)
+    else:
+        key_cols = ["Year", "Quarter"]
+        def _key(df_):
+            return df_["Year"].astype(int).astype(str) + " Q" + df_["Quarter"].astype(int).astype(str)
+
+    df_inc_map = df_inc.copy()
+    df_out_map = df_out.copy()
+    df_dom_map = df_dom.copy()
+    df_inc_map[target_col] = _key(df_inc_map)
+    df_out_map[target_col] = _key(df_out_map)
+    df_dom_map[target_col] = _key(df_dom_map)
+
+    # Optional: ambil growth YoY/QtQ per jenis transaksi (Inc/Out/Dom)
+    if show_breakdown_growth and (not is_month):
+        for src_df, label in [(df_inc_map, "Incoming"), (df_out_map, "Outgoing"), (df_dom_map, "Domestik")]:
+            if "%YoY" not in src_df.columns or "%QtQ" not in src_df.columns:
+                st.warning(f"Kolom growth (%YoY/%QtQ) tidak ditemukan untuk {label}.")
+                show_breakdown_growth = False
+                break
+
+    # Rename kolom growth agar tidak bentrok saat merge
+    if show_breakdown_growth and (not is_month):
+        df_inc_map = df_inc_map.rename(columns={"%YoY": "_inc_yoy", "%QtQ": "_inc_qoq"})
+        df_out_map = df_out_map.rename(columns={"%YoY": "_out_yoy", "%QtQ": "_out_qoq"})
+        df_dom_map = df_dom_map.rename(columns={"%YoY": "_dom_yoy", "%QtQ": "_dom_qoq"})
+
+    inc_merge_cols = [target_col, inc_col] + (["_inc_yoy", "_inc_qoq"] if show_breakdown_growth and (not is_month) else [])
+    out_merge_cols = [target_col, out_col] + (["_out_yoy", "_out_qoq"] if show_breakdown_growth and (not is_month) else [])
+    dom_merge_cols = [target_col, dom_col] + (["_dom_yoy", "_dom_qoq"] if show_breakdown_growth and (not is_month) else [])
+
+    df_plot = df_plot.merge(df_inc_map[inc_merge_cols], on=target_col, how="left")
+    df_plot = df_plot.merge(df_out_map[out_merge_cols], on=target_col, how="left")
+    df_plot = df_plot.merge(df_dom_map[dom_merge_cols], on=target_col, how="left")
+
+    if df_plot[[inc_col, out_col, dom_col]].isna().all(axis=None):
+        st.info("Data breakdown Inc/Out/Dom tidak tersedia.")
+        return
+
+    # Skala sumbu utama
+    if sum_trx_type == "Jumlah":
+        y_title = "Volume (Jutaan)"
+        scale_factor = 1e6
+    else:
+        # Disamakan dengan chart VS: tampilkan Triliun
+        y_title = "Nilai (Rp Triliun)"
+        scale_factor = 1e12
+
+    fig = go.Figure()
+
+    # Stacked bars (tetap pakai warna pastel untuk breakdown)
+    fig.add_trace(go.Bar(
+        x=df_plot[target_col],
+        y=pd.to_numeric(df_plot[inc_col], errors="coerce") / scale_factor,
+        name="Incoming",
+        marker=dict(color="#F5B0CB", line=dict(width=0)),
+        hovertemplate="%{x}<br>Incoming: %{y:,.2f}<extra></extra>",
+        yaxis="y1",
+    ))
+    fig.add_trace(go.Bar(
+        x=df_plot[target_col],
+        y=pd.to_numeric(df_plot[out_col], errors="coerce") / scale_factor,
+        name="Outgoing",
+        marker=dict(color="#F5CBA7", line=dict(width=0)),
+        hovertemplate="%{x}<br>Outgoing: %{y:,.2f}<extra></extra>",
+        yaxis="y1",
+    ))
+    fig.add_trace(go.Bar(
+        x=df_plot[target_col],
+        y=pd.to_numeric(df_plot[dom_col], errors="coerce") / scale_factor,
+        name="Domestik",
+        marker=dict(color="#5DADE2", line=dict(width=0)),
+        hovertemplate="%{x}<br>Domestik: %{y:,.2f}<extra></extra>",
+        yaxis="y1",
+    ))
+
+    yoy = pd.to_numeric(df_plot[growth_yoy_col], errors="coerce")
+    qoq = pd.to_numeric(df_plot[growth_qoq_col], errors="coerce")
+
+    # Garis growth dibuat kontras (hindari biru/ungu/merah/orange)
+    yoy_color = "#111827"  # gray-900
+    qoq_color = "#0F766E"  # teal-700
+
+    fig.add_trace(go.Scatter(
+        x=df_plot[target_col],
+        y=yoy,
+        name=yoy_label,
+        yaxis="y2",
+        mode="lines+markers",
+        line=dict(color=yoy_color, width=4),
+        marker=dict(size=9, color=yoy_color, line=dict(color="white", width=2)),
+        hovertemplate="%{x}<br>YoY Growth: %{y:.2f}%<extra></extra>",
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df_plot[target_col],
+        y=qoq,
+        name=qoq_label,
+        yaxis="y2",
+        mode="lines+markers",
+        line=dict(color=qoq_color, width=4, dash="dot"),
+        marker=dict(size=9, color=qoq_color, line=dict(color="white", width=2)),
+        hovertemplate="%{x}<br>QtQ Growth: %{y:.2f}%<extra></extra>",
+    ))
+
+    def _add_breakdown_growth(prefix: str, label: str, base_color: str, dash_qoq: str, yshift_base: int):
+        yoy_col = f"_{prefix}_yoy"
+        qoq_col = f"_{prefix}_qoq"
+        if yoy_col not in df_plot.columns or qoq_col not in df_plot.columns:
+            return
+
+        s_yoy = pd.to_numeric(df_plot[yoy_col], errors="coerce")
+        s_qoq = pd.to_numeric(df_plot[qoq_col], errors="coerce")
+
+        fig.add_trace(go.Scatter(
+            x=df_plot[target_col],
+            y=s_yoy,
+            name=f"{label} YoY (%)",
+            yaxis="y2",
+            mode="lines+markers",
+            line=dict(color=base_color, width=2),
+            marker=dict(size=7, color=base_color, line=dict(color="white", width=1.5)),
+            hovertemplate="%{x}<br>" + label + " YoY: %{y:.2f}%<extra></extra>",
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=df_plot[target_col],
+            y=s_qoq,
+            name=f"{label} QtQ (%)",
+            yaxis="y2",
+            mode="lines+markers",
+            line=dict(color=base_color, width=2, dash=dash_qoq),
+            marker=dict(size=7, color=base_color, line=dict(color="white", width=1.5)),
+            hovertemplate="%{x}<br>" + label + " QtQ: %{y:.2f}%<extra></extra>",
+        ))
+
+        # Tambahkan badge di titik terakhir (lebih ringkas daripada label di semua titik)
+        last_x_local = df_plot[target_col].iloc[-1]
+        if pd.notna(s_yoy.iloc[-1]):
+            fig.add_annotation(
+                x=last_x_local,
+                y=float(s_yoy.iloc[-1]),
+                yref="y2",
+                text=f"{label[:3]} YoY {float(s_yoy.iloc[-1]):+.1f}%",
+                showarrow=False,
+                yshift=yshift_base,
+                bgcolor="rgba(255, 255, 255, 0.92)",
+                bordercolor=base_color,
+                borderwidth=1,
+                font=dict(size=11, color="#111827", family="Inter, Arial, sans-serif"),
+            )
+        if pd.notna(s_qoq.iloc[-1]):
+            fig.add_annotation(
+                x=last_x_local,
+                y=float(s_qoq.iloc[-1]),
+                yref="y2",
+                text=f"{label[:3]} QtQ {float(s_qoq.iloc[-1]):+.1f}%",
+                showarrow=False,
+                yshift=yshift_base - 18,
+                bgcolor="rgba(255, 255, 255, 0.92)",
+                bordercolor=base_color,
+                borderwidth=1,
+                font=dict(size=11, color="#111827", family="Inter, Arial, sans-serif"),
+            )
+
+    if show_breakdown_growth and (not is_month):
+        # Warna garis dibuat kontras dan tidak memakai merah/oranye terang
+        _add_breakdown_growth("inc", "Incoming", base_color="#A21CAF", dash_qoq="dot", yshift_base=54)
+        _add_breakdown_growth("out", "Outgoing", base_color="#334155", dash_qoq="dot", yshift_base=18)
+        _add_breakdown_growth("dom", "Domestik", base_color="#065F46", dash_qoq="dot", yshift_base=-18)
+
+    # Badge label di titik terakhir supaya jelas tapi tidak penuh tulisan
+    last_x = df_plot[target_col].iloc[-1]
+    if pd.notna(yoy.iloc[-1]):
+        fig.add_annotation(
+            x=last_x,
+            y=float(yoy.iloc[-1]),
+            yref="y2",
+            text=f"YoY {float(yoy.iloc[-1]):+.1f}%",
+            showarrow=False,
+            yshift=18,
+            bgcolor="rgba(255, 255, 255, 0.95)",
+            bordercolor=yoy_color,
+            borderwidth=1,
+            font=dict(size=12, color="#111827", family="Inter, Arial, sans-serif"),
+        )
+    if pd.notna(qoq.iloc[-1]):
+        fig.add_annotation(
+            x=last_x,
+            y=float(qoq.iloc[-1]),
+            yref="y2",
+            text=f"{'MtM' if is_month else 'QtQ'} {float(qoq.iloc[-1]):+.1f}%",
+            showarrow=False,
+            yshift=-18,
+            bgcolor="rgba(255, 255, 255, 0.95)",
+            bordercolor=qoq_color,
+            borderwidth=1,
+            font=dict(size=12, color="#111827", family="Inter, Arial, sans-serif"),
+        )
+
+    fig.update_layout(
+        title=dict(
+            text=f"Visualisasi Keseluruhan Data Transaksi (Per {period_label})",
+            font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+        ),
+        barmode="stack",
+        xaxis=dict(
+            title=dict(text="Periode", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            showgrid=False,
+            showline=True,
+            linewidth=2,
+            linecolor="#d1d5db",
+            tickangle=-45,
+            tickfont=dict(size=11, family="Inter, Arial, sans-serif"),
+        ),
+        yaxis=dict(
+            title=dict(text=y_title, font=dict(size=14, family="Inter, Arial, sans-serif")),
+            tickformat=",.0f",
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="#e5e7eb",
+            zeroline=True,
+            zerolinewidth=2,
+            zerolinecolor="#d1d5db",
+        ),
+        yaxis2=dict(
+            title=dict(text="Growth (%)", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            overlaying="y",
+            side="right",
+            tickformat=".1f",
+            showgrid=False,
+        ),
+        template="plotly_white",
+        paper_bgcolor="white",
+        plot_bgcolor="#f9fafb",
+        font=dict(family="Inter, Arial, sans-serif", size=12),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="#e5e7eb",
+            borderwidth=1,
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),
     )
 
     st.plotly_chart(fig, use_container_width=True)

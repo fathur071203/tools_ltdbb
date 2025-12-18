@@ -647,16 +647,32 @@ if st.session_state['df'] is not None:
                 trx_code = "Total"
                 is_combined = True
 
-            make_quarter_vs_quarter_chart(
-                df=df_vs_src,
-                year_a=int(vs_year_a),
-                quarter_a=int(vs_q_a),
-                year_b=int(vs_year_b),
-                quarter_b=int(vs_q_b),
-                sum_trx_type=sum_trx_type,
-                trx_type=trx_code,
-                is_combined=is_combined,
-            )
+            if trx_code == "Total":
+                df_vs_inc = df_nom_inc_filtered if sum_trx_type == "Nilai" else df_jumlah_inc_filtered
+                df_vs_out = df_nom_out_filtered if sum_trx_type == "Nilai" else df_jumlah_out_filtered
+                df_vs_dom = df_nom_dom_filtered if sum_trx_type == "Nilai" else df_jumlah_dom_filtered
+
+                make_quarter_vs_quarter_chart_total_breakdown(
+                    df_inc=df_vs_inc,
+                    df_out=df_vs_out,
+                    df_dom=df_vs_dom,
+                    year_a=int(vs_year_a),
+                    quarter_a=int(vs_q_a),
+                    year_b=int(vs_year_b),
+                    quarter_b=int(vs_q_b),
+                    sum_trx_type=sum_trx_type,
+                )
+            else:
+                make_quarter_vs_quarter_chart(
+                    df=df_vs_src,
+                    year_a=int(vs_year_a),
+                    quarter_a=int(vs_q_a),
+                    year_b=int(vs_year_b),
+                    quarter_b=int(vs_q_b),
+                    sum_trx_type=sum_trx_type,
+                    trx_type=trx_code,
+                    is_combined=is_combined,
+                )
 
             # Tabel VS Market Share (Jakarta vs Nasional)
             df_national_raw = st.session_state.get('df_national')
@@ -840,8 +856,24 @@ if st.session_state['df'] is not None:
 
             st.markdown("<hr style='border-top: 2px dashed #f59e0b; margin: 20px 0;'>", unsafe_allow_html=True)
             st.markdown("### 📊 Visualisasi Keseluruhan Data Transaksi (Frekuensi & Nominal Tergabung)")
-            make_combined_bar_line_chart(df_total_combined, "Jumlah", "Total", False, True)
-            make_combined_bar_line_chart(df_total_combined, "Nilai", "Total", False, True)
+            make_overall_total_stacked_growth_chart(
+                df_total=df_total_combined,
+                df_inc=df_jumlah_inc_filtered,
+                df_out=df_jumlah_out_filtered,
+                df_dom=df_jumlah_dom_filtered,
+                sum_trx_type="Jumlah",
+                is_month=False,
+                show_breakdown_growth=True,
+            )
+            make_overall_total_stacked_growth_chart(
+                df_total=df_total_combined,
+                df_inc=df_nom_inc_filtered,
+                df_out=df_nom_out_filtered,
+                df_dom=df_nom_dom_filtered,
+                sum_trx_type="Nilai",
+                is_month=False,
+                show_breakdown_growth=True,
+            )
 
         # MONTHLY SECTION
         if st.session_state['view_mode'] == 'monthly':
@@ -1034,8 +1066,22 @@ if st.session_state['df'] is not None:
 
             st.markdown("<hr style='border-top: 2px dashed #f59e0b; margin: 20px 0;'>", unsafe_allow_html=True)
             st.markdown("### 📅 Visualisasi Keseluruhan Data Transaksi (Frekuensi & Nominal Tergabung)")
-            make_combined_bar_line_chart(df_total_month_combined, "Jumlah", "Total", True, True)
-            make_combined_bar_line_chart(df_total_month_combined, "Nilai", "Total", True, True)
+            make_overall_total_stacked_growth_chart(
+                df_total=df_total_month_combined,
+                df_inc=df_jumlah_inc_month_filtered,
+                df_out=df_jumlah_out_month_filtered,
+                df_dom=df_jumlah_dom_month_filtered,
+                sum_trx_type="Jumlah",
+                is_month=True,
+            )
+            make_overall_total_stacked_growth_chart(
+                df_total=df_total_month_combined,
+                df_inc=df_nom_inc_month_filtered,
+                df_out=df_nom_out_month_filtered,
+                df_dom=df_nom_dom_month_filtered,
+                sum_trx_type="Nilai",
+                is_month=True,
+            )
 
 else:
     st.warning("Please Upload the Main Excel File first in the Summary Section.")
