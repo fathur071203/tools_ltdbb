@@ -412,7 +412,50 @@ if st.session_state['df'] is not None:
 
             jenis_transaksi = ['All', 'Incoming', 'Outgoing', 'Domestik']
             selected_jenis_transaksi = st.selectbox('Select Jenis Transaksi:', jenis_transaksi)
+
+        with st.expander("Pengaturan Tampilan Grafik (Growth)", True):
+            st.slider(
+                "Ukuran Font (Global)",
+                min_value=9,
+                max_value=22,
+                value=int(st.session_state.get("growth_font_size", 12)),
+                step=1,
+                key="growth_font_size",
+                help="Mengatur ukuran seluruh tulisan di grafik (judul, axis, legend, hoverlabel).",
+            )
+            st.slider(
+                "Ukuran Legend (Legenda Grafik)",
+                min_value=9,
+                max_value=24,
+                value=int(st.session_state.get("growth_legend_font_size", st.session_state.get("growth_font_size", 12))),
+                step=1,
+                key="growth_legend_font_size",
+                help="Mengatur ukuran tulisan pada legend/legenda grafik.",
+            )
+            st.slider(
+                "Ukuran Font Label (%)",
+                min_value=9,
+                max_value=26,
+                value=int(st.session_state.get("growth_label_font_size", 12)),
+                step=1,
+                key="growth_label_font_size",
+                help="Mengatur ukuran tulisan label persentase (YoY/QtQ) di titik terakhir.",
+            )
+            st.slider(
+                "Tinggi Grafik (px)",
+                min_value=380,
+                max_value=980,
+                value=int(st.session_state.get("growth_chart_height", 560)),
+                step=20,
+                key="growth_chart_height",
+                help="Atur tinggi grafik supaya tidak gepeng / terlalu tinggi.",
+            )
         st.info("Use the filters to adjust the year-quarter range and transaction type.")
+
+        _growth_font_size = int(st.session_state.get("growth_font_size", 12))
+        _growth_legend_font_size = int(st.session_state.get("growth_legend_font_size", _growth_font_size))
+        _growth_label_font_size = int(st.session_state.get("growth_label_font_size", 12))
+        _growth_chart_height = int(st.session_state.get("growth_chart_height", 560))
 
     with (st.spinner('Loading and filtering data...')):
         df_preprocessed_time = preprocess_data(df, True)
@@ -725,7 +768,16 @@ if st.session_state['df'] is not None:
             
             # Grafik Gabungan (Stacked Bar + Line)
             st.markdown("<h3 style='margin-bottom: 15px;'>📊 Grafik Gabungan - Nilai Transaksi</h3>", unsafe_allow_html=True)
-            make_stacked_bar_line_chart_combined(df_inc_combined, df_out_combined, df_dom_combined, is_month=False)
+            make_stacked_bar_line_chart_combined(
+                df_inc_combined,
+                df_out_combined,
+                df_dom_combined,
+                is_month=False,
+                font_size=_growth_font_size,
+                label_font_size=_growth_label_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
+            )
 
             # Perbandingan Periode (Quarter) - VS
             st.markdown("<h3 style='margin-top: 25px; margin-bottom: 10px;'>🆚 Perbandingan Periode (Kuartal)</h3>", unsafe_allow_html=True)
@@ -797,6 +849,10 @@ if st.session_state['df'] is not None:
                     year_b=int(vs_year_b),
                     quarter_b=int(vs_q_b),
                     sum_trx_type=sum_trx_type,
+                    font_size=_growth_font_size,
+                    label_font_size=_growth_label_font_size,
+                    legend_font_size=_growth_legend_font_size,
+                    chart_height=_growth_chart_height,
                 )
             else:
                 make_quarter_vs_quarter_chart(
@@ -808,6 +864,10 @@ if st.session_state['df'] is not None:
                     sum_trx_type=sum_trx_type,
                     trx_type=trx_code,
                     is_combined=is_combined,
+                    font_size=_growth_font_size,
+                    label_font_size=_growth_label_font_size,
+                    legend_font_size=_growth_legend_font_size,
+                    chart_height=_growth_chart_height,
                 )
 
             # Tabel VS Market Share (Jakarta vs Nasional)
@@ -894,8 +954,22 @@ if st.session_state['df'] is not None:
                                     _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Incoming")
                                 break
                 
-                make_combined_bar_line_chart(df_jumlah_inc_filtered, "Jumlah", "Inc")
-                make_combined_bar_line_chart(df_nom_inc_filtered, "Nilai", "Inc")
+                make_combined_bar_line_chart(
+                    df_jumlah_inc_filtered,
+                    "Jumlah",
+                    "Inc",
+                    font_size=_growth_font_size,
+                    legend_font_size=_growth_legend_font_size,
+                    chart_height=_growth_chart_height,
+                )
+                make_combined_bar_line_chart(
+                    df_nom_inc_filtered,
+                    "Nilai",
+                    "Inc",
+                    font_size=_growth_font_size,
+                    legend_font_size=_growth_legend_font_size,
+                    chart_height=_growth_chart_height,
+                )
                 st.divider()
 
             if selected_jenis_transaksi == 'Outgoing' or selected_jenis_transaksi == 'All':
@@ -926,8 +1000,22 @@ if st.session_state['df'] is not None:
                                     _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Outgoing")
                                 break
                 
-                make_combined_bar_line_chart(df_jumlah_out_filtered, "Jumlah", "Out")
-                make_combined_bar_line_chart(df_nom_out_filtered, "Nilai", "Out")
+                make_combined_bar_line_chart(
+                    df_jumlah_out_filtered,
+                    "Jumlah",
+                    "Out",
+                    font_size=_growth_font_size,
+                    legend_font_size=_growth_legend_font_size,
+                    chart_height=_growth_chart_height,
+                )
+                make_combined_bar_line_chart(
+                    df_nom_out_filtered,
+                    "Nilai",
+                    "Out",
+                    font_size=_growth_font_size,
+                    legend_font_size=_growth_legend_font_size,
+                    chart_height=_growth_chart_height,
+                )
                 st.divider()
                 
             if selected_jenis_transaksi == 'Domestik' or selected_jenis_transaksi == 'All':
@@ -958,8 +1046,22 @@ if st.session_state['df'] is not None:
                                     _render_pjp_detail(df_preprocessed_time, year_val, quarter_val, "Domestik")
                                 break
                 
-                make_combined_bar_line_chart(df_jumlah_dom_filtered, "Jumlah", "Dom")
-                make_combined_bar_line_chart(df_nom_dom_filtered, "Nilai", "Dom")
+                make_combined_bar_line_chart(
+                    df_jumlah_dom_filtered,
+                    "Jumlah",
+                    "Dom",
+                    font_size=_growth_font_size,
+                    legend_font_size=_growth_legend_font_size,
+                    chart_height=_growth_chart_height,
+                )
+                make_combined_bar_line_chart(
+                    df_nom_dom_filtered,
+                    "Nilai",
+                    "Dom",
+                    font_size=_growth_font_size,
+                    legend_font_size=_growth_legend_font_size,
+                    chart_height=_growth_chart_height,
+                )
                 st.divider()
 
             st.markdown("<h3 style='background-color: #fef3c7; border-left: 5px solid #f59e0b; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px; margin-top: 30px;'>💰 TOTAL KESELURUHAN - Data Transaksi (Kuartalan)</h3>", unsafe_allow_html=True)
@@ -1033,6 +1135,10 @@ if st.session_state['df'] is not None:
                 is_month=False,
                 show_breakdown_growth=True,
                 visible_periods=st.session_state.get("overall_visible_periods"),
+                font_size=_growth_font_size,
+                label_font_size=_growth_label_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
             )
             _render_overall_growth_detail_table_quarterly(
                 df_total_combined=df_total_combined,
@@ -1055,6 +1161,10 @@ if st.session_state['df'] is not None:
                 is_month=False,
                 show_breakdown_growth=True,
                 visible_periods=st.session_state.get("overall_visible_periods"),
+                font_size=_growth_font_size,
+                label_font_size=_growth_label_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
             )
             _render_overall_growth_detail_table_quarterly(
                 df_total_combined=df_total_combined,
@@ -1133,7 +1243,16 @@ if st.session_state['df'] is not None:
             
             # Grafik Gabungan (Stacked Bar + Line) - Monthly
             st.markdown("<h3 style='margin-bottom: 15px;'>📊 Grafik Gabungan - Nilai Transaksi</h3>", unsafe_allow_html=True)
-            make_stacked_bar_line_chart_combined(df_inc_combined_month, df_out_combined_month, df_dom_combined_month, is_month=True)
+            make_stacked_bar_line_chart_combined(
+                df_inc_combined_month,
+                df_out_combined_month,
+                df_dom_combined_month,
+                is_month=True,
+                font_size=_growth_font_size,
+                label_font_size=_growth_label_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
+            )
             
             st.divider()
             
@@ -1219,14 +1338,62 @@ if st.session_state['df'] is not None:
             
             st.divider()
             
-            make_combined_bar_line_chart(df_jumlah_inc_month_filtered, "Jumlah", "Inc", True)
-            make_combined_bar_line_chart(df_nom_inc_month_filtered, "Nilai", "Inc", True)
+            make_combined_bar_line_chart(
+                df_jumlah_inc_month_filtered,
+                "Jumlah",
+                "Inc",
+                True,
+                font_size=_growth_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
+            )
+            make_combined_bar_line_chart(
+                df_nom_inc_month_filtered,
+                "Nilai",
+                "Inc",
+                True,
+                font_size=_growth_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
+            )
 
-            make_combined_bar_line_chart(df_jumlah_out_month_filtered, "Jumlah", "Out", True)
-            make_combined_bar_line_chart(df_nom_out_month_filtered, "Nilai", "Out", True)
+            make_combined_bar_line_chart(
+                df_jumlah_out_month_filtered,
+                "Jumlah",
+                "Out",
+                True,
+                font_size=_growth_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
+            )
+            make_combined_bar_line_chart(
+                df_nom_out_month_filtered,
+                "Nilai",
+                "Out",
+                True,
+                font_size=_growth_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
+            )
 
-            make_combined_bar_line_chart(df_jumlah_dom_month_filtered, "Jumlah", "Dom", True)
-            make_combined_bar_line_chart(df_nom_dom_month_filtered, "Nilai", "Dom", True)
+            make_combined_bar_line_chart(
+                df_jumlah_dom_month_filtered,
+                "Jumlah",
+                "Dom",
+                True,
+                font_size=_growth_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
+            )
+            make_combined_bar_line_chart(
+                df_nom_dom_month_filtered,
+                "Nilai",
+                "Dom",
+                True,
+                font_size=_growth_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
+            )
 
             st.markdown("<h3 style='background-color: #fef3c7; border-left: 5px solid #f59e0b; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px; margin-top: 30px;'>💰 TOTAL KESELURUHAN - Data Transaksi (Bulanan)</h3>", unsafe_allow_html=True)
             st.markdown("<p style='color: #92400e; font-weight: 500; margin-bottom: 15px;'>Gabungan Data Transaksi Incoming + Outgoing + Domestik per Bulan (Frekuensi & Nominal)</p>", unsafe_allow_html=True)
@@ -1264,6 +1431,10 @@ if st.session_state['df'] is not None:
                 df_dom=df_jumlah_dom_month_filtered,
                 sum_trx_type="Jumlah",
                 is_month=True,
+                font_size=_growth_font_size,
+                label_font_size=_growth_label_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
             )
             make_overall_total_stacked_growth_chart(
                 df_total=df_total_month_combined,
@@ -1272,6 +1443,10 @@ if st.session_state['df'] is not None:
                 df_dom=df_nom_dom_month_filtered,
                 sum_trx_type="Nilai",
                 is_month=True,
+                font_size=_growth_font_size,
+                label_font_size=_growth_label_font_size,
+                legend_font_size=_growth_legend_font_size,
+                chart_height=_growth_chart_height,
             )
 
 else:

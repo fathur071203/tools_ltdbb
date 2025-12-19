@@ -5,7 +5,17 @@ import plotly.graph_objects as go
 import calendar
 
 
-def make_stacked_bar_line_chart_combined(df_inc, df_out, df_dom, is_month: bool = False):
+def make_stacked_bar_line_chart_combined(
+    df_inc,
+    df_out,
+    df_dom,
+    is_month: bool = False,
+    *,
+    font_size: int | None = None,
+    label_font_size: int | None = None,
+    legend_font_size: int | None = None,
+    chart_height: int | None = None,
+):
     """
     Membuat grafik gabungan dengan stacked bar (Inc, Out, Dom) dan line growth (YoY)
     """
@@ -37,6 +47,14 @@ def make_stacked_bar_line_chart_combined(df_inc, df_out, df_dom, is_month: bool 
     # Scale to Miliar
     scale_factor = 1e9
     
+    fs = int(font_size) if font_size is not None else 12
+    tick_fs = max(fs - 1, 9)
+    axis_title_fs = fs + 2
+    title_fs = fs + 10
+    hover_fs = fs
+    label_fs = int(label_font_size) if label_font_size is not None else tick_fs
+    legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
     fig = go.Figure()
     
     # Stacked bars - Incoming (Pink)
@@ -81,7 +99,7 @@ def make_stacked_bar_line_chart_combined(df_inc, df_out, df_dom, is_month: bool 
         text=[f"{val:.1f}%" for val in df_merged[growth_col]],
         textposition='top center',
         textfont=dict(
-            size=11,
+            size=label_fs,
             color='#1E8449',
             family='Inter, Arial, sans-serif',
             weight='bold'
@@ -92,20 +110,20 @@ def make_stacked_bar_line_chart_combined(df_inc, df_out, df_dom, is_month: bool 
     fig.update_layout(
         title=dict(
             text=f"Perkembangan Nilai Transaksi Gabungan (Per {period_label})",
-            font=dict(size=22, family='Inter, Arial, sans-serif', color='#1f2937', weight=700)
+            font=dict(size=title_fs, family='Inter, Arial, sans-serif', color='#1f2937', weight=700)
         ),
         barmode='stack',
         xaxis=dict(
-            title=dict(text="Periode", font=dict(size=14, family='Inter, Arial, sans-serif')),
+            title=dict(text="Periode", font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
             showgrid=False,
             showline=True,
             linewidth=2,
             linecolor='#d1d5db',
             tickangle=-45,
-            tickfont=dict(size=11, family='Inter, Arial, sans-serif')
+            tickfont=dict(size=tick_fs, family='Inter, Arial, sans-serif')
         ),
         yaxis=dict(
-            title=dict(text="Nilai (Rp Miliar)", font=dict(size=14, family='Inter, Arial, sans-serif')),
+            title=dict(text="Nilai (Rp Miliar)", font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
             tickformat=",.0f",
             showgrid=True,
             gridwidth=1,
@@ -115,7 +133,7 @@ def make_stacked_bar_line_chart_combined(df_inc, df_out, df_dom, is_month: bool 
             zerolinecolor='#d1d5db'
         ),
         yaxis2=dict(
-            title=dict(text='Growth (%)', font=dict(size=14, family='Inter, Arial, sans-serif')),
+            title=dict(text='Growth (%)', font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
             overlaying='y',
             side='right',
             tickformat=".1f",
@@ -124,7 +142,7 @@ def make_stacked_bar_line_chart_combined(df_inc, df_out, df_dom, is_month: bool 
         template="plotly_white",
         paper_bgcolor='white',
         plot_bgcolor='#f9fafb',
-        font=dict(family='Inter, Arial, sans-serif', size=12),
+        font=dict(family='Inter, Arial, sans-serif', size=fs),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -133,15 +151,19 @@ def make_stacked_bar_line_chart_combined(df_inc, df_out, df_dom, is_month: bool 
             x=0.5,
             bgcolor='rgba(255, 255, 255, 0.8)',
             bordercolor='#e5e7eb',
-            borderwidth=1
+            borderwidth=1,
+            font=dict(size=legend_fs, family='Inter, Arial, sans-serif')
         ),
         hovermode='x unified',
         hoverlabel=dict(
             bgcolor="white",
-            font_size=12,
+            font_size=hover_fs,
             font_family="Inter, Arial, sans-serif"
         )
     )
+
+    if chart_height is not None:
+        fig.update_layout(height=int(chart_height))
     
     st.plotly_chart(fig, use_container_width=True)
 
@@ -152,6 +174,11 @@ def make_quarter_across_years_chart(
     sum_trx_type: str,
     trx_type: str,
     is_combined: bool = False,
+    *,
+    font_size: int | None = None,
+    label_font_size: int | None = None,
+    legend_font_size: int | None = None,
+    chart_height: int | None = None,
 ):
     """Bandingkan kuartal yang sama (Q1/Q2/Q3/Q4) antar tahun.
 
@@ -235,6 +262,14 @@ def make_quarter_across_years_chart(
     yoy = pd.to_numeric(dfc[growth_col], errors="coerce")
     yoy_text = [f"{v:.1f}%" if pd.notna(v) else "" for v in yoy.tolist()]
 
+    fs = int(font_size) if font_size is not None else 12
+    tick_fs = max(fs - 1, 9)
+    axis_title_fs = fs + 2
+    title_fs = fs + 10
+    hover_fs = fs
+    label_fs = int(label_font_size) if label_font_size is not None else tick_fs
+    legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
     fig = go.Figure()
 
     fig.add_trace(
@@ -259,7 +294,7 @@ def make_quarter_across_years_chart(
             marker=dict(size=8, color="#1E8449", line=dict(color="white", width=2)),
             text=yoy_text,
             textposition="top center",
-            textfont=dict(size=11, color="#1E8449", family="Inter, Arial, sans-serif"),
+            textfont=dict(size=label_fs, color="#1E8449", family="Inter, Arial, sans-serif"),
             hovertemplate="Year %{x}<br>Growth YoY: %{y:.2f}%<extra></extra>",
         )
     )
@@ -267,18 +302,18 @@ def make_quarter_across_years_chart(
     fig.update_layout(
         title=dict(
             text=title,
-            font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+            font=dict(size=title_fs, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
         ),
         xaxis=dict(
-            title=dict(text=f"Tahun (Q{int(quarter)})", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text=f"Tahun (Q{int(quarter)})", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             showgrid=False,
             showline=True,
             linewidth=2,
             linecolor="#d1d5db",
-            tickfont=dict(size=12, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=tick_fs, family="Inter, Arial, sans-serif"),
         ),
         yaxis=dict(
-            title=dict(text=bar_yaxis_title, font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text=bar_yaxis_title, font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             tickformat=",.0f",
             showgrid=True,
             gridwidth=1,
@@ -288,7 +323,7 @@ def make_quarter_across_years_chart(
             zerolinecolor="#d1d5db",
         ),
         yaxis2=dict(
-            title=dict(text="Growth (%)", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text="Growth (%)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             overlaying="y",
             side="right",
             tickformat=".1f",
@@ -297,7 +332,7 @@ def make_quarter_across_years_chart(
         template="plotly_white",
         paper_bgcolor="white",
         plot_bgcolor="#f9fafb",
-        font=dict(family="Inter, Arial, sans-serif", size=12),
+        font=dict(family="Inter, Arial, sans-serif", size=fs),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -307,10 +342,14 @@ def make_quarter_across_years_chart(
             bgcolor="rgba(255, 255, 255, 0.8)",
             bordercolor="#e5e7eb",
             borderwidth=1,
+            font=dict(size=legend_fs, family="Inter, Arial, sans-serif"),
         ),
         hovermode="x unified",
-        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),
+        hoverlabel=dict(bgcolor="white", font_size=hover_fs, font_family="Inter, Arial, sans-serif"),
     )
+
+    if chart_height is not None:
+        fig.update_layout(height=int(chart_height))
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -324,6 +363,11 @@ def make_quarter_vs_quarter_chart(
     sum_trx_type: str,
     trx_type: str,
     is_combined: bool = False,
+    *,
+    font_size: int | None = None,
+    label_font_size: int | None = None,
+    legend_font_size: int | None = None,
+    chart_height: int | None = None,
 ):
     """Bandingkan 2 periode kuartal (Year, Quarter) vs (Year, Quarter)."""
 
@@ -386,6 +430,14 @@ def make_quarter_vs_quarter_chart(
 
     y_vals = [val_a / scale_factor, val_b / scale_factor]
 
+    fs = int(font_size) if font_size is not None else 12
+    tick_fs = max(fs - 1, 9)
+    axis_title_fs = fs + 2
+    title_fs = fs + 10
+    hover_fs = fs
+    label_fs = int(label_font_size) if label_font_size is not None else tick_fs
+    legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
     delta_pct = None
     if pd.notna(val_a) and pd.notna(val_b) and float(val_a) != 0:
         delta_pct = ((float(val_b) - float(val_a)) / float(val_a)) * 100
@@ -427,7 +479,7 @@ def make_quarter_vs_quarter_chart(
                 bgcolor="rgba(255, 255, 255, 0.95)",
                 bordercolor=trend_color,
                 borderwidth=1,
-                font=dict(size=12, color="#111827", family="Inter, Arial, sans-serif"),
+                font=dict(size=label_fs, color="#111827", family="Inter, Arial, sans-serif"),
             )
 
     # (Delta sudah ditampilkan sebagai text pada garis)
@@ -435,18 +487,18 @@ def make_quarter_vs_quarter_chart(
     fig.update_layout(
         title=dict(
             text=f"Perbandingan Periode - {y_title} {jenis_trx}",
-            font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+            font=dict(size=title_fs, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
         ),
         xaxis=dict(
-            title=dict(text="Periode", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text="Periode", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             showgrid=False,
             showline=True,
             linewidth=2,
             linecolor="#d1d5db",
-            tickfont=dict(size=12, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=tick_fs, family="Inter, Arial, sans-serif"),
         ),
         yaxis=dict(
-            title=dict(text=y_title, font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text=y_title, font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             tickformat=",.0f",
             showgrid=True,
             gridwidth=1,
@@ -458,7 +510,7 @@ def make_quarter_vs_quarter_chart(
         template="plotly_white",
         paper_bgcolor="white",
         plot_bgcolor="#f9fafb",
-        font=dict(family="Inter, Arial, sans-serif", size=12),
+        font=dict(family="Inter, Arial, sans-serif", size=fs),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -468,10 +520,14 @@ def make_quarter_vs_quarter_chart(
             bgcolor="rgba(255, 255, 255, 0.8)",
             bordercolor="#e5e7eb",
             borderwidth=1,
+            font=dict(size=legend_fs, family="Inter, Arial, sans-serif"),
         ),
         hovermode="x unified",
-        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),
+        hoverlabel=dict(bgcolor="white", font_size=hover_fs, font_family="Inter, Arial, sans-serif"),
     )
+
+    if chart_height is not None:
+        fig.update_layout(height=int(chart_height))
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -485,6 +541,11 @@ def make_quarter_vs_quarter_chart_total_breakdown(
     year_b: int,
     quarter_b: int,
     sum_trx_type: str,
+    *,
+    font_size: int | None = None,
+    label_font_size: int | None = None,
+    legend_font_size: int | None = None,
+    chart_height: int | None = None,
 ):
     """VS chart khusus TOTAL: tampilkan stacked bar Inc/Out/Dom + garis perubahan untuk masing-masing + total."""
 
@@ -570,6 +631,14 @@ def make_quarter_vs_quarter_chart_total_breakdown(
     y_dom = [dom_a / scale_factor, dom_b / scale_factor]
     y_tot = [total_a / scale_factor, total_b / scale_factor]
 
+    fs = int(font_size) if font_size is not None else 12
+    tick_fs = max(fs - 1, 9)
+    axis_title_fs = fs + 2
+    title_fs = fs + 10
+    hover_fs = fs
+    label_fs = int(label_font_size) if label_font_size is not None else tick_fs
+    legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
     fig = go.Figure()
 
     # Stacked bars seperti Grafik Gabungan
@@ -627,7 +696,7 @@ def make_quarter_vs_quarter_chart_total_breakdown(
                 bgcolor="rgba(255, 255, 255, 0.95)",
                 bordercolor=color,
                 borderwidth=1,
-                font=dict(size=12, color="#111827", family="Inter, Arial, sans-serif"),
+                font=dict(size=label_fs, color="#111827", family="Inter, Arial, sans-serif"),
             )
 
     _line("Incoming", y_inc, d_inc, 18)
@@ -638,19 +707,19 @@ def make_quarter_vs_quarter_chart_total_breakdown(
     fig.update_layout(
         title=dict(
             text=f"Perbandingan Periode - {y_title} TOTAL (Breakdown Inc/Out/Dom)",
-            font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+            font=dict(size=title_fs, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
         ),
         barmode="stack",
         xaxis=dict(
-            title=dict(text="Periode", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text="Periode", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             showgrid=False,
             showline=True,
             linewidth=2,
             linecolor="#d1d5db",
-            tickfont=dict(size=12, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=tick_fs, family="Inter, Arial, sans-serif"),
         ),
         yaxis=dict(
-            title=dict(text=y_title, font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text=y_title, font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             tickformat=",.0f",
             showgrid=True,
             gridwidth=1,
@@ -662,7 +731,7 @@ def make_quarter_vs_quarter_chart_total_breakdown(
         template="plotly_white",
         paper_bgcolor="white",
         plot_bgcolor="#f9fafb",
-        font=dict(family="Inter, Arial, sans-serif", size=12),
+        font=dict(family="Inter, Arial, sans-serif", size=fs),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -672,10 +741,14 @@ def make_quarter_vs_quarter_chart_total_breakdown(
             bgcolor="rgba(255, 255, 255, 0.8)",
             bordercolor="#e5e7eb",
             borderwidth=1,
+            font=dict(size=legend_fs, family="Inter, Arial, sans-serif"),
         ),
         hovermode="x unified",
-        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),
+        hoverlabel=dict(bgcolor="white", font_size=hover_fs, font_family="Inter, Arial, sans-serif"),
     )
+
+    if chart_height is not None:
+        fig.update_layout(height=int(chart_height))
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -830,7 +903,17 @@ def make_grouped_bar_chart(df, mode, is_month):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month: bool = False, is_combined: bool = False):
+def make_combined_bar_line_chart(
+    df,
+    sum_trx_type: str,
+    trx_type: str,
+    is_month: bool = False,
+    is_combined: bool = False,
+    *,
+    font_size: int | None = None,
+    legend_font_size: int | None = None,
+    chart_height: int | None = None,
+):
     df_copy = df.copy()
 
     if is_combined:
@@ -879,6 +962,13 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
     else:
         bar_yaxis_title = "Nilai (Rp Miliar)"
         scale_factor = 1e9  # Ubah ke Miliar sesuai Chart.js
+
+    fs = int(font_size) if font_size is not None else 12
+    tick_fs = max(fs - 1, 9)
+    axis_title_fs = fs + 2
+    title_fs = fs + 10
+    hover_fs = fs
+    legend_fs = int(legend_font_size) if legend_font_size is not None else fs
 
     fig = go.Figure()
 
@@ -968,19 +1058,19 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
     fig.update_layout(
         title=dict(
             text=bar_title,
-            font=dict(size=22, family='Inter, Arial, sans-serif', color='#1f2937', weight=700)
+            font=dict(size=title_fs, family='Inter, Arial, sans-serif', color='#1f2937', weight=700)
         ),
         xaxis=dict(
-            title=dict(text="Periode", font=dict(size=14, family='Inter, Arial, sans-serif')),
+            title=dict(text="Periode", font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
             showgrid=False,
             showline=True,
             linewidth=2,
             linecolor='#d1d5db',
             tickangle=-45,
-            tickfont=dict(size=11, family='Inter, Arial, sans-serif')
+            tickfont=dict(size=tick_fs, family='Inter, Arial, sans-serif')
         ),
         yaxis=dict(
-            title=dict(text=bar_yaxis_title, font=dict(size=14, family='Inter, Arial, sans-serif')),
+            title=dict(text=bar_yaxis_title, font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
             tickformat=",.0f",
             showgrid=True,
             gridwidth=1,
@@ -990,7 +1080,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
             zerolinecolor='#d1d5db'
         ),
         yaxis2=dict(
-            title=dict(text='Growth (%)', font=dict(size=14, family='Inter, Arial, sans-serif')),
+            title=dict(text='Growth (%)', font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
             overlaying='y',
             side='right',
             tickformat=".1f",
@@ -999,7 +1089,7 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
         template="plotly_white",
         paper_bgcolor='white',
         plot_bgcolor='#f9fafb',
-        font=dict(family='Inter, Arial, sans-serif', size=12),
+        font=dict(family='Inter, Arial, sans-serif', size=fs),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -1008,15 +1098,19 @@ def make_combined_bar_line_chart(df, sum_trx_type: str, trx_type: str, is_month:
             x=0.5,
             bgcolor='rgba(255, 255, 255, 0.8)',
             bordercolor='#e5e7eb',
-            borderwidth=1
+            borderwidth=1,
+            font=dict(size=legend_fs, family='Inter, Arial, sans-serif')
         ),
         hovermode='x unified',
         hoverlabel=dict(
             bgcolor="white",
-            font_size=12,
+            font_size=hover_fs,
             font_family="Inter, Arial, sans-serif"
         )
     )
+
+    if chart_height is not None:
+        fig.update_layout(height=int(chart_height))
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -1030,6 +1124,11 @@ def make_overall_total_stacked_growth_chart(
     is_month: bool = False,
     show_breakdown_growth: bool = False,
     visible_periods: list[str] | None = None,
+    *,
+    font_size: int | None = None,
+    label_font_size: int | None = None,
+    legend_font_size: int | None = None,
+    chart_height: int | None = None,
 ):
     """Visualisasi Keseluruhan TOTAL: stacked bar (Inc/Out/Dom) + Growth YoY & QtQ.
 
@@ -1051,7 +1150,14 @@ def make_overall_total_stacked_growth_chart(
     TOTAL_GROWTH_MARKER_SIZE = 10
     BREAKDOWN_GROWTH_MARKER_SIZE = 8
     LABEL_BORDER_WIDTH = 2
-    LABEL_FONT_SIZE = 12
+    fs = int(font_size) if font_size is not None else 12
+    tick_fs = max(fs - 1, 9)
+    axis_title_fs = fs + 2
+    title_fs = fs + 10
+    hover_fs = fs
+    legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
+    LABEL_FONT_SIZE = int(label_font_size) if label_font_size is not None else 12
     LABEL_OFFSET_TOTAL = 0.65
     LABEL_OFFSET_BREAKDOWN_STEP = 0.45
 
@@ -1399,20 +1505,20 @@ def make_overall_total_stacked_growth_chart(
     fig.update_layout(
         title=dict(
             text=f"Visualisasi Keseluruhan Data Transaksi - {y_title} (Per {period_label})",
-            font=dict(size=22, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+            font=dict(size=title_fs, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
         ),
         barmode="stack",
         xaxis=dict(
-            title=dict(text="Periode", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text="Periode", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             showgrid=False,
             showline=True,
             linewidth=2,
             linecolor="#d1d5db",
             tickangle=-45,
-            tickfont=dict(size=11, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=tick_fs, family="Inter, Arial, sans-serif"),
         ),
         yaxis=dict(
-            title=dict(text=y_title, font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text=y_title, font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             tickformat=",.0f",
             showgrid=True,
             gridwidth=1,
@@ -1422,7 +1528,7 @@ def make_overall_total_stacked_growth_chart(
             zerolinecolor="#d1d5db",
         ),
         yaxis2=dict(
-            title=dict(text="Growth (%)", font=dict(size=14, family="Inter, Arial, sans-serif")),
+            title=dict(text="Growth (%)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
             overlaying="y",
             side="right",
             tickformat=".1f",
@@ -1431,7 +1537,7 @@ def make_overall_total_stacked_growth_chart(
         template="plotly_white",
         paper_bgcolor="white",
         plot_bgcolor="#f9fafb",
-        font=dict(family="Inter, Arial, sans-serif", size=12),
+        font=dict(family="Inter, Arial, sans-serif", size=fs),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -1442,10 +1548,14 @@ def make_overall_total_stacked_growth_chart(
             bordercolor="#e5e7eb",
             borderwidth=1,
             groupclick="togglegroup",
+            font=dict(size=legend_fs, family="Inter, Arial, sans-serif"),
         ),
         hovermode="x unified",
-        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),
+        hoverlabel=dict(bgcolor="white", font_size=hover_fs, font_family="Inter, Arial, sans-serif"),
     )
+
+    if chart_height is not None:
+        fig.update_layout(height=int(chart_height))
 
     st.plotly_chart(fig, use_container_width=True)
 
