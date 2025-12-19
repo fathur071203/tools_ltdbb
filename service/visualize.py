@@ -14,6 +14,7 @@ def make_stacked_bar_line_chart_combined(
     font_size: int | None = None,
     label_font_size: int | None = None,
     legend_font_size: int | None = None,
+    axis_tick_font_size: int | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -49,7 +50,7 @@ def make_stacked_bar_line_chart_combined(
     scale_factor = 1e9
     
     fs = int(font_size) if font_size is not None else 12
-    tick_fs = max(fs - 1, 9)
+    tick_fs = int(axis_tick_font_size) if axis_tick_font_size is not None else max(fs - 1, 9)
     axis_title_fs = fs + 2
     title_fs = fs + 10
     hover_fs = fs
@@ -115,7 +116,7 @@ def make_stacked_bar_line_chart_combined(
         ),
         barmode='stack',
         xaxis=dict(
-            title=dict(text="Periode", font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
+            title=dict(text="Periode", font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif'), standoff=15),
             showgrid=False,
             showline=True,
             linewidth=2,
@@ -124,7 +125,7 @@ def make_stacked_bar_line_chart_combined(
             tickfont=dict(size=tick_fs, family='Inter, Arial, sans-serif')
         ),
         yaxis=dict(
-            title=dict(text="Nilai (Rp Miliar)", font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
+            title=dict(text="Nilai (Rp Miliar)", font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif'), standoff=15),
             tickformat=",.0f",
             showgrid=True,
             gridwidth=1,
@@ -134,7 +135,7 @@ def make_stacked_bar_line_chart_combined(
             zerolinecolor='#d1d5db'
         ),
         yaxis2=dict(
-            title=dict(text='Growth (%)', font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
+            title=dict(text='Growth (%)', font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif'), standoff=15),
             overlaying='y',
             side='right',
             tickformat=".1f",
@@ -372,6 +373,7 @@ def make_quarter_vs_quarter_chart(
     font_size: int | None = None,
     label_font_size: int | None = None,
     legend_font_size: int | None = None,
+    axis_tick_font_size: int | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -437,7 +439,7 @@ def make_quarter_vs_quarter_chart(
     y_vals = [val_a / scale_factor, val_b / scale_factor]
 
     fs = int(font_size) if font_size is not None else 12
-    tick_fs = max(fs - 1, 9)
+    tick_fs = int(axis_tick_font_size) if axis_tick_font_size is not None else max(fs - 1, 9)
     axis_title_fs = fs + 2
     title_fs = fs + 10
     hover_fs = fs
@@ -555,6 +557,7 @@ def make_quarter_vs_quarter_chart_total_breakdown(
     font_size: int | None = None,
     label_font_size: int | None = None,
     legend_font_size: int | None = None,
+    axis_tick_font_size: int | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -643,7 +646,7 @@ def make_quarter_vs_quarter_chart_total_breakdown(
     y_tot = [total_a / scale_factor, total_b / scale_factor]
 
     fs = int(font_size) if font_size is not None else 12
-    tick_fs = max(fs - 1, 9)
+    tick_fs = int(axis_tick_font_size) if axis_tick_font_size is not None else max(fs - 1, 9)
     axis_title_fs = fs + 2
     title_fs = fs + 10
     hover_fs = fs
@@ -927,6 +930,7 @@ def make_combined_bar_line_chart(
     *,
     font_size: int | None = None,
     legend_font_size: int | None = None,
+    axis_tick_font_size: int | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -980,7 +984,7 @@ def make_combined_bar_line_chart(
         scale_factor = 1e9  # Ubah ke Miliar sesuai Chart.js
 
     fs = int(font_size) if font_size is not None else 12
-    tick_fs = max(fs - 1, 9)
+    tick_fs = int(axis_tick_font_size) if axis_tick_font_size is not None else max(fs - 1, 9)
     axis_title_fs = fs + 2
     title_fs = fs + 10
     hover_fs = fs
@@ -1148,6 +1152,7 @@ def make_overall_total_stacked_growth_chart(
     font_size: int | None = None,
     label_font_size: int | None = None,
     legend_font_size: int | None = None,
+    axis_tick_font_size: int | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -1172,7 +1177,7 @@ def make_overall_total_stacked_growth_chart(
     BREAKDOWN_GROWTH_MARKER_SIZE = 8
     LABEL_BORDER_WIDTH = 2
     fs = int(font_size) if font_size is not None else 12
-    tick_fs = max(fs - 1, 9)
+    tick_fs = int(axis_tick_font_size) if axis_tick_font_size is not None else max(fs - 1, 9)
     axis_title_fs = fs + 2
     title_fs = fs + 10
     hover_fs = fs
@@ -1421,7 +1426,6 @@ def make_overall_total_stacked_growth_chart(
     # Garis growth dibuat gelap tapi kontras (hindari hitam tua & biru tua)
     yoy_color = "#14532D"  # green-900
     qoq_color = "#7F1D1D"  # red-900
-
     total_yoy_group = "overall_total_yoy"
     total_qoq_group = "overall_total_qoq"
 
