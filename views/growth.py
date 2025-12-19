@@ -450,12 +450,22 @@ if st.session_state['df'] is not None:
                 key="growth_chart_height",
                 help="Atur tinggi grafik supaya tidak gepeng / terlalu tinggi.",
             )
+            st.slider(
+                "Lebar Grafik (px)",
+                min_value=0,
+                max_value=2200,
+                value=int(st.session_state.get("growth_chart_width", 0)),
+                step=50,
+                key="growth_chart_width",
+                help="Atur lebar grafik. 0 = mengikuti lebar container (auto).",
+            )
         st.info("Use the filters to adjust the year-quarter range and transaction type.")
 
         _growth_font_size = int(st.session_state.get("growth_font_size", 12))
         _growth_legend_font_size = int(st.session_state.get("growth_legend_font_size", _growth_font_size))
         _growth_label_font_size = int(st.session_state.get("growth_label_font_size", 12))
         _growth_chart_height = int(st.session_state.get("growth_chart_height", 560))
+        _growth_chart_width = int(st.session_state.get("growth_chart_width", 0))
 
     with (st.spinner('Loading and filtering data...')):
         df_preprocessed_time = preprocess_data(df, True)
@@ -777,6 +787,7 @@ if st.session_state['df'] is not None:
                 label_font_size=_growth_label_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
 
             # Perbandingan Periode (Quarter) - VS
@@ -853,6 +864,7 @@ if st.session_state['df'] is not None:
                     label_font_size=_growth_label_font_size,
                     legend_font_size=_growth_legend_font_size,
                     chart_height=_growth_chart_height,
+                    chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
             else:
                 make_quarter_vs_quarter_chart(
@@ -868,6 +880,7 @@ if st.session_state['df'] is not None:
                     label_font_size=_growth_label_font_size,
                     legend_font_size=_growth_legend_font_size,
                     chart_height=_growth_chart_height,
+                    chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
 
             # Tabel VS Market Share (Jakarta vs Nasional)
@@ -961,6 +974,7 @@ if st.session_state['df'] is not None:
                     font_size=_growth_font_size,
                     legend_font_size=_growth_legend_font_size,
                     chart_height=_growth_chart_height,
+                    chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
                 make_combined_bar_line_chart(
                     df_nom_inc_filtered,
@@ -969,6 +983,7 @@ if st.session_state['df'] is not None:
                     font_size=_growth_font_size,
                     legend_font_size=_growth_legend_font_size,
                     chart_height=_growth_chart_height,
+                    chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
                 st.divider()
 
@@ -1007,6 +1022,7 @@ if st.session_state['df'] is not None:
                     font_size=_growth_font_size,
                     legend_font_size=_growth_legend_font_size,
                     chart_height=_growth_chart_height,
+                    chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
                 make_combined_bar_line_chart(
                     df_nom_out_filtered,
@@ -1015,6 +1031,7 @@ if st.session_state['df'] is not None:
                     font_size=_growth_font_size,
                     legend_font_size=_growth_legend_font_size,
                     chart_height=_growth_chart_height,
+                    chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
                 st.divider()
                 
@@ -1053,6 +1070,7 @@ if st.session_state['df'] is not None:
                     font_size=_growth_font_size,
                     legend_font_size=_growth_legend_font_size,
                     chart_height=_growth_chart_height,
+                    chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
                 make_combined_bar_line_chart(
                     df_nom_dom_filtered,
@@ -1061,6 +1079,7 @@ if st.session_state['df'] is not None:
                     font_size=_growth_font_size,
                     legend_font_size=_growth_legend_font_size,
                     chart_height=_growth_chart_height,
+                    chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
                 st.divider()
 
@@ -1139,6 +1158,7 @@ if st.session_state['df'] is not None:
                 label_font_size=_growth_label_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
             _render_overall_growth_detail_table_quarterly(
                 df_total_combined=df_total_combined,
@@ -1165,6 +1185,7 @@ if st.session_state['df'] is not None:
                 label_font_size=_growth_label_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
             _render_overall_growth_detail_table_quarterly(
                 df_total_combined=df_total_combined,
@@ -1252,6 +1273,7 @@ if st.session_state['df'] is not None:
                 label_font_size=_growth_label_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
             
             st.divider()
@@ -1346,6 +1368,7 @@ if st.session_state['df'] is not None:
                 font_size=_growth_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
             make_combined_bar_line_chart(
                 df_nom_inc_month_filtered,
@@ -1355,6 +1378,7 @@ if st.session_state['df'] is not None:
                 font_size=_growth_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
 
             make_combined_bar_line_chart(
@@ -1365,6 +1389,7 @@ if st.session_state['df'] is not None:
                 font_size=_growth_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
             make_combined_bar_line_chart(
                 df_nom_out_month_filtered,
@@ -1374,6 +1399,7 @@ if st.session_state['df'] is not None:
                 font_size=_growth_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
 
             make_combined_bar_line_chart(
@@ -1384,6 +1410,7 @@ if st.session_state['df'] is not None:
                 font_size=_growth_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
             make_combined_bar_line_chart(
                 df_nom_dom_month_filtered,
@@ -1393,6 +1420,7 @@ if st.session_state['df'] is not None:
                 font_size=_growth_font_size,
                 legend_font_size=_growth_legend_font_size,
                 chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
 
             st.markdown("<h3 style='background-color: #fef3c7; border-left: 5px solid #f59e0b; padding: 12px 15px; border-radius: 5px; margin-bottom: 20px; margin-top: 30px;'>💰 TOTAL KESELURUHAN - Data Transaksi (Bulanan)</h3>", unsafe_allow_html=True)

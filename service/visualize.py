@@ -15,6 +15,7 @@ def make_stacked_bar_line_chart_combined(
     label_font_size: int | None = None,
     legend_font_size: int | None = None,
     chart_height: int | None = None,
+    chart_width: int | None = None,
 ):
     """
     Membuat grafik gabungan dengan stacked bar (Inc, Out, Dom) dan line growth (YoY)
@@ -164,8 +165,12 @@ def make_stacked_bar_line_chart_combined(
 
     if chart_height is not None:
         fig.update_layout(height=int(chart_height))
-    
-    st.plotly_chart(fig, use_container_width=True)
+
+    if chart_width is not None and int(chart_width) > 0:
+        fig.update_layout(width=int(chart_width))
+        st.plotly_chart(fig, use_container_width=False)
+    else:
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def make_quarter_across_years_chart(
@@ -368,6 +373,7 @@ def make_quarter_vs_quarter_chart(
     label_font_size: int | None = None,
     legend_font_size: int | None = None,
     chart_height: int | None = None,
+    chart_width: int | None = None,
 ):
     """Bandingkan 2 periode kuartal (Year, Quarter) vs (Year, Quarter)."""
 
@@ -529,7 +535,11 @@ def make_quarter_vs_quarter_chart(
     if chart_height is not None:
         fig.update_layout(height=int(chart_height))
 
-    st.plotly_chart(fig, use_container_width=True)
+    if chart_width is not None and int(chart_width) > 0:
+        fig.update_layout(width=int(chart_width))
+        st.plotly_chart(fig, use_container_width=False)
+    else:
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def make_quarter_vs_quarter_chart_total_breakdown(
@@ -546,6 +556,7 @@ def make_quarter_vs_quarter_chart_total_breakdown(
     label_font_size: int | None = None,
     legend_font_size: int | None = None,
     chart_height: int | None = None,
+    chart_width: int | None = None,
 ):
     """VS chart khusus TOTAL: tampilkan stacked bar Inc/Out/Dom + garis perubahan untuk masing-masing + total."""
 
@@ -750,7 +761,11 @@ def make_quarter_vs_quarter_chart_total_breakdown(
     if chart_height is not None:
         fig.update_layout(height=int(chart_height))
 
-    st.plotly_chart(fig, use_container_width=True)
+    if chart_width is not None and int(chart_width) > 0:
+        fig.update_layout(width=int(chart_width))
+        st.plotly_chart(fig, use_container_width=False)
+    else:
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def make_pie_chart_summary(df, top_n):
@@ -913,6 +928,7 @@ def make_combined_bar_line_chart(
     font_size: int | None = None,
     legend_font_size: int | None = None,
     chart_height: int | None = None,
+    chart_width: int | None = None,
 ):
     df_copy = df.copy()
 
@@ -1112,7 +1128,11 @@ def make_combined_bar_line_chart(
     if chart_height is not None:
         fig.update_layout(height=int(chart_height))
 
-    st.plotly_chart(fig, use_container_width=True)
+    if chart_width is not None and int(chart_width) > 0:
+        fig.update_layout(width=int(chart_width))
+        st.plotly_chart(fig, use_container_width=False)
+    else:
+        st.plotly_chart(fig, use_container_width=True)
 
 
 def make_overall_total_stacked_growth_chart(
@@ -1129,6 +1149,7 @@ def make_overall_total_stacked_growth_chart(
     label_font_size: int | None = None,
     legend_font_size: int | None = None,
     chart_height: int | None = None,
+    chart_width: int | None = None,
 ):
     """Visualisasi Keseluruhan TOTAL: stacked bar (Inc/Out/Dom) + Growth YoY & QtQ.
 
@@ -1158,8 +1179,16 @@ def make_overall_total_stacked_growth_chart(
     legend_fs = int(legend_font_size) if legend_font_size is not None else fs
 
     LABEL_FONT_SIZE = int(label_font_size) if label_font_size is not None else 12
-    LABEL_OFFSET_TOTAL = 0.65
-    LABEL_OFFSET_BREAKDOWN_STEP = 0.45
+    # Offset dibuat kecil agar label % tetap “mepet” dengan titiknya (bukan naik/serong jauh)
+    LABEL_OFFSET_TOTAL = 0.18
+    LABEL_OFFSET_BREAKDOWN_STEP = 0.12
+
+    # Layout padding knobs
+    # - Right margin: ruang untuk label % di sisi kanan
+    # - Top margin: ruang untuk title (responsif terhadap font)
+    # - Bottom margin: ruang untuk legend (legend dipindah ke bawah agar tidak bisa nabrak title)
+    TOP_MARGIN_PX = max(95, int(title_fs * 4.5))
+    RIGHT_MARGIN_PX = 110
 
     # Tentukan kolom periode
     if is_month:
@@ -1316,7 +1345,10 @@ def make_overall_total_stacked_growth_chart(
         vmin = float(min(vals))
         vmax = float(max(vals))
         span = vmax - vmin
-        return span * 0.035 if span > 0 else 1.0
+        # Lebih kecil dari sebelumnya supaya label tidak “lari” jauh dari titik
+        return span * 0.015 if span > 0 else 1.0
+
+    label_y_values: list[float] = []
 
     def _add_last_point_label_trace(
         *,
@@ -1337,18 +1369,21 @@ def make_overall_total_stacked_growth_chart(
         # Sesuaikan ukuran kotak dengan panjang teks agar tulisan tidak "keluar" dari box
         safe_text = str(text)
         # Teks saja (tanpa kotak putih) supaya tidak "beleber"
+        placed_y = y_num + float(y_offset)
+        label_y_values.append(float(placed_y))
         fig.add_trace(
             go.Scatter(
                 x=[x_val],
-                y=[y_num + float(y_offset)],
+                y=[placed_y],
                 name=text,
                 legendgroup=legend_group,
                 showlegend=False,
                 yaxis="y2",
                 mode="text",
-                cliponaxis=False,
+                # Jangan keluar area plot supaya tidak “nabrak” komponen lain (mis. tabel)
+                cliponaxis=True,
                 text=[f"<b>{safe_text}</b>"],
-                textposition="middle center",
+                textposition="middle right",
                 textfont=dict(size=LABEL_FONT_SIZE, color=border_color, family="Inter, Arial, sans-serif"),
                 hoverinfo="skip",
             )
@@ -1502,10 +1537,48 @@ def make_overall_total_stacked_growth_chart(
             y_offset=-LABEL_OFFSET_TOTAL * y2_offset_unit,
         )
 
+    # Pastikan area y2 cukup untuk menampung label (tanpa keluar canvas)
+    try:
+        y2_series_vals: list[float] = []
+        for s in [yoy, qoq]:
+            y2_series_vals.extend(pd.to_numeric(s, errors="coerce").dropna().astype(float).tolist())
+
+        if show_breakdown_growth and (not is_month):
+            for col in ("_inc_yoy", "_inc_qoq", "_out_yoy", "_out_qoq", "_dom_yoy", "_dom_qoq"):
+                if col in df_show.columns:
+                    y2_series_vals.extend(
+                        pd.to_numeric(df_show[col], errors="coerce").dropna().astype(float).tolist()
+                    )
+
+        y2_all = y2_series_vals + label_y_values
+        if y2_all:
+            y2_min = float(min(y2_all))
+            y2_max = float(max(y2_all))
+            y2_span = y2_max - y2_min
+            y2_pad = max(1.0, y2_span * 0.12)
+            y2_range = [y2_min - y2_pad, y2_max + y2_pad]
+        else:
+            y2_range = None
+    except Exception:
+        y2_range = None
+
+    legend_items = 0
+    try:
+        legend_items = sum(1 for tr in fig.data if getattr(tr, "showlegend", True))
+    except Exception:
+        legend_items = 0
+    legend_rows = max(1, (int(legend_items) + 3) // 4)
+    # Space atas dinamis untuk title + legend (legend tetap di atas grafik, tapi tidak nabrak title)
+    legend_block_px = max(32, 14 + legend_rows * (legend_fs + 10))
+    top_margin_px = TOP_MARGIN_PX + legend_block_px
+    bottom_margin_px = 80
+
     fig.update_layout(
         title=dict(
             text=f"Visualisasi Keseluruhan Data Transaksi - {y_title} (Per {period_label})",
             font=dict(size=title_fs, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+            y=0.98,
+            yanchor="top",
         ),
         barmode="stack",
         xaxis=dict(
@@ -1533,6 +1606,7 @@ def make_overall_total_stacked_growth_chart(
             side="right",
             tickformat=".1f",
             showgrid=False,
+            range=y2_range,
         ),
         template="plotly_white",
         paper_bgcolor="white",
@@ -1540,6 +1614,7 @@ def make_overall_total_stacked_growth_chart(
         font=dict(family="Inter, Arial, sans-serif", size=fs),
         legend=dict(
             orientation="h",
+            # Legend diletakkan di area margin atas (bukan menimpa plot)
             yanchor="bottom",
             y=1.02,
             xanchor="center",
@@ -1552,12 +1627,32 @@ def make_overall_total_stacked_growth_chart(
         ),
         hovermode="x unified",
         hoverlabel=dict(bgcolor="white", font_size=hover_fs, font_family="Inter, Arial, sans-serif"),
+        margin=dict(l=60, r=RIGHT_MARGIN_PX, t=top_margin_px, b=bottom_margin_px),
     )
+
+    # Tambah ruang kanan berbasis index kategori supaya label di kanan tidak kepotong.
+    try:
+        cats = df_show[target_col].astype(str).tolist()
+        if len(cats) > 0:
+            fig.update_layout(
+                xaxis=dict(
+                    type="category",
+                    categoryorder="array",
+                    categoryarray=cats,
+                    range=[-0.5, (len(cats) - 0.5) + 0.9],
+                )
+            )
+    except Exception:
+        pass
 
     if chart_height is not None:
         fig.update_layout(height=int(chart_height))
 
-    st.plotly_chart(fig, use_container_width=True)
+    if chart_width is not None and int(chart_width) > 0:
+        fig.update_layout(width=int(chart_width))
+        st.plotly_chart(fig, use_container_width=False)
+    else:
+        st.plotly_chart(fig, use_container_width=True)
 
 def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_pjp: str, selected_year: str):
     # Buat label time-series lintas tahun: YYYY-MM dan urutkan kronologis
