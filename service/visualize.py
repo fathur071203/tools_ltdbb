@@ -434,6 +434,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
     end_month: int = 9,
     cap_years: set[int] | None = None,
     default_end_month: int = 12,
+    yoy_cap_years: set[int] | None = None,
     font_size: int | None = None,
     legend_font_size: int | None = None,
     axis_x_tick_font_size: int | None = None,
@@ -460,10 +461,17 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
 
     cap_years_set = set(cap_years) if cap_years else None
 
+    yoy_cap_years_set = set(yoy_cap_years) if yoy_cap_years else cap_years_set
+
     def _limit_for_year(year_int: int) -> int:
         if cap_years_set is None:
             return end_month_int
         return end_month_int if int(year_int) in cap_years_set else default_end_month_int
+
+    def _yoy_limit_for_year(year_int: int) -> int:
+        if yoy_cap_years_set is None:
+            return end_month_int
+        return end_month_int if int(year_int) in yoy_cap_years_set else default_end_month_int
 
     def _month_to_int(v) -> int | None:
         if v is None or (isinstance(v, float) and pd.isna(v)):
@@ -483,7 +491,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
         except Exception:
             return None
 
-    def _agg_year_ytd(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
+    def _agg_year_upto(df: pd.DataFrame, value_col: str, limit_month: int) -> pd.DataFrame:
         if df is None or df.empty:
             return pd.DataFrame(columns=["Year", value_col, "_nm"])
         d = df.copy()
@@ -500,8 +508,8 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
         d["MonthInt"] = d["MonthInt"].astype(int)
         d[value_col] = pd.to_numeric(d.get(value_col), errors="coerce")
 
-        d["_limit"] = d["YearInt"].apply(_limit_for_year)
-        d = d[d["MonthInt"] <= d["_limit"]].copy()
+        limit_int = int(limit_month)
+        d = d[d["MonthInt"] <= limit_int].copy()
         if d.empty:
             return pd.DataFrame(columns=["Year", value_col, "_nm"])
 
@@ -517,43 +525,130 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
     out_col = "Sum of Fin Nilai Out"
     dom_col = "Sum of Fin Nilai Dom"
 
-    inc_y = _agg_year_ytd(df_inc, inc_col)
-    out_y = _agg_year_ytd(df_out, out_col)
-    dom_y = _agg_year_ytd(df_dom, dom_col)
+    # Precompute aggregates for two windows: capped window (end_month) and default window (default_end_month)
+    def _build_window(limit_month: int):
+        inc_w = _agg_year_upto(df_inc, inc_col, limit_month)
+        out_w = _agg_year_upto(df_out, out_col, limit_month)
+        dom_w = _agg_year_upto(df_dom, dom_col, limit_month)
 
-    df_y = inc_y.merge(out_y[["Year", out_col, "_nm"]], on="Year", how="outer", suffixes=("", "_out"))
-    df_y = df_y.merge(dom_y[["Year", dom_col, "_nm"]], on="Year", how="outer", suffixes=("", "_dom"))
+        w = inc_w.merge(out_w[["Year", out_col, "_nm"]], on="Year", how="outer", suffixes=("", "_out"))
+        w = w.merge(dom_w[["Year", dom_col, "_nm"]], on="Year", how="outer", suffixes=("", "_dom"))
 
-    if df_y.empty:
-        st.info("Data tidak cukup untuk membuat grafik tahunan (YTD).")
+        if w.empty:
+            return w
+
+        def _max3(a, b, c):
+            vals = [v for v in [a, b, c] if pd.notna(v)]
+            return int(max(vals)) if vals else 0
+
+        w["_nm_out"] = w.get("_nm_out")
+        w["_nm_dom"] = w.get("_nm_dom")
+        w["_nm"] = w.apply(lambda r: _max3(r.get("_nm"), r.get("_nm_out"), r.get("_nm_dom")), axis=1)
+
+        w["YearInt"] = pd.to_numeric(w.get("Year"), errors="coerce")
+        w = w.dropna(subset=["YearInt"]).copy()
+        w["YearInt"] = w["YearInt"].astype(int)
+
+        w[inc_col] = pd.to_numeric(w.get(inc_col), errors="coerce").fillna(0.0)
+        w[out_col] = pd.to_numeric(w.get(out_col), errors="coerce").fillna(0.0)
+        w[dom_col] = pd.to_numeric(w.get(dom_col), errors="coerce").fillna(0.0)
+        w["Total"] = w[inc_col] + w[out_col] + w[dom_col]
+        w = w.sort_values("YearInt")
+        return w[["YearInt", inc_col, out_col, dom_col, "Total", "_nm"]]
+
+    w_cap = _build_window(end_month_int)
+    w_def = _build_window(default_end_month_int)
+
+    if (w_cap is None or w_cap.empty) and (w_def is None or w_def.empty):
+        st.info("Data tidak cukup untuk membuat grafik tahunan (mix window).")
         return
 
-    def _max3(a, b, c):
-        vals = [v for v in [a, b, c] if pd.notna(v)]
-        return int(max(vals)) if vals else 0
+    years = sorted(set((w_cap["YearInt"].tolist() if w_cap is not None and not w_cap.empty else []) + (w_def["YearInt"].tolist() if w_def is not None and not w_def.empty else [])))
+    df_y = pd.DataFrame({"YearInt": years})
 
-    df_y["_nm_out"] = df_y.get("_nm_out")
-    df_y["_nm_dom"] = df_y.get("_nm_dom")
-    df_y["_nm"] = df_y.apply(lambda r: _max3(r.get("_nm"), r.get("_nm_out"), r.get("_nm_dom")), axis=1)
+    def _merge_window(df_base: pd.DataFrame, w: pd.DataFrame, suffix: str):
+        if w is None or w.empty:
+            df_base[f"Total{suffix}"] = 0.0
+            df_base[f"Inc{suffix}"] = 0.0
+            df_base[f"Out{suffix}"] = 0.0
+            df_base[f"Dom{suffix}"] = 0.0
+            df_base[f"_nm{suffix}"] = 0
+            return df_base
+        m = w.rename(
+            columns={
+                inc_col: f"Inc{suffix}",
+                out_col: f"Out{suffix}",
+                dom_col: f"Dom{suffix}",
+                "Total": f"Total{suffix}",
+                "_nm": f"_nm{suffix}",
+            }
+        )
+        return df_base.merge(m, on="YearInt", how="left")
 
-    df_y["YearInt"] = pd.to_numeric(df_y.get("Year"), errors="coerce")
-    df_y = df_y.dropna(subset=["YearInt"]).copy()
-    df_y["YearInt"] = df_y["YearInt"].astype(int)
+    df_y = _merge_window(df_y, w_cap, "_cap")
+    df_y = _merge_window(df_y, w_def, "_def")
 
-    df_y[inc_col] = pd.to_numeric(df_y.get(inc_col), errors="coerce").fillna(0.0)
-    df_y[out_col] = pd.to_numeric(df_y.get(out_col), errors="coerce").fillna(0.0)
-    df_y[dom_col] = pd.to_numeric(df_y.get(dom_col), errors="coerce").fillna(0.0)
-    df_y = df_y.sort_values("YearInt")
+    for c in ["Inc_cap", "Out_cap", "Dom_cap", "Total_cap", "Inc_def", "Out_def", "Dom_def", "Total_def"]:
+        if c in df_y.columns:
+            df_y[c] = pd.to_numeric(df_y[c], errors="coerce").fillna(0.0)
+    for c in ["_nm_cap", "_nm_def"]:
+        if c in df_y.columns:
+            df_y[c] = pd.to_numeric(df_y[c], errors="coerce").fillna(0).astype(int)
 
-    df_y["_limit"] = df_y["YearInt"].apply(_limit_for_year)
-    df_y["_partial"] = df_y["_nm"].astype(int) < df_y["_limit"].astype(int)
+    # Choose bar values per-year: capped years use cap-window, others use default-window
+    df_y["_bar_limit"] = df_y["YearInt"].apply(_limit_for_year)
+    df_y["_yoy_limit"] = df_y["YearInt"].apply(_yoy_limit_for_year)
+
+    def _pick_bar(row, base: str) -> float:
+        use_cap = int(row["_bar_limit"]) == end_month_int
+        return float(row[f"{base}_cap"] if use_cap else row[f"{base}_def"])
+
+    def _pick_nm(row) -> int:
+        use_cap = int(row["_bar_limit"]) == end_month_int
+        return int(row["_nm_cap"] if use_cap else row["_nm_def"])
+
+    df_y["Inc"] = df_y.apply(lambda r: _pick_bar(r, "Inc"), axis=1)
+    df_y["Out"] = df_y.apply(lambda r: _pick_bar(r, "Out"), axis=1)
+    df_y["Dom"] = df_y.apply(lambda r: _pick_bar(r, "Dom"), axis=1)
+    df_y["Total"] = df_y["Inc"] + df_y["Out"] + df_y["Dom"]
+    df_y["_nm"] = df_y.apply(_pick_nm, axis=1)
+
+    # Partial marker for bar-label: months observed < months required for that bar's window
+    df_y["_partial"] = df_y.apply(lambda r: int(r["_nm"]) < int(r["_bar_limit"]), axis=1)
     df_y["YearLabel"] = df_y["YearInt"].astype(int).astype(str) + df_y["_partial"].apply(lambda v: "*" if bool(v) else "")
 
-    df_y["Total"] = df_y[inc_col] + df_y[out_col] + df_y[dom_col]
-    df_y["YoY"] = df_y["Total"].pct_change() * 100
+    # YoY uses its own window per-year; baseline is previous year using the same window (important for 2025 Jan–Sep vs 2024 Jan–Sep)
+    def _total_upto(row, limit_month: int) -> float:
+        if int(limit_month) == end_month_int:
+            return float(row["Total_cap"])
+        return float(row["Total_def"])
 
-    prev_partial = df_y["_partial"].shift(1).fillna(False)
-    df_y["_yoy_partial"] = (df_y["_partial"] | prev_partial).astype(bool)
+    yoy_vals: list[float | None] = []
+    yoy_partial_flags: list[bool] = []
+
+    # Compute YoY using DataFrame lookup (avoid itertuples renaming for columns like _nm_def)
+    df_idx = df_y.set_index("YearInt", drop=False)
+    years_sorted = df_y["YearInt"].astype(int).tolist()
+    for y in years_sorted:
+        lim = int(_yoy_limit_for_year(y))
+        if int(y) not in df_idx.index or int(y) - 1 not in df_idx.index:
+            yoy_vals.append(None)
+            yoy_partial_flags.append(False)
+            continue
+
+        cur_total = float(df_idx.at[int(y), "Total_cap"] if lim == end_month_int else df_idx.at[int(y), "Total_def"])
+        prev_total = float(df_idx.at[int(y) - 1, "Total_cap"] if lim == end_month_int else df_idx.at[int(y) - 1, "Total_def"])
+        if prev_total == 0 or pd.isna(prev_total):
+            yoy_vals.append(None)
+        else:
+            yoy_vals.append((cur_total - prev_total) / prev_total * 100)
+
+        cur_nm = int(df_idx.at[int(y), "_nm_cap"] if lim == end_month_int else df_idx.at[int(y), "_nm_def"])
+        prev_nm = int(df_idx.at[int(y) - 1, "_nm_cap"] if lim == end_month_int else df_idx.at[int(y) - 1, "_nm_def"])
+        yoy_partial_flags.append((cur_nm < lim) or (prev_nm < lim))
+
+    df_y["YoY"] = yoy_vals
+    df_y["_yoy_partial"] = yoy_partial_flags
 
     scale_factor = 1e9
 
@@ -573,7 +668,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
     fig.add_trace(
         go.Bar(
             x=x_years,
-            y=df_y[inc_col] / scale_factor,
+            y=df_y["Inc"] / scale_factor,
             name="Incoming",
             marker=dict(color="#F5B0CB", line=dict(width=0)),
             hovertemplate="%{x}<br>Incoming: Rp %{y:,.2f} Miliar<extra></extra>",
@@ -583,7 +678,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
     fig.add_trace(
         go.Bar(
             x=x_years,
-            y=df_y[out_col] / scale_factor,
+            y=df_y["Out"] / scale_factor,
             name="Outgoing",
             marker=dict(color="#F5CBA7", line=dict(width=0)),
             hovertemplate="%{x}<br>Outgoing: Rp %{y:,.2f} Miliar<extra></extra>",
@@ -593,7 +688,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
     fig.add_trace(
         go.Bar(
             x=x_years,
-            y=df_y[dom_col] / scale_factor,
+            y=df_y["Dom"] / scale_factor,
             name="Domestik",
             marker=dict(color="#5DADE2", line=dict(width=0)),
             hovertemplate="%{x}<br>Domestik: Rp %{y:,.2f} Miliar<extra></extra>",
@@ -667,15 +762,20 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
 
     month_label = f"Jan–{calendar.month_name[end_month_int][:3]}"
     full_label = "Jan–Dec" if default_end_month_int == 12 else f"Jan–{calendar.month_name[default_end_month_int][:3]}"
-    mixed_suffix = (
-        f" (hanya {', '.join(str(y) for y in sorted(cap_years_set))} pakai {month_label}; lainnya {full_label})"
+    bar_suffix = (
+        f" (bar: hanya {', '.join(str(y) for y in sorted(cap_years_set))} pakai {month_label}; lainnya {full_label})"
         if cap_years_set is not None
+        else ""
+    )
+    yoy_suffix = (
+        f" (YoY: hanya {', '.join(str(y) for y in sorted(yoy_cap_years_set))} pakai {month_label} vs tahun sebelumnya {month_label})"
+        if yoy_cap_years_set is not None
         else ""
     )
 
     fig.update_layout(
         title=dict(
-            text=f"Perkembangan Nilai Transaksi Tahunan{mixed_suffix} - Stacked & YoY (%)",
+            text=f"Perkembangan Nilai Transaksi Tahunan{bar_suffix}{yoy_suffix} - Stacked & YoY (%)",
             font=dict(size=title_fs, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
         ),
         barmode="stack",
