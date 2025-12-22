@@ -1372,6 +1372,7 @@ def make_overall_total_stacked_growth_chart(
         return span * 0.015 if span > 0 else 1.0
 
     label_y_values: list[float] = []
+    min_label_gap = 1  # will be recalculated after y2_offset_unit is known
 
     def _add_last_point_label_trace(
         *,
@@ -1391,8 +1392,20 @@ def make_overall_total_stacked_growth_chart(
 
         # Sesuaikan ukuran kotak dengan panjang teks agar tulisan tidak "keluar" dari box
         safe_text = str(text)
-        # Teks saja (tanpa kotak putih) supaya tidak "beleber"
-        placed_y = y_num + float(y_offset)
+
+        # Cari slot y yang tidak terlalu dekat dengan label lain (auto spacing)
+        def _find_non_overlap_y(target_y: float) -> float:
+            step = max(float(min_label_gap), 0.1)
+            pos = float(target_y)
+            direction = 1.0
+            tries = 0
+            while any(abs(pos - existing) < step for existing in label_y_values) and tries < 14:
+                pos += direction * step
+                direction *= -1
+                tries += 1
+            return pos
+
+        placed_y = _find_non_overlap_y(y_num + float(y_offset))
         label_y_values.append(float(placed_y))
         fig.add_trace(
             go.Scatter(
@@ -1407,7 +1420,13 @@ def make_overall_total_stacked_growth_chart(
                 cliponaxis=True,
                 text=[f"<b>{safe_text}</b>"],
                 textposition="middle right",
-                textfont=dict(size=LABEL_FONT_SIZE, color=border_color, family="Inter, Arial, sans-serif"),
+                textfont=dict(
+                    size=LABEL_FONT_SIZE,
+                    color=border_color,
+                    family="Inter, Arial, sans-serif",
+                    # Tipiskan pemisah visual via text shadow (Plotly tidak punya border untuk textfont)
+                    shadow="0px 0px 1px #ffffff",
+                ),
                 hoverinfo="skip",
             )
         )
@@ -1472,6 +1491,8 @@ def make_overall_total_stacked_growth_chart(
     ))
 
     y2_offset_unit = _calc_y2_offset_unit()
+    # Gap minimum antar label (supaya tidak tumpang tindih) disesuaikan skala data
+    min_label_gap = max(y2_offset_unit * 0.8, 0.6)
 
     def _add_breakdown_growth(prefix: str, label: str, base_color: str, dash_qoq: str, yshift_base: int):
         yoy_col = f"_{prefix}_yoy"
