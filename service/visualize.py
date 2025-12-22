@@ -48,7 +48,7 @@ def make_stacked_bar_line_chart_combined(
     df_merged = df_merged[df_merged[growth_col].notnull()]
     
     # Scale to Miliar
-    scale_factor = 1e9
+    scale_factor = 1e12
     
     fs = int(font_size) if font_size is not None else 12
     x_tick_fs = int(axis_x_tick_font_size) if axis_x_tick_font_size is not None else max(fs - 1, 9)
@@ -248,8 +248,8 @@ def make_yearly_stacked_bar_yoy_chart(
     prev_partial = df_y["_partial"].shift(1).fillna(False)
     df_y["_yoy_partial"] = (df_y["_partial"] | prev_partial).astype(bool)
 
-    # Scale to Rp Miliar
-    scale_factor = 1e9
+    # Scale to Rp Triliun
+    scale_factor = 1e12
 
     fs = int(font_size) if font_size is not None else 12
     x_tick_fs = int(axis_x_tick_font_size) if axis_x_tick_font_size is not None else max(fs - 1, 9)
@@ -270,7 +270,7 @@ def make_yearly_stacked_bar_yoy_chart(
             y=df_y[inc_col] / scale_factor,
             name="Incoming",
             marker=dict(color="#F5B0CB", line=dict(width=0)),
-            hovertemplate="%{x}<br>Incoming: Rp %{y:,.2f} Miliar<extra></extra>",
+            hovertemplate="%{x}<br>Incoming: Rp %{y:,.2f} T<extra></extra>",
             yaxis="y1",
         )
     )
@@ -280,7 +280,7 @@ def make_yearly_stacked_bar_yoy_chart(
             y=df_y[out_col] / scale_factor,
             name="Outgoing",
             marker=dict(color="#F5CBA7", line=dict(width=0)),
-            hovertemplate="%{x}<br>Outgoing: Rp %{y:,.2f} Miliar<extra></extra>",
+            hovertemplate="%{x}<br>Outgoing: Rp %{y:,.2f} T<extra></extra>",
             yaxis="y1",
         )
     )
@@ -290,7 +290,7 @@ def make_yearly_stacked_bar_yoy_chart(
             y=df_y[dom_col] / scale_factor,
             name="Domestik",
             marker=dict(color="#5DADE2", line=dict(width=0)),
-            hovertemplate="%{x}<br>Domestik: Rp %{y:,.2f} Miliar<extra></extra>",
+            hovertemplate="%{x}<br>Domestik: Rp %{y:,.2f} T<extra></extra>",
             yaxis="y1",
         )
     )
@@ -385,8 +385,8 @@ def make_yearly_stacked_bar_yoy_chart(
             linecolor="#d1d5db",
         ),
         yaxis=dict(
-            title=dict(text="Rp Miliar", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
-            tickformat=",.0f",
+            title=dict(text="Nilai (Rp Triliun)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            tickformat=",.2f",
             tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
             showgrid=True,
             gridcolor="#e5e7eb",
@@ -671,7 +671,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
             y=df_y["Inc"] / scale_factor,
             name="Incoming",
             marker=dict(color="#F5B0CB", line=dict(width=0)),
-            hovertemplate="%{x}<br>Incoming: Rp %{y:,.2f} Miliar<extra></extra>",
+            hovertemplate="%{x}<br>Incoming: Rp %{y:,.2f} T<extra></extra>",
             yaxis="y1",
         )
     )
@@ -681,7 +681,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
             y=df_y["Out"] / scale_factor,
             name="Outgoing",
             marker=dict(color="#F5CBA7", line=dict(width=0)),
-            hovertemplate="%{x}<br>Outgoing: Rp %{y:,.2f} Miliar<extra></extra>",
+            hovertemplate="%{x}<br>Outgoing: Rp %{y:,.2f} T<extra></extra>",
             yaxis="y1",
         )
     )
@@ -691,7 +691,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
             y=df_y["Dom"] / scale_factor,
             name="Domestik",
             marker=dict(color="#5DADE2", line=dict(width=0)),
-            hovertemplate="%{x}<br>Domestik: Rp %{y:,.2f} Miliar<extra></extra>",
+            hovertemplate="%{x}<br>Domestik: Rp %{y:,.2f} T<extra></extra>",
             yaxis="y1",
         )
     )
@@ -775,7 +775,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
 
     fig.update_layout(
         title=dict(
-            text=f"Perkembangan Nilai Transaksi Tahunan{bar_suffix}{yoy_suffix} - Stacked & YoY (%)",
+            text=f"Perkembangan Nilai Transaksi Tahunan YoY (%)",
             font=dict(size=title_fs, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
         ),
         barmode="stack",
@@ -797,8 +797,8 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
             linecolor="#d1d5db",
         ),
         yaxis=dict(
-            title=dict(text="Rp Miliar", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
-            tickformat=",.0f",
+            title=dict(text="Nilai (Rp Triliun)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            tickformat=",.2f",
             tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
             showgrid=True,
             gridcolor="#e5e7eb",

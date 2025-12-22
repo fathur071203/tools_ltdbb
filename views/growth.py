@@ -1766,8 +1766,14 @@ if st.session_state['df'] is not None:
                 chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
 
-            st.markdown("<h3 style='margin-top: 20px; margin-bottom: 15px;'>📊 Grafik Tahunan (Khusus 2025 = Jan–Sep) - Nilai Transaksi (Stacked) + YoY (%)</h3>", unsafe_allow_html=True)
-            st.caption("Bar 2025 memakai akumulasi Januari–September, tahun lainnya Januari–Desember. Untuk YoY 2025: bandingkan Jan–Sep 2025 vs Jan–Sep 2024; YoY 2024 tetap full-year vs 2023.")
+            st.markdown(
+                "<h3 style='margin-top: 20px; margin-bottom: 15px;'>📊 Grafik Tahunan (Khusus 2025 = Jan–Sep) — Nilai Transaksi (Rp Triliun) + YoY (%)</h3>",
+                unsafe_allow_html=True,
+            )
+            st.caption(
+                "Sumbu nilai dalam Rp Triliun (Rp T). Bar 2025 memakai akumulasi Jan–Sep, tahun lainnya Jan–Des. "
+                "Untuk YoY 2025: bandingkan Jan–Sep 2025 vs Jan–Sep 2024; YoY 2024 tetap full-year vs 2023."
+            )
             make_yearly_stacked_bar_yoy_chart_ytd(
                 df_inc=df_nom_inc_month_filtered,
                 df_out=df_nom_out_month_filtered,
