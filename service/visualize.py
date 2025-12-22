@@ -5,6 +5,21 @@ import plotly.graph_objects as go
 import calendar
 
 
+def _tick_family_for_weight(weight: str | None) -> str:
+    """Map ketebalan ke font-family (fallback aman lintas Windows/browser)."""
+    w = (weight or "").strip().lower()
+    if w in {"black", "heavy", "extrabold", "extra bold"}:
+        return "Inter Black, Inter ExtraBold, Segoe UI Black, Arial Black, Inter, Segoe UI, Arial, sans-serif"
+    if w in {"bold"}:
+        return "Inter Bold, Segoe UI Bold, Arial Black, Inter, Segoe UI, Arial, sans-serif"
+    if w in {"semibold", "semi bold", "demibold", "demi bold"}:
+        return "Inter SemiBold, Segoe UI Semibold, Arial Black, Inter, Segoe UI, Arial, sans-serif"
+    if w in {"medium"}:
+        return "Inter Medium, Segoe UI Semilight, Segoe UI, Arial, sans-serif"
+    # normal/default
+    return "Inter, Segoe UI, Arial, sans-serif"
+
+
 def make_stacked_bar_line_chart_combined(
     df_inc,
     df_out,
@@ -16,6 +31,8 @@ def make_stacked_bar_line_chart_combined(
     legend_font_size: int | None = None,
     axis_x_tick_font_size: int | None = None,
     axis_y_tick_font_size: int | None = None,
+    axis_x_tick_bold: bool | None = None,
+    axis_y_tick_bold: bool | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -58,6 +75,21 @@ def make_stacked_bar_line_chart_combined(
     hover_fs = fs
     label_fs = int(label_font_size) if label_font_size is not None else y_tick_fs
     legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
+    base_family = "Inter, Segoe UI, Arial, sans-serif"
+    bold_family = "Inter SemiBold, Segoe UI Semibold, Arial Black, Inter, Segoe UI, Arial, sans-serif"
+    x_tick_family = bold_family if bool(axis_x_tick_bold) else base_family
+    y_tick_family = bold_family if bool(axis_y_tick_bold) else base_family
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
 
     fig = go.Figure()
     
@@ -124,7 +156,7 @@ def make_stacked_bar_line_chart_combined(
             linewidth=2,
             linecolor='#d1d5db',
             tickangle=-45,
-            tickfont=dict(size=x_tick_fs, family='Inter, Arial, sans-serif')
+            tickfont=dict(size=x_tick_fs, family=x_tick_family, color=x_tick_color)
         ),
         yaxis=dict(
             title=dict(text="Nilai (Rp Miliar)", font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif'), standoff=15),
@@ -135,7 +167,7 @@ def make_stacked_bar_line_chart_combined(
             zeroline=True,
             zerolinewidth=2,
             zerolinecolor='#d1d5db',
-            tickfont=dict(size=y_tick_fs, family='Inter, Arial, sans-serif')
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color)
         ),
         yaxis2=dict(
             title=dict(text='Growth (%)', font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif'), standoff=15),
@@ -143,7 +175,7 @@ def make_stacked_bar_line_chart_combined(
             side='right',
             tickformat=".1f",
             showgrid=False,
-            tickfont=dict(size=y_tick_fs, family='Inter, Arial, sans-serif')
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color)
         ),
         template="plotly_white",
         paper_bgcolor='white',
@@ -184,9 +216,14 @@ def make_yearly_stacked_bar_yoy_chart(
     df_dom: pd.DataFrame,
     *,
     font_size: int | None = None,
+    label_font_size: int | None = None,
     legend_font_size: int | None = None,
     axis_x_tick_font_size: int | None = None,
     axis_y_tick_font_size: int | None = None,
+    axis_x_tick_bold: bool | None = None,
+    axis_y_tick_bold: bool | None = None,
+    axis_x_tick_weight: str | None = None,
+    axis_y_tick_weight: str | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -257,7 +294,16 @@ def make_yearly_stacked_bar_yoy_chart(
     axis_title_fs = fs + 2
     title_fs = fs + 10
     hover_fs = fs
+    label_fs = int(label_font_size) if label_font_size is not None else y_tick_fs
     legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
+    base_family = "Inter, Segoe UI, Arial, sans-serif"
+    x_tick_weight_eff = axis_x_tick_weight if axis_x_tick_weight is not None else ("semibold" if bool(axis_x_tick_bold) else "normal")
+    y_tick_weight_eff = axis_y_tick_weight if axis_y_tick_weight is not None else ("semibold" if bool(axis_y_tick_bold) else "normal")
+    x_tick_family = _tick_family_for_weight(x_tick_weight_eff)
+    y_tick_family = _tick_family_for_weight(y_tick_weight_eff)
+    x_tick_color = "#111827" if (str(x_tick_weight_eff).lower() not in ("", "normal")) else "#374151"
+    y_tick_color = "#111827" if (str(y_tick_weight_eff).lower() not in ("", "normal")) else "#374151"
 
     fig = go.Figure()
 
@@ -345,7 +391,7 @@ def make_yearly_stacked_bar_yoy_chart(
                 showarrow=False,
                 xanchor="center",
                 yanchor="bottom",
-                font=dict(size=max(9, fs), family="Inter, Arial, sans-serif", color="#111827"),
+                font=dict(size=max(9, label_fs), family=y_tick_family, color="#111827"),
                 bgcolor="rgba(245, 158, 11, 0.95)",
                 bordercolor="rgba(245, 158, 11, 1.0)",
                 borderwidth=0,
@@ -372,8 +418,11 @@ def make_yearly_stacked_bar_yoy_chart(
         plot_bgcolor="#f9fafb",
         font=dict(family="Inter, Arial, sans-serif", size=fs),
         xaxis=dict(
-            title=dict(text="Tahun", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
-            tickfont=dict(size=x_tick_fs, family="Inter, Arial, sans-serif"),
+            title=dict(
+                text="Tahun",
+                font=dict(size=axis_title_fs, family=_tick_family_for_weight("bold"), color="#111827"),
+            ),
+            tickfont=dict(size=x_tick_fs, family=x_tick_family, color=x_tick_color),
             type="linear",
             tickmode="array",
             tickvals=x_years,
@@ -385,18 +434,24 @@ def make_yearly_stacked_bar_yoy_chart(
             linecolor="#d1d5db",
         ),
         yaxis=dict(
-            title=dict(text="Nilai (Rp Triliun)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            title=dict(
+                text="Nilai (Rp Triliun)",
+                font=dict(size=axis_title_fs, family=_tick_family_for_weight("bold"), color="#111827"),
+            ),
             tickformat=",.2f",
-            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color),
             showgrid=True,
             gridcolor="#e5e7eb",
         ),
         yaxis2=dict(
-            title=dict(text="YoY (%)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            title=dict(
+                text="YoY (%)",
+                font=dict(size=axis_title_fs, family=_tick_family_for_weight("bold"), color="#111827"),
+            ),
             overlaying="y",
             side="right",
             tickformat=".0f",
-            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color),
             showgrid=False,
             range=y2_range,
         ),
@@ -436,9 +491,14 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
     default_end_month: int = 12,
     yoy_cap_years: set[int] | None = None,
     font_size: int | None = None,
+    label_font_size: int | None = None,
     legend_font_size: int | None = None,
     axis_x_tick_font_size: int | None = None,
     axis_y_tick_font_size: int | None = None,
+    axis_x_tick_bold: bool | None = None,
+    axis_y_tick_bold: bool | None = None,
+    axis_x_tick_weight: str | None = None,
+    axis_y_tick_weight: str | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -650,7 +710,8 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
     df_y["YoY"] = yoy_vals
     df_y["_yoy_partial"] = yoy_partial_flags
 
-    scale_factor = 1e9
+    # Scale to Rp Triliun
+    scale_factor = 1e12
 
     fs = int(font_size) if font_size is not None else 12
     x_tick_fs = int(axis_x_tick_font_size) if axis_x_tick_font_size is not None else max(fs - 1, 9)
@@ -658,7 +719,18 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
     axis_title_fs = fs + 2
     title_fs = fs + 10
     hover_fs = fs
+    label_fs = int(label_font_size) if label_font_size is not None else y_tick_fs
     legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
+    base_family = "Inter, Segoe UI, Arial, sans-serif"
+    x_tick_weight_eff = axis_x_tick_weight if axis_x_tick_weight is not None else ("semibold" if bool(axis_x_tick_bold) else "normal")
+    y_tick_weight_eff = axis_y_tick_weight if axis_y_tick_weight is not None else ("semibold" if bool(axis_y_tick_bold) else "normal")
+    x_tick_family = _tick_family_for_weight(x_tick_weight_eff)
+    y_tick_family = _tick_family_for_weight(y_tick_weight_eff)
+    x_tick_color = "#111827" if (str(x_tick_weight_eff).lower() not in ("", "normal")) else "#374151"
+    y_tick_color = "#111827" if (str(y_tick_weight_eff).lower() not in ("", "normal")) else "#374151"
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
 
     fig = go.Figure()
 
@@ -745,7 +817,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
                 showarrow=False,
                 xanchor="center",
                 yanchor="bottom",
-                font=dict(size=max(9, fs), family="Inter, Arial, sans-serif", color="#111827"),
+                font=dict(size=max(9, label_fs), family=y_tick_family, color="#111827"),
                 bgcolor="rgba(245, 158, 11, 0.95)",
                 bordercolor="rgba(245, 158, 11, 1.0)",
                 borderwidth=0,
@@ -784,8 +856,11 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
         plot_bgcolor="#f9fafb",
         font=dict(family="Inter, Arial, sans-serif", size=fs),
         xaxis=dict(
-            title=dict(text="Tahun", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
-            tickfont=dict(size=x_tick_fs, family="Inter, Arial, sans-serif"),
+            title=dict(
+                text="Tahun",
+                font=dict(size=axis_title_fs, family=_tick_family_for_weight("bold"), color="#111827"),
+            ),
+            tickfont=dict(size=x_tick_fs, family=x_tick_family, color=x_tick_color),
             type="linear",
             tickmode="array",
             tickvals=x_years,
@@ -797,18 +872,24 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
             linecolor="#d1d5db",
         ),
         yaxis=dict(
-            title=dict(text="Nilai (Rp Triliun)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            title=dict(
+                text="Nilai (Rp Triliun)",
+                font=dict(size=axis_title_fs, family=_tick_family_for_weight("bold"), color="#111827"),
+            ),
             tickformat=",.2f",
-            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color),
             showgrid=True,
             gridcolor="#e5e7eb",
         ),
         yaxis2=dict(
-            title=dict(text="YoY (%)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            title=dict(
+                text="YoY (%)",
+                font=dict(size=axis_title_fs, family=_tick_family_for_weight("bold"), color="#111827"),
+            ),
             overlaying="y",
             side="right",
             tickformat=".0f",
-            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color),
             showgrid=False,
             range=y2_range,
         ),
@@ -1041,6 +1122,8 @@ def make_quarter_vs_quarter_chart(
     legend_font_size: int | None = None,
     axis_x_tick_font_size: int | None = None,
     axis_y_tick_font_size: int | None = None,
+    axis_x_tick_bold: bool | None = None,
+    axis_y_tick_bold: bool | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -1114,6 +1197,14 @@ def make_quarter_vs_quarter_chart(
     label_fs = int(label_font_size) if label_font_size is not None else y_tick_fs
     legend_fs = int(legend_font_size) if legend_font_size is not None else fs
 
+    base_family = "Inter, Segoe UI, Arial, sans-serif"
+    bold_family = "Inter SemiBold, Segoe UI Semibold, Arial Black, Inter, Segoe UI, Arial, sans-serif"
+    x_tick_family = bold_family if bool(axis_x_tick_bold) else base_family
+    y_tick_family = bold_family if bool(axis_y_tick_bold) else base_family
+
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
+
     delta_pct = None
     if pd.notna(val_a) and pd.notna(val_b) and float(val_a) != 0:
         delta_pct = ((float(val_b) - float(val_a)) / float(val_a)) * 100
@@ -1171,7 +1262,7 @@ def make_quarter_vs_quarter_chart(
             showline=True,
             linewidth=2,
             linecolor="#d1d5db",
-            tickfont=dict(size=x_tick_fs, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=x_tick_fs, family=x_tick_family, color=x_tick_color),
         ),
         yaxis=dict(
             title=dict(text=y_title, font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
@@ -1182,7 +1273,7 @@ def make_quarter_vs_quarter_chart(
             zeroline=True,
             zerolinewidth=2,
             zerolinecolor="#d1d5db",
-            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif")
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color)
         ),
         template="plotly_white",
         paper_bgcolor="white",
@@ -1228,6 +1319,8 @@ def make_quarter_vs_quarter_chart_total_breakdown(
     legend_font_size: int | None = None,
     axis_x_tick_font_size: int | None = None,
     axis_y_tick_font_size: int | None = None,
+    axis_x_tick_bold: bool | None = None,
+    axis_y_tick_bold: bool | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -1324,6 +1417,13 @@ def make_quarter_vs_quarter_chart_total_breakdown(
     label_fs = int(label_font_size) if label_font_size is not None else y_tick_fs
     legend_fs = int(legend_font_size) if legend_font_size is not None else fs
 
+    base_family = "Inter, Segoe UI, Arial, sans-serif"
+    bold_family = "Inter SemiBold, Segoe UI Semibold, Arial Black, Inter, Segoe UI, Arial, sans-serif"
+    x_tick_family = bold_family if bool(axis_x_tick_bold) else base_family
+    y_tick_family = bold_family if bool(axis_y_tick_bold) else base_family
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
+
     fig = go.Figure()
 
     # Stacked bars seperti Grafik Gabungan
@@ -1401,7 +1501,7 @@ def make_quarter_vs_quarter_chart_total_breakdown(
             showline=True,
             linewidth=2,
             linecolor="#d1d5db",
-            tickfont=dict(size=x_tick_fs, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=x_tick_fs, family=x_tick_family, color=x_tick_color),
         ),
         yaxis=dict(
             title=dict(text=y_title, font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
@@ -1412,7 +1512,7 @@ def make_quarter_vs_quarter_chart_total_breakdown(
             zeroline=True,
             zerolinewidth=2,
             zerolinecolor="#d1d5db",
-            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif")
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color)
         ),
         template="plotly_white",
         paper_bgcolor="white",
@@ -1604,6 +1704,8 @@ def make_combined_bar_line_chart(
     legend_font_size: int | None = None,
     axis_x_tick_font_size: int | None = None,
     axis_y_tick_font_size: int | None = None,
+    axis_x_tick_bold: bool | None = None,
+    axis_y_tick_bold: bool | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -1663,6 +1765,13 @@ def make_combined_bar_line_chart(
     title_fs = fs + 10
     hover_fs = fs
     legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
+    base_family = "Inter, Segoe UI, Arial, sans-serif"
+    bold_family = "Inter SemiBold, Segoe UI Semibold, Arial Black, Inter, Segoe UI, Arial, sans-serif"
+    x_tick_family = bold_family if bool(axis_x_tick_bold) else base_family
+    y_tick_family = bold_family if bool(axis_y_tick_bold) else base_family
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
 
     fig = go.Figure()
 
@@ -1761,7 +1870,7 @@ def make_combined_bar_line_chart(
             linewidth=2,
             linecolor='#d1d5db',
             tickangle=-45,
-            tickfont=dict(size=x_tick_fs, family='Inter, Arial, sans-serif')
+            tickfont=dict(size=x_tick_fs, family=x_tick_family, color=x_tick_color)
         ),
         yaxis=dict(
             title=dict(text=bar_yaxis_title, font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
@@ -1772,7 +1881,7 @@ def make_combined_bar_line_chart(
             zeroline=True,
             zerolinewidth=2,
             zerolinecolor='#d1d5db',
-            tickfont=dict(size=y_tick_fs, family='Inter, Arial, sans-serif')
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color)
         ),
         yaxis2=dict(
             title=dict(text='Growth (%)', font=dict(size=axis_title_fs, family='Inter, Arial, sans-serif')),
@@ -1780,7 +1889,7 @@ def make_combined_bar_line_chart(
             side='right',
             tickformat=".1f",
             showgrid=False,
-            tickfont=dict(size=y_tick_fs, family='Inter, Arial, sans-serif')
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color)
         ),
         template="plotly_white",
         paper_bgcolor='white',
@@ -1801,15 +1910,14 @@ def make_combined_bar_line_chart(
         hoverlabel=dict(
             bgcolor="white",
             font_size=hover_fs,
-            font_family="Inter, Arial, sans-serif"
-        )
+            font_family="Inter, Arial, sans-serif",
+        ),
     )
 
     if chart_height is not None:
         fig.update_layout(height=int(chart_height))
 
     if chart_width is not None and int(chart_width) > 0:
-        fig.update_layout(width=int(chart_width))
         st.plotly_chart(fig, use_container_width=False)
     else:
         st.plotly_chart(fig, use_container_width=True)
@@ -1830,6 +1938,8 @@ def make_overall_total_stacked_growth_chart(
     legend_font_size: int | None = None,
     axis_x_tick_font_size: int | None = None,
     axis_y_tick_font_size: int | None = None,
+    axis_x_tick_bold: bool | None = None,
+    axis_y_tick_bold: bool | None = None,
     chart_height: int | None = None,
     chart_width: int | None = None,
 ):
@@ -1860,6 +1970,13 @@ def make_overall_total_stacked_growth_chart(
     title_fs = fs + 10
     hover_fs = fs
     legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
+    base_family = "Inter, Segoe UI, Arial, sans-serif"
+    bold_family = "Inter SemiBold, Segoe UI Semibold, Arial Black, Inter, Segoe UI, Arial, sans-serif"
+    x_tick_family = bold_family if bool(axis_x_tick_bold) else base_family
+    y_tick_family = bold_family if bool(axis_y_tick_bold) else base_family
+    x_tick_color = "#111827" if bool(axis_x_tick_bold) else "#374151"
+    y_tick_color = "#111827" if bool(axis_y_tick_bold) else "#374151"
 
     LABEL_FONT_SIZE = int(label_font_size) if label_font_size is not None else 12
     # Offset dibuat kecil agar label % tetap “mepet” dengan titiknya (bukan naik/serong jauh)
@@ -2291,7 +2408,7 @@ def make_overall_total_stacked_growth_chart(
             linewidth=2,
             linecolor="#d1d5db",
             tickangle=-45,
-            tickfont=dict(size=x_tick_fs, family="Inter, Arial, sans-serif"),
+            tickfont=dict(size=x_tick_fs, family=x_tick_family, color=x_tick_color),
         ),
         yaxis=dict(
             title=dict(text=y_title, font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
@@ -2302,7 +2419,7 @@ def make_overall_total_stacked_growth_chart(
             zeroline=True,
             zerolinewidth=2,
             zerolinecolor="#d1d5db",
-            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif")
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color)
         ),
         yaxis2=dict(
             title=dict(text="Growth (%)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
@@ -2311,7 +2428,7 @@ def make_overall_total_stacked_growth_chart(
             tickformat=".1f",
             showgrid=False,
             range=y2_range,
-            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif")
+            tickfont=dict(size=y_tick_fs, family=y_tick_family, color=y_tick_color)
         ),
         template="plotly_white",
         paper_bgcolor="white",

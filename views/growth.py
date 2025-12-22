@@ -432,6 +432,19 @@ if st.session_state['df'] is not None:
                 key="growth_axis_x_tick_font_size",
                 help="Mengatur ukuran angka pada sumbu X (horizontal/periode).",
             )
+            st.checkbox(
+                "Bold Angka Sumbu X",
+                value=bool(st.session_state.get("growth_axis_x_tick_bold", True)),
+                key="growth_axis_x_tick_bold",
+                help="Menebalkan angka pada sumbu X.",
+            )
+            st.selectbox(
+                "Ketebalan Angka Sumbu X",
+                options=["Normal", "Medium", "SemiBold", "Bold", "Black"],
+                index=["Normal", "Medium", "SemiBold", "Bold", "Black"].index(str(st.session_state.get("growth_axis_x_tick_weight", "SemiBold"))),
+                key="growth_axis_x_tick_weight",
+                help="Mengatur seberapa tebal angka pada sumbu X. Ini override checkbox Bold.",
+            )
             st.slider(
                 "Ukuran Angka Sumbu Y",
                 min_value=8,
@@ -440,6 +453,19 @@ if st.session_state['df'] is not None:
                 step=1,
                 key="growth_axis_y_tick_font_size",
                 help="Mengatur ukuran angka pada sumbu Y (kiri & kanan/nilai & growth).",
+            )
+            st.checkbox(
+                "Bold Angka Sumbu Y",
+                value=bool(st.session_state.get("growth_axis_y_tick_bold", True)),
+                key="growth_axis_y_tick_bold",
+                help="Menebalkan angka pada sumbu Y (termasuk sumbu kanan jika ada).",
+            )
+            st.selectbox(
+                "Ketebalan Angka Sumbu Y",
+                options=["Normal", "Medium", "SemiBold", "Bold", "Black"],
+                index=["Normal", "Medium", "SemiBold", "Bold", "Black"].index(str(st.session_state.get("growth_axis_y_tick_weight", "SemiBold"))),
+                key="growth_axis_y_tick_weight",
+                help="Mengatur seberapa tebal angka pada sumbu Y. Ini override checkbox Bold.",
             )
             st.slider(
                 "Ukuran Legend (Legenda Grafik)",
@@ -482,6 +508,10 @@ if st.session_state['df'] is not None:
         _growth_font_size = int(st.session_state.get("growth_font_size", 12))
         _growth_axis_x_tick_font_size = int(st.session_state.get("growth_axis_x_tick_font_size", max(_growth_font_size - 1, 9)))
         _growth_axis_y_tick_font_size = int(st.session_state.get("growth_axis_y_tick_font_size", max(_growth_font_size - 1, 9)))
+        _growth_axis_x_tick_bold = bool(st.session_state.get("growth_axis_x_tick_bold", True))
+        _growth_axis_y_tick_bold = bool(st.session_state.get("growth_axis_y_tick_bold", True))
+        _growth_axis_x_tick_weight = str(st.session_state.get("growth_axis_x_tick_weight", "SemiBold"))
+        _growth_axis_y_tick_weight = str(st.session_state.get("growth_axis_y_tick_weight", "SemiBold"))
         _growth_legend_font_size = int(st.session_state.get("growth_legend_font_size", _growth_font_size))
         _growth_label_font_size = int(st.session_state.get("growth_label_font_size", 12))
         _growth_chart_height = int(st.session_state.get("growth_chart_height", 560))
@@ -816,6 +846,8 @@ if st.session_state['df'] is not None:
                 legend_font_size=_growth_legend_font_size,
                 axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                 axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                axis_x_tick_bold=_growth_axis_x_tick_bold,
+                axis_y_tick_bold=_growth_axis_y_tick_bold,
                 chart_height=_growth_chart_height,
                 chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
@@ -895,6 +927,8 @@ if st.session_state['df'] is not None:
                     legend_font_size=_growth_legend_font_size,
                     axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                     axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                    axis_x_tick_bold=_growth_axis_x_tick_bold,
+                    axis_y_tick_bold=_growth_axis_y_tick_bold,
                     chart_height=_growth_chart_height,
                     chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
@@ -913,6 +947,8 @@ if st.session_state['df'] is not None:
                     legend_font_size=_growth_legend_font_size,
                     axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                     axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                    axis_x_tick_bold=_growth_axis_x_tick_bold,
+                    axis_y_tick_bold=_growth_axis_y_tick_bold,
                     chart_height=_growth_chart_height,
                     chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
@@ -1009,6 +1045,8 @@ if st.session_state['df'] is not None:
                     legend_font_size=_growth_legend_font_size,
                     axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                     axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                    axis_x_tick_bold=_growth_axis_x_tick_bold,
+                    axis_y_tick_bold=_growth_axis_y_tick_bold,
                     chart_height=_growth_chart_height,
                     chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
@@ -1020,6 +1058,8 @@ if st.session_state['df'] is not None:
                     legend_font_size=_growth_legend_font_size,
                     axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                     axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                    axis_x_tick_bold=_growth_axis_x_tick_bold,
+                    axis_y_tick_bold=_growth_axis_y_tick_bold,
                     chart_height=_growth_chart_height,
                     chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
@@ -1061,6 +1101,8 @@ if st.session_state['df'] is not None:
                     legend_font_size=_growth_legend_font_size,
                     axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                     axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                    axis_x_tick_bold=_growth_axis_x_tick_bold,
+                    axis_y_tick_bold=_growth_axis_y_tick_bold,
                     chart_height=_growth_chart_height,
                     chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
@@ -1072,6 +1114,8 @@ if st.session_state['df'] is not None:
                     legend_font_size=_growth_legend_font_size,
                     axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                     axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                    axis_x_tick_bold=_growth_axis_x_tick_bold,
+                    axis_y_tick_bold=_growth_axis_y_tick_bold,
                     chart_height=_growth_chart_height,
                     chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
@@ -1113,6 +1157,8 @@ if st.session_state['df'] is not None:
                     legend_font_size=_growth_legend_font_size,
                     axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                     axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                    axis_x_tick_bold=_growth_axis_x_tick_bold,
+                    axis_y_tick_bold=_growth_axis_y_tick_bold,
                     chart_height=_growth_chart_height,
                     chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
@@ -1124,6 +1170,8 @@ if st.session_state['df'] is not None:
                     legend_font_size=_growth_legend_font_size,
                     axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                     axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                    axis_x_tick_bold=_growth_axis_x_tick_bold,
+                    axis_y_tick_bold=_growth_axis_y_tick_bold,
                     chart_height=_growth_chart_height,
                     chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
                 )
@@ -1205,6 +1253,8 @@ if st.session_state['df'] is not None:
                 legend_font_size=_growth_legend_font_size,
                 axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                 axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                axis_x_tick_bold=_growth_axis_x_tick_bold,
+                axis_y_tick_bold=_growth_axis_y_tick_bold,
                 chart_height=_growth_chart_height,
                 chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
@@ -1234,6 +1284,8 @@ if st.session_state['df'] is not None:
                 legend_font_size=_growth_legend_font_size,
                 axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                 axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                axis_x_tick_bold=_growth_axis_x_tick_bold,
+                axis_y_tick_bold=_growth_axis_y_tick_bold,
                 chart_height=_growth_chart_height,
                 chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
@@ -1526,6 +1578,8 @@ if st.session_state['df'] is not None:
                 legend_font_size=_growth_legend_font_size,
                 axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                 axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                axis_x_tick_bold=_growth_axis_x_tick_bold,
+                axis_y_tick_bold=_growth_axis_y_tick_bold,
                 chart_height=_growth_chart_height,
             )
             make_overall_total_stacked_growth_chart(
@@ -1540,6 +1594,8 @@ if st.session_state['df'] is not None:
                 legend_font_size=_growth_legend_font_size,
                 axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                 axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                axis_x_tick_bold=_growth_axis_x_tick_bold,
+                axis_y_tick_bold=_growth_axis_y_tick_bold,
                 chart_height=_growth_chart_height,
             )
 
@@ -1753,15 +1809,23 @@ if st.session_state['df'] is not None:
                         },
                     )
 
-            st.markdown("<h3 style='margin-bottom: 15px;'>📊 Grafik Tahunan - Nilai Transaksi (Stacked) + YoY (%)</h3>", unsafe_allow_html=True)
+            st.markdown(
+                "<h3 style='margin-bottom: 15px;'>📊 Grafik Tahunan — Nilai Transaksi (Rp Triliun) + YoY (%)</h3>",
+                unsafe_allow_html=True,
+            )
             make_yearly_stacked_bar_yoy_chart(
                 df_inc=df_nom_inc_filtered,
                 df_out=df_nom_out_filtered,
                 df_dom=df_nom_dom_filtered,
                 font_size=_growth_font_size,
+                label_font_size=_growth_label_font_size,
                 legend_font_size=_growth_legend_font_size,
                 axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                 axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                axis_x_tick_bold=_growth_axis_x_tick_bold,
+                axis_y_tick_bold=_growth_axis_y_tick_bold,
+                axis_x_tick_weight=_growth_axis_x_tick_weight,
+                axis_y_tick_weight=_growth_axis_y_tick_weight,
                 chart_height=_growth_chart_height,
                 chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
@@ -1783,9 +1847,14 @@ if st.session_state['df'] is not None:
                 default_end_month=12,
                 yoy_cap_years={2025},
                 font_size=_growth_font_size,
+                label_font_size=_growth_label_font_size,
                 legend_font_size=_growth_legend_font_size,
                 axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                 axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                axis_x_tick_bold=_growth_axis_x_tick_bold,
+                axis_y_tick_bold=_growth_axis_y_tick_bold,
+                axis_x_tick_weight=_growth_axis_x_tick_weight,
+                axis_y_tick_weight=_growth_axis_y_tick_weight,
                 chart_height=_growth_chart_height,
                 chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
