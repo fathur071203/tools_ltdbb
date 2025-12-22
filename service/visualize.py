@@ -696,7 +696,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
         )
     )
 
-    yoy_color = "#7CFA60"
+    yoy_color = "#383B37"
     fig.add_trace(
         go.Scatter(
             x=x_years,
