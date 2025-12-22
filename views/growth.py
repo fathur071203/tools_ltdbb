@@ -676,7 +676,7 @@ if st.session_state['df'] is not None:
             st.markdown(segmented_css, unsafe_allow_html=True)
         
         # Create button group
-        col_q, col_m = st.columns([1, 1], gap="small")
+        col_q, col_m, col_y = st.columns([1, 1, 1], gap="small")
         
         with col_q:
             is_quarterly = st.session_state['view_mode'] == 'quarterly'
@@ -692,6 +692,14 @@ if st.session_state['df'] is not None:
             if st.button("📅 Monthly", key="toggle_monthly", use_container_width=True,
                         type=btn_style):
                 st.session_state['view_mode'] = 'monthly'
+                st.rerun()
+
+        with col_y:
+            is_yearly = st.session_state['view_mode'] == 'yearly'
+            btn_style = "primary" if is_yearly else "secondary"
+            if st.button("🗓️ Yearly", key="toggle_yearly", use_container_width=True,
+                        type=btn_style):
+                st.session_state['view_mode'] = 'yearly'
                 st.rerun()
         
         st.divider()
@@ -1533,6 +1541,246 @@ if st.session_state['df'] is not None:
                 axis_x_tick_font_size=_growth_axis_x_tick_font_size,
                 axis_y_tick_font_size=_growth_axis_y_tick_font_size,
                 chart_height=_growth_chart_height,
+            )
+
+        # YEARLY SECTION
+        if st.session_state['view_mode'] == 'yearly':
+            st.subheader("🗓️ Data Transaksi Tahunan")
+            st.caption("Catatan: tanda '*' berarti data tahun tersebut tidak lengkap (terpotong karena filter Start/End Quarter).")
+
+            # KPI Cards - Yearly (per Tahun)
+            if df_total_combined is None or df_total_combined.empty:
+                st.info("Tidak ada data pada rentang tahun/kuartal yang dipilih.")
+            else:
+                kpi_css = """
+                <style>
+                    .kpi-card {
+                        background: white;
+                        border-radius: 12px;
+                        padding: 20px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                        border-left: 5px solid;
+                        transition: transform 0.2s ease, box-shadow 0.2s ease;
+                    }
+                    .kpi-card:hover {
+                        transform: translateY(-4px);
+                        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+                    }
+                    .kpi-title {
+                        font-size: 14px;
+                        color: #6b7280;
+                        font-weight: 600;
+                        margin-bottom: 8px;
+                    }
+                    .kpi-value-main {
+                        font-size: 28px;
+                        font-weight: 700;
+                        margin-bottom: 4px;
+                    }
+                    .kpi-value-sub {
+                        font-size: 16px;
+                        color: #6b7280;
+                        font-weight: 500;
+                    }
+                </style>
+                """
+                st.markdown(kpi_css, unsafe_allow_html=True)
+
+                def _safe_year_sum(df_src: pd.DataFrame | None, value_col: str) -> pd.Series:
+                    if df_src is None or df_src.empty:
+                        return pd.Series(dtype="float64")
+                    if "Year" not in df_src.columns or value_col not in df_src.columns:
+                        return pd.Series(dtype="float64")
+                    dfc = df_src[["Year", value_col]].copy()
+                    dfc["Year"] = pd.to_numeric(dfc["Year"], errors="coerce")
+                    dfc[value_col] = pd.to_numeric(dfc[value_col], errors="coerce")
+                    dfc = dfc.dropna(subset=["Year"]).copy()
+                    if dfc.empty:
+                        return pd.Series(dtype="float64")
+                    dfc["Year"] = dfc["Year"].astype(int)
+                    return dfc.groupby("Year", observed=False)[value_col].sum()
+
+                years = (
+                    df_total_combined["Year"].dropna().astype(int).sort_values().unique().tolist()
+                    if "Year" in df_total_combined.columns
+                    else []
+                )
+
+                q_counts = (
+                    df_total_combined.groupby("Year", observed=False)["Quarter"].nunique()
+                    if {"Year", "Quarter"}.issubset(set(df_total_combined.columns))
+                    else pd.Series(dtype="int64")
+                )
+                is_partial_map = {int(y): (int(q_counts.get(int(y), 0)) < 4) for y in years}
+
+                # Annual totals (Nominal)
+                inc_nom_y = _safe_year_sum(df_nom_inc_filtered, "Sum of Fin Nilai Inc")
+                out_nom_y = _safe_year_sum(df_nom_out_filtered, "Sum of Fin Nilai Out")
+                dom_nom_y = _safe_year_sum(df_nom_dom_filtered, "Sum of Fin Nilai Dom")
+
+                # Annual totals (Frekuensi)
+                inc_freq_y = _safe_year_sum(df_jumlah_inc_filtered, "Sum of Fin Jumlah Inc")
+                out_freq_y = _safe_year_sum(df_jumlah_out_filtered, "Sum of Fin Jumlah Out")
+                dom_freq_y = _safe_year_sum(df_jumlah_dom_filtered, "Sum of Fin Jumlah Dom")
+
+                yearly = pd.DataFrame({"Year": years})
+                yearly["Incoming_Nominal"] = yearly["Year"].map(inc_nom_y).fillna(0.0)
+                yearly["Outgoing_Nominal"] = yearly["Year"].map(out_nom_y).fillna(0.0)
+                yearly["Domestik_Nominal"] = yearly["Year"].map(dom_nom_y).fillna(0.0)
+                yearly["Total_Nominal"] = yearly["Incoming_Nominal"] + yearly["Outgoing_Nominal"] + yearly["Domestik_Nominal"]
+
+                yearly["Incoming_Frekuensi"] = yearly["Year"].map(inc_freq_y).fillna(0.0)
+                yearly["Outgoing_Frekuensi"] = yearly["Year"].map(out_freq_y).fillna(0.0)
+                yearly["Domestik_Frekuensi"] = yearly["Year"].map(dom_freq_y).fillna(0.0)
+                yearly["Total_Frekuensi"] = yearly["Incoming_Frekuensi"] + yearly["Outgoing_Frekuensi"] + yearly["Domestik_Frekuensi"]
+
+                yearly["YoY_Total_Nominal"] = yearly["Total_Nominal"].pct_change() * 100
+                yearly["YoY_Total_Frekuensi"] = yearly["Total_Frekuensi"].pct_change() * 100
+
+                def _fmt_yoy(v: float | None) -> str:
+                    if v is None or pd.isna(v):
+                        return "-"
+                    return f"{v:+.2f}%".replace(".", ",").replace(",00%", "%")
+
+                st.markdown("<h3 style='margin-top: 20px; margin-bottom: 15px;'>📈 KPI Tahunan</h3>", unsafe_allow_html=True)
+
+                year_labels = [f"{int(y)}{'*' if is_partial_map.get(int(y), False) else ''}" for y in years]
+                label_to_year = {lbl: int(lbl.replace("*", "")) for lbl in year_labels}
+                default_label = year_labels[-1] if year_labels else None
+                selected_year_label = st.selectbox(
+                    "Pilih Tahun (untuk KPI)",
+                    options=year_labels,
+                    index=(len(year_labels) - 1) if year_labels else 0,
+                    key="yearly_kpi_year",
+                )
+                selected_year = label_to_year.get(selected_year_label, years[-1] if years else None)
+
+                row = yearly[yearly["Year"] == int(selected_year)].iloc[0] if selected_year is not None else None
+
+                if row is not None:
+                    inc_freq = float(row["Incoming_Frekuensi"]) if not pd.isna(row["Incoming_Frekuensi"]) else 0.0
+                    out_freq = float(row["Outgoing_Frekuensi"]) if not pd.isna(row["Outgoing_Frekuensi"]) else 0.0
+                    dom_freq = float(row["Domestik_Frekuensi"]) if not pd.isna(row["Domestik_Frekuensi"]) else 0.0
+                    tot_freq = float(row["Total_Frekuensi"]) if not pd.isna(row["Total_Frekuensi"]) else 0.0
+
+                    inc_nom = float(row["Incoming_Nominal"]) if not pd.isna(row["Incoming_Nominal"]) else 0.0
+                    out_nom = float(row["Outgoing_Nominal"]) if not pd.isna(row["Outgoing_Nominal"]) else 0.0
+                    dom_nom = float(row["Domestik_Nominal"]) if not pd.isna(row["Domestik_Nominal"]) else 0.0
+                    tot_nom = float(row["Total_Nominal"]) if not pd.isna(row["Total_Nominal"]) else 0.0
+
+                    col1, col2, col3, col4 = st.columns(4)
+
+                    with col1:
+                        st.markdown(f"""
+                        <div class="kpi-card" style="border-left-color: #F5B0CB;">
+                            <div class="kpi-title">📥 INCOMING ({selected_year_label})</div>
+                            <div class="kpi-value-main" style="color: #F5B0CB;">{inc_freq:,.0f}</div>
+                            <div class="kpi-value-sub">Frekuensi</div>
+                            <div class="kpi-value-main" style="color: #F5B0CB; margin-top: 12px;">Rp {inc_nom/1e12:,.2f} T</div>
+                            <div class="kpi-value-sub">Nilai</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    with col2:
+                        st.markdown(f"""
+                        <div class="kpi-card" style="border-left-color: #F5CBA7;">
+                            <div class="kpi-title">📤 OUTGOING ({selected_year_label})</div>
+                            <div class="kpi-value-main" style="color: #F5CBA7;">{out_freq:,.0f}</div>
+                            <div class="kpi-value-sub">Frekuensi</div>
+                            <div class="kpi-value-main" style="color: #F5CBA7; margin-top: 12px;">Rp {out_nom/1e12:,.2f} T</div>
+                            <div class="kpi-value-sub">Nilai</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    with col3:
+                        st.markdown(f"""
+                        <div class="kpi-card" style="border-left-color: #5DADE2;">
+                            <div class="kpi-title">🏠 DOMESTIK ({selected_year_label})</div>
+                            <div class="kpi-value-main" style="color: #5DADE2;">{dom_freq:,.0f}</div>
+                            <div class="kpi-value-sub">Frekuensi</div>
+                            <div class="kpi-value-main" style="color: #5DADE2; margin-top: 12px;">Rp {dom_nom/1e12:,.2f} T</div>
+                            <div class="kpi-value-sub">Nilai</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    with col4:
+                        st.markdown(f"""
+                        <div class="kpi-card" style="border-left-color: #6366f1;">
+                            <div class="kpi-title">💰 TOTAL ({selected_year_label})</div>
+                            <div class="kpi-value-main" style="color: #6366f1;">{tot_freq:,.0f}</div>
+                            <div class="kpi-value-sub">Frekuensi</div>
+                            <div class="kpi-value-main" style="color: #6366f1; margin-top: 12px;">Rp {tot_nom/1e12:,.2f} T</div>
+                            <div class="kpi-value-sub">Nilai</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    # YoY info for selected year (Total)
+                    yoy_nom = yearly.loc[yearly["Year"] == int(selected_year), "YoY_Total_Nominal"].iloc[0]
+                    yoy_freq = yearly.loc[yearly["Year"] == int(selected_year), "YoY_Total_Frekuensi"].iloc[0]
+                    st.caption(f"YoY Total Nominal: {_fmt_yoy(yoy_nom)} | YoY Total Frekuensi: {_fmt_yoy(yoy_freq)}")
+
+                with st.expander("📋 Ringkasan Tahunan (Tabel)", expanded=False):
+                    table = yearly.copy()
+                    table["Incoming (Rp T)"] = table["Incoming_Nominal"] / 1e12
+                    table["Outgoing (Rp T)"] = table["Outgoing_Nominal"] / 1e12
+                    table["Domestik (Rp T)"] = table["Domestik_Nominal"] / 1e12
+                    table["Total (Rp T)"] = table["Total_Nominal"] / 1e12
+                    table["YoY Total Nominal (%)"] = table["YoY_Total_Nominal"]
+                    table["YoY Total Frekuensi (%)"] = table["YoY_Total_Frekuensi"]
+                    table["Data Lengkap?"] = table["Year"].map(lambda y: "Lengkap" if not is_partial_map.get(int(y), False) else "Parsial*")
+
+                    st.dataframe(
+                        table[[
+                            "Year",
+                            "Incoming (Rp T)",
+                            "Outgoing (Rp T)",
+                            "Domestik (Rp T)",
+                            "Total (Rp T)",
+                            "YoY Total Nominal (%)",
+                            "YoY Total Frekuensi (%)",
+                            "Data Lengkap?",
+                        ]],
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "Year": st.column_config.NumberColumn("Year", format="%d"),
+                            "Incoming (Rp T)": st.column_config.NumberColumn("Incoming (Rp T)", format="%.2f"),
+                            "Outgoing (Rp T)": st.column_config.NumberColumn("Outgoing (Rp T)", format="%.2f"),
+                            "Domestik (Rp T)": st.column_config.NumberColumn("Domestik (Rp T)", format="%.2f"),
+                            "Total (Rp T)": st.column_config.NumberColumn("Total (Rp T)", format="%.2f"),
+                            "YoY Total Nominal (%)": st.column_config.NumberColumn("YoY Total Nominal (%)", format="%+.2f%%"),
+                            "YoY Total Frekuensi (%)": st.column_config.NumberColumn("YoY Total Frekuensi (%)", format="%+.2f%%"),
+                        },
+                    )
+
+            st.markdown("<h3 style='margin-bottom: 15px;'>📊 Grafik Tahunan - Nilai Transaksi (Stacked) + YoY (%)</h3>", unsafe_allow_html=True)
+            make_yearly_stacked_bar_yoy_chart(
+                df_inc=df_nom_inc_filtered,
+                df_out=df_nom_out_filtered,
+                df_dom=df_nom_dom_filtered,
+                font_size=_growth_font_size,
+                legend_font_size=_growth_legend_font_size,
+                axis_x_tick_font_size=_growth_axis_x_tick_font_size,
+                axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
+            )
+
+            st.markdown("<h3 style='margin-top: 20px; margin-bottom: 15px;'>📊 Grafik Tahunan (Khusus 2024 & 2025 = Jan–Sep) - Nilai Transaksi (Stacked) + YoY (%)</h3>", unsafe_allow_html=True)
+            st.caption("Tahun 2024 & 2025 memakai akumulasi Januari–September. Tahun lainnya tetap Januari–Desember.")
+            make_yearly_stacked_bar_yoy_chart_ytd(
+                df_inc=df_nom_inc_month_filtered,
+                df_out=df_nom_out_month_filtered,
+                df_dom=df_nom_dom_month_filtered,
+                end_month=9,
+                cap_years={2024, 2025},
+                default_end_month=12,
+                font_size=_growth_font_size,
+                legend_font_size=_growth_legend_font_size,
+                axis_x_tick_font_size=_growth_axis_x_tick_font_size,
+                axis_y_tick_font_size=_growth_axis_y_tick_font_size,
+                chart_height=_growth_chart_height,
+                chart_width=_growth_chart_width if _growth_chart_width > 0 else None,
             )
 
 else:

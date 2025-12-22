@@ -178,6 +178,566 @@ def make_stacked_bar_line_chart_combined(
         st.plotly_chart(fig, use_container_width=True)
 
 
+def make_yearly_stacked_bar_yoy_chart(
+    df_inc: pd.DataFrame,
+    df_out: pd.DataFrame,
+    df_dom: pd.DataFrame,
+    *,
+    font_size: int | None = None,
+    legend_font_size: int | None = None,
+    axis_x_tick_font_size: int | None = None,
+    axis_y_tick_font_size: int | None = None,
+    chart_height: int | None = None,
+    chart_width: int | None = None,
+):
+    """Grafik Tahunan: stacked bar (Nilai) + garis YoY (%) dengan label boxed (mirip contoh)."""
+
+    # Aggregate per year (respect partial year if filter by quarter makes incomplete years)
+    def _agg_year(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["Year", value_col, "_nq"])
+        d = df.copy()
+        if "Quarter" in d.columns:
+            g = d.groupby("Year", observed=False).agg({value_col: "sum", "Quarter": pd.Series.nunique}).reset_index()
+            g = g.rename(columns={"Quarter": "_nq"})
+        else:
+            g = d.groupby("Year", observed=False).agg({value_col: "sum"}).reset_index()
+            g["_nq"] = 4
+        return g
+
+    inc_col = "Sum of Fin Nilai Inc"
+    out_col = "Sum of Fin Nilai Out"
+    dom_col = "Sum of Fin Nilai Dom"
+
+    inc_y = _agg_year(df_inc, inc_col)
+    out_y = _agg_year(df_out, out_col)
+    dom_y = _agg_year(df_dom, dom_col)
+
+    df_y = inc_y.merge(out_y[["Year", out_col, "_nq"]], on="Year", how="outer", suffixes=("", "_out"))
+    df_y = df_y.merge(dom_y[["Year", dom_col, "_nq"]], on="Year", how="outer", suffixes=("", "_dom"))
+
+    if df_y.empty:
+        st.info("Data tidak cukup untuk membuat grafik tahunan.")
+        return
+
+    # consolidate nq (max across sources)
+    def _max3(a, b, c):
+        vals = [v for v in [a, b, c] if pd.notna(v)]
+        return int(max(vals)) if vals else 4
+
+    df_y["_nq_out"] = df_y.get("_nq_out")
+    df_y["_nq_dom"] = df_y.get("_nq_dom")
+    df_y["_nq"] = df_y.apply(lambda r: _max3(r.get("_nq"), r.get("_nq_out"), r.get("_nq_dom")), axis=1)
+
+    df_y["YearInt"] = pd.to_numeric(df_y.get("Year"), errors="coerce")
+    df_y = df_y.dropna(subset=["YearInt"]).copy()
+    df_y["YearInt"] = df_y["YearInt"].astype(int)
+
+    df_y[inc_col] = pd.to_numeric(df_y.get(inc_col), errors="coerce").fillna(0.0)
+    df_y[out_col] = pd.to_numeric(df_y.get(out_col), errors="coerce").fillna(0.0)
+    df_y[dom_col] = pd.to_numeric(df_y.get(dom_col), errors="coerce").fillna(0.0)
+    df_y = df_y.sort_values("YearInt")
+
+    df_y["_partial"] = df_y["_nq"].astype(int) < 4
+    df_y["YearLabel"] = df_y["YearInt"].astype(int).astype(str) + df_y["_partial"].apply(lambda v: "*" if bool(v) else "")
+
+    df_y["Total"] = df_y[inc_col] + df_y[out_col] + df_y[dom_col]
+    df_y["YoY"] = df_y["Total"].pct_change() * 100
+
+    # mark yoy label with * if current or previous year is partial
+    prev_partial = df_y["_partial"].shift(1).fillna(False)
+    df_y["_yoy_partial"] = (df_y["_partial"] | prev_partial).astype(bool)
+
+    # Scale to Rp Miliar
+    scale_factor = 1e9
+
+    fs = int(font_size) if font_size is not None else 12
+    x_tick_fs = int(axis_x_tick_font_size) if axis_x_tick_font_size is not None else max(fs - 1, 9)
+    y_tick_fs = int(axis_y_tick_font_size) if axis_y_tick_font_size is not None else max(fs - 1, 9)
+    axis_title_fs = fs + 2
+    title_fs = fs + 10
+    hover_fs = fs
+    legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
+    fig = go.Figure()
+
+    x_years = df_y["YearInt"].astype(int).tolist()
+    x_text = df_y["YearLabel"].astype(str).tolist()
+
+    fig.add_trace(
+        go.Bar(
+            x=x_years,
+            y=df_y[inc_col] / scale_factor,
+            name="Incoming",
+            marker=dict(color="#F5B0CB", line=dict(width=0)),
+            hovertemplate="%{x}<br>Incoming: Rp %{y:,.2f} Miliar<extra></extra>",
+            yaxis="y1",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            x=x_years,
+            y=df_y[out_col] / scale_factor,
+            name="Outgoing",
+            marker=dict(color="#F5CBA7", line=dict(width=0)),
+            hovertemplate="%{x}<br>Outgoing: Rp %{y:,.2f} Miliar<extra></extra>",
+            yaxis="y1",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            x=x_years,
+            y=df_y[dom_col] / scale_factor,
+            name="Domestik",
+            marker=dict(color="#5DADE2", line=dict(width=0)),
+            hovertemplate="%{x}<br>Domestik: Rp %{y:,.2f} Miliar<extra></extra>",
+            yaxis="y1",
+        )
+    )
+
+    yoy_color = "#60A5FA"  # keep consistent with existing palette family
+    fig.add_trace(
+        go.Scatter(
+            x=x_years,
+            y=df_y["YoY"],
+            name="YoY",
+            yaxis="y2",
+            mode="lines+markers",
+            line=dict(color=yoy_color, width=4),
+            marker=dict(size=10, color=yoy_color, line=dict(color="white", width=2)),
+            hovertemplate="%{x}<br>YoY: %{y:.2f}%<extra></extra>",
+        )
+    )
+
+    # Boxed labels (annotations) for YoY
+    yoy_vals = pd.to_numeric(df_y["YoY"], errors="coerce")
+    valid = yoy_vals.dropna().astype(float)
+    if not valid.empty:
+        vmin = float(valid.min())
+        vmax = float(valid.max())
+        span = vmax - vmin
+        gap = max(5.0, span * 0.10)
+        placed: list[float] = []
+
+        def _place(y: float) -> float:
+            pos = float(y)
+            direction = 1.0
+            tries = 0
+            while any(abs(pos - p) < gap for p in placed) and tries < 12:
+                pos += direction * gap
+                direction *= -1
+                tries += 1
+            placed.append(pos)
+            return pos
+
+        for x, y, is_partial in zip(x_years, yoy_vals.tolist(), df_y["_yoy_partial"].tolist()):
+            if y is None or (isinstance(y, float) and pd.isna(y)):
+                continue
+            y_float = float(y)
+            y_used = _place(y_float)
+            suffix = "*" if bool(is_partial) else ""
+            fig.add_annotation(
+                x=x,
+                y=y_used,
+                xref="x",
+                yref="y2",
+                text=f"{y_float:.2f}%{suffix}",
+                showarrow=False,
+                xanchor="center",
+                yanchor="bottom",
+                font=dict(size=max(9, fs), family="Inter, Arial, sans-serif", color="#111827"),
+                bgcolor="rgba(245, 158, 11, 0.95)",
+                bordercolor="rgba(245, 158, 11, 1.0)",
+                borderwidth=0,
+                borderpad=4,
+            )
+
+        # expand y2 range to include annotations
+        all_y = placed + valid.tolist()
+        ymin = float(min(all_y))
+        ymax = float(max(all_y))
+        pad = max(5.0, (ymax - ymin) * 0.15)
+        y2_range = [ymin - pad, ymax + pad]
+    else:
+        y2_range = None
+
+    fig.update_layout(
+        title=dict(
+            text="Perkembangan Nilai Transaksi Tahunan (Stacked) & YoY (%)",
+            font=dict(size=title_fs, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+        ),
+        barmode="stack",
+        template="plotly_white",
+        paper_bgcolor="white",
+        plot_bgcolor="#f9fafb",
+        font=dict(family="Inter, Arial, sans-serif", size=fs),
+        xaxis=dict(
+            title=dict(text="Tahun", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            tickfont=dict(size=x_tick_fs, family="Inter, Arial, sans-serif"),
+            type="linear",
+            tickmode="array",
+            tickvals=x_years,
+            ticktext=x_text,
+            range=[min(x_years) - 0.6, max(x_years) + 0.6] if x_years else None,
+            showgrid=False,
+            showline=True,
+            linewidth=2,
+            linecolor="#d1d5db",
+        ),
+        yaxis=dict(
+            title=dict(text="Rp Miliar", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            tickformat=",.0f",
+            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
+            showgrid=True,
+            gridcolor="#e5e7eb",
+        ),
+        yaxis2=dict(
+            title=dict(text="YoY (%)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            overlaying="y",
+            side="right",
+            tickformat=".0f",
+            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
+            showgrid=False,
+            range=y2_range,
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="#e5e7eb",
+            borderwidth=1,
+            font=dict(size=legend_fs, family="Inter, Arial, sans-serif"),
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="white", font_size=hover_fs, font_family="Inter, Arial, sans-serif"),
+        margin=dict(l=60, r=80, t=80, b=80),
+    )
+
+    if chart_height is not None:
+        fig.update_layout(height=int(chart_height))
+
+    if chart_width is not None and int(chart_width) > 0:
+        fig.update_layout(width=int(chart_width))
+        st.plotly_chart(fig, use_container_width=False)
+    else:
+        st.plotly_chart(fig, use_container_width=True)
+
+
+def make_yearly_stacked_bar_yoy_chart_ytd(
+    df_inc: pd.DataFrame,
+    df_out: pd.DataFrame,
+    df_dom: pd.DataFrame,
+    *,
+    end_month: int = 9,
+    cap_years: set[int] | None = None,
+    default_end_month: int = 12,
+    font_size: int | None = None,
+    legend_font_size: int | None = None,
+    axis_x_tick_font_size: int | None = None,
+    axis_y_tick_font_size: int | None = None,
+    chart_height: int | None = None,
+    chart_width: int | None = None,
+):
+    """Grafik Tahunan (YTD): stacked bar (Nilai) + garis YoY (%).
+
+    - Jika cap_years None: semua tahun memakai Jan..end_month.
+    - Jika cap_years diberikan: hanya tahun dalam cap_years yang memakai Jan..end_month,
+      sementara tahun lain memakai Jan..default_end_month.
+    """
+
+    end_month_int = int(end_month)
+    if end_month_int < 1 or end_month_int > 12:
+        st.warning("end_month harus 1..12")
+        return
+
+    default_end_month_int = int(default_end_month)
+    if default_end_month_int < 1 or default_end_month_int > 12:
+        st.warning("default_end_month harus 1..12")
+        return
+
+    cap_years_set = set(cap_years) if cap_years else None
+
+    def _limit_for_year(year_int: int) -> int:
+        if cap_years_set is None:
+            return end_month_int
+        return end_month_int if int(year_int) in cap_years_set else default_end_month_int
+
+    def _month_to_int(v) -> int | None:
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
+        s = str(v).strip()
+        if not s:
+            return None
+        try:
+            mi = int(float(s))
+            return mi if 1 <= mi <= 12 else None
+        except Exception:
+            pass
+        # handle month name (English)
+        try:
+            mi = list(calendar.month_name).index(s)
+            return mi if 1 <= mi <= 12 else None
+        except Exception:
+            return None
+
+    def _agg_year_ytd(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["Year", value_col, "_nm"])
+        d = df.copy()
+        if "Year" not in d.columns or "Month" not in d.columns:
+            return pd.DataFrame(columns=["Year", value_col, "_nm"])
+
+        d["YearInt"] = pd.to_numeric(d["Year"], errors="coerce")
+        d["MonthInt"] = d["Month"].apply(_month_to_int)
+        d = d.dropna(subset=["YearInt", "MonthInt"]).copy()
+        if d.empty:
+            return pd.DataFrame(columns=["Year", value_col, "_nm"])
+
+        d["YearInt"] = d["YearInt"].astype(int)
+        d["MonthInt"] = d["MonthInt"].astype(int)
+        d[value_col] = pd.to_numeric(d.get(value_col), errors="coerce")
+
+        d["_limit"] = d["YearInt"].apply(_limit_for_year)
+        d = d[d["MonthInt"] <= d["_limit"]].copy()
+        if d.empty:
+            return pd.DataFrame(columns=["Year", value_col, "_nm"])
+
+        g = (
+            d.groupby("YearInt", observed=False)
+            .agg({value_col: "sum", "MonthInt": pd.Series.nunique})
+            .reset_index()
+            .rename(columns={"YearInt": "Year", "MonthInt": "_nm"})
+        )
+        return g
+
+    inc_col = "Sum of Fin Nilai Inc"
+    out_col = "Sum of Fin Nilai Out"
+    dom_col = "Sum of Fin Nilai Dom"
+
+    inc_y = _agg_year_ytd(df_inc, inc_col)
+    out_y = _agg_year_ytd(df_out, out_col)
+    dom_y = _agg_year_ytd(df_dom, dom_col)
+
+    df_y = inc_y.merge(out_y[["Year", out_col, "_nm"]], on="Year", how="outer", suffixes=("", "_out"))
+    df_y = df_y.merge(dom_y[["Year", dom_col, "_nm"]], on="Year", how="outer", suffixes=("", "_dom"))
+
+    if df_y.empty:
+        st.info("Data tidak cukup untuk membuat grafik tahunan (YTD).")
+        return
+
+    def _max3(a, b, c):
+        vals = [v for v in [a, b, c] if pd.notna(v)]
+        return int(max(vals)) if vals else 0
+
+    df_y["_nm_out"] = df_y.get("_nm_out")
+    df_y["_nm_dom"] = df_y.get("_nm_dom")
+    df_y["_nm"] = df_y.apply(lambda r: _max3(r.get("_nm"), r.get("_nm_out"), r.get("_nm_dom")), axis=1)
+
+    df_y["YearInt"] = pd.to_numeric(df_y.get("Year"), errors="coerce")
+    df_y = df_y.dropna(subset=["YearInt"]).copy()
+    df_y["YearInt"] = df_y["YearInt"].astype(int)
+
+    df_y[inc_col] = pd.to_numeric(df_y.get(inc_col), errors="coerce").fillna(0.0)
+    df_y[out_col] = pd.to_numeric(df_y.get(out_col), errors="coerce").fillna(0.0)
+    df_y[dom_col] = pd.to_numeric(df_y.get(dom_col), errors="coerce").fillna(0.0)
+    df_y = df_y.sort_values("YearInt")
+
+    df_y["_limit"] = df_y["YearInt"].apply(_limit_for_year)
+    df_y["_partial"] = df_y["_nm"].astype(int) < df_y["_limit"].astype(int)
+    df_y["YearLabel"] = df_y["YearInt"].astype(int).astype(str) + df_y["_partial"].apply(lambda v: "*" if bool(v) else "")
+
+    df_y["Total"] = df_y[inc_col] + df_y[out_col] + df_y[dom_col]
+    df_y["YoY"] = df_y["Total"].pct_change() * 100
+
+    prev_partial = df_y["_partial"].shift(1).fillna(False)
+    df_y["_yoy_partial"] = (df_y["_partial"] | prev_partial).astype(bool)
+
+    scale_factor = 1e9
+
+    fs = int(font_size) if font_size is not None else 12
+    x_tick_fs = int(axis_x_tick_font_size) if axis_x_tick_font_size is not None else max(fs - 1, 9)
+    y_tick_fs = int(axis_y_tick_font_size) if axis_y_tick_font_size is not None else max(fs - 1, 9)
+    axis_title_fs = fs + 2
+    title_fs = fs + 10
+    hover_fs = fs
+    legend_fs = int(legend_font_size) if legend_font_size is not None else fs
+
+    fig = go.Figure()
+
+    x_years = df_y["YearInt"].astype(int).tolist()
+    x_text = df_y["YearLabel"].astype(str).tolist()
+
+    fig.add_trace(
+        go.Bar(
+            x=x_years,
+            y=df_y[inc_col] / scale_factor,
+            name="Incoming",
+            marker=dict(color="#F5B0CB", line=dict(width=0)),
+            hovertemplate="%{x}<br>Incoming: Rp %{y:,.2f} Miliar<extra></extra>",
+            yaxis="y1",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            x=x_years,
+            y=df_y[out_col] / scale_factor,
+            name="Outgoing",
+            marker=dict(color="#F5CBA7", line=dict(width=0)),
+            hovertemplate="%{x}<br>Outgoing: Rp %{y:,.2f} Miliar<extra></extra>",
+            yaxis="y1",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            x=x_years,
+            y=df_y[dom_col] / scale_factor,
+            name="Domestik",
+            marker=dict(color="#5DADE2", line=dict(width=0)),
+            hovertemplate="%{x}<br>Domestik: Rp %{y:,.2f} Miliar<extra></extra>",
+            yaxis="y1",
+        )
+    )
+
+    yoy_color = "#60A5FA"
+    fig.add_trace(
+        go.Scatter(
+            x=x_years,
+            y=df_y["YoY"],
+            name="YoY",
+            yaxis="y2",
+            mode="lines+markers",
+            line=dict(color=yoy_color, width=4),
+            marker=dict(size=10, color=yoy_color, line=dict(color="white", width=2)),
+            hovertemplate="%{x}<br>YoY: %{y:.2f}%<extra></extra>",
+        )
+    )
+
+    yoy_vals = pd.to_numeric(df_y["YoY"], errors="coerce")
+    valid = yoy_vals.dropna().astype(float)
+    if not valid.empty:
+        vmin = float(valid.min())
+        vmax = float(valid.max())
+        span = vmax - vmin
+        gap = max(5.0, span * 0.10)
+        placed: list[float] = []
+
+        def _place(y: float) -> float:
+            pos = float(y)
+            direction = 1.0
+            tries = 0
+            while any(abs(pos - p) < gap for p in placed) and tries < 12:
+                pos += direction * gap
+                direction *= -1
+                tries += 1
+            placed.append(pos)
+            return pos
+
+        for x, y, is_partial in zip(x_years, yoy_vals.tolist(), df_y["_yoy_partial"].tolist()):
+            if y is None or (isinstance(y, float) and pd.isna(y)):
+                continue
+            y_float = float(y)
+            y_used = _place(y_float)
+            suffix = "*" if bool(is_partial) else ""
+            fig.add_annotation(
+                x=x,
+                y=y_used,
+                xref="x",
+                yref="y2",
+                text=f"{y_float:.2f}%{suffix}",
+                showarrow=False,
+                xanchor="center",
+                yanchor="bottom",
+                font=dict(size=max(9, fs), family="Inter, Arial, sans-serif", color="#111827"),
+                bgcolor="rgba(245, 158, 11, 0.95)",
+                bordercolor="rgba(245, 158, 11, 1.0)",
+                borderwidth=0,
+                borderpad=4,
+            )
+
+        all_y = placed + valid.tolist()
+        ymin = float(min(all_y))
+        ymax = float(max(all_y))
+        pad = max(5.0, (ymax - ymin) * 0.15)
+        y2_range = [ymin - pad, ymax + pad]
+    else:
+        y2_range = None
+
+    month_label = f"Jan–{calendar.month_name[end_month_int][:3]}"
+    full_label = "Jan–Dec" if default_end_month_int == 12 else f"Jan–{calendar.month_name[default_end_month_int][:3]}"
+    mixed_suffix = (
+        f" (hanya {', '.join(str(y) for y in sorted(cap_years_set))} pakai {month_label}; lainnya {full_label})"
+        if cap_years_set is not None
+        else ""
+    )
+
+    fig.update_layout(
+        title=dict(
+            text=f"Perkembangan Nilai Transaksi Tahunan{mixed_suffix} - Stacked & YoY (%)",
+            font=dict(size=title_fs, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+        ),
+        barmode="stack",
+        template="plotly_white",
+        paper_bgcolor="white",
+        plot_bgcolor="#f9fafb",
+        font=dict(family="Inter, Arial, sans-serif", size=fs),
+        xaxis=dict(
+            title=dict(text="Tahun", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            tickfont=dict(size=x_tick_fs, family="Inter, Arial, sans-serif"),
+            type="linear",
+            tickmode="array",
+            tickvals=x_years,
+            ticktext=x_text,
+            range=[min(x_years) - 0.6, max(x_years) + 0.6] if x_years else None,
+            showgrid=False,
+            showline=True,
+            linewidth=2,
+            linecolor="#d1d5db",
+        ),
+        yaxis=dict(
+            title=dict(text="Rp Miliar", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            tickformat=",.0f",
+            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
+            showgrid=True,
+            gridcolor="#e5e7eb",
+        ),
+        yaxis2=dict(
+            title=dict(text="YoY (%)", font=dict(size=axis_title_fs, family="Inter, Arial, sans-serif")),
+            overlaying="y",
+            side="right",
+            tickformat=".0f",
+            tickfont=dict(size=y_tick_fs, family="Inter, Arial, sans-serif"),
+            showgrid=False,
+            range=y2_range,
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="#e5e7eb",
+            borderwidth=1,
+            font=dict(size=legend_fs, family="Inter, Arial, sans-serif"),
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="white", font_size=hover_fs, font_family="Inter, Arial, sans-serif"),
+        margin=dict(l=60, r=80, t=80, b=80),
+    )
+
+    if chart_height is not None:
+        fig.update_layout(height=int(chart_height))
+
+    if chart_width is not None and int(chart_width) > 0:
+        fig.update_layout(width=int(chart_width))
+        st.plotly_chart(fig, use_container_width=False)
+    else:
+        st.plotly_chart(fig, use_container_width=True)
+
+
 def make_quarter_across_years_chart(
     df: pd.DataFrame,
     quarter: int,
