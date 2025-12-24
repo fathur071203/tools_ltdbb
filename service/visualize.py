@@ -4,6 +4,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import calendar
 
+from service.units import pick_rupiah_unit, rupiah_unit_axis_label
+
 
 def _tick_family_for_weight(weight: str | None) -> str:
     """Map ketebalan ke font-family (fallback aman lintas Windows/browser)."""
@@ -2499,17 +2501,22 @@ def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_p
 
     fig = go.Figure()
 
+    nominal_col = f'Sum of Fin Nilai {trx_type}'
+    unit = pick_rupiah_unit(df_copy[nominal_col].max() if nominal_col in df_copy.columns else None)
+    decimals = 2 if unit.label in {"Miliar", "Triliun"} else 0
+    nominal_scaled = (df_copy[nominal_col] / unit.divisor) if nominal_col in df_copy.columns else df_copy.index
+
     # Bar trace
     fig.add_trace(go.Bar(
         x=df_copy['YearMonth'],
-        y=df_copy[f'Sum of Fin Nilai {trx_type}'],
+        y=nominal_scaled,
         name="Nilai",
         yaxis='y1',
         marker=dict(
             color=bar_color,
             line=dict(width=0)
         ),
-        hovertemplate="%{x}<br>Nilai: Rp %{y:,.0f}<extra></extra>"
+        hovertemplate=f"%{{x}}<br>Nilai: %{{y:,.{decimals}f}} (Rp {unit.label})<extra></extra>" if unit.label != "Rp" else f"%{{x}}<br>Nilai: Rp %{{y:,.{decimals}f}}<extra></extra>"
     ))
 
     # Line trace dengan warna hijau
@@ -2539,8 +2546,8 @@ def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_p
             tickfont=dict(size=11, family='Inter, Arial, sans-serif')
         ),
         yaxis=dict(
-            title=dict(text="Nilai (Rp Miliar)", font=dict(size=14, family='Inter, Arial, sans-serif')),
-            tickformat=",.0f",
+            title=dict(text=rupiah_unit_axis_label(unit), font=dict(size=14, family='Inter, Arial, sans-serif')),
+            tickformat=f",.{decimals}f",
             showgrid=True,
             gridwidth=1,
             gridcolor='#e5e7eb',

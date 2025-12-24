@@ -3,6 +3,8 @@ import streamlit as st
 import calendar
 import numpy as np
 
+from service.units import pick_rupiah_unit, rupiah_unit_suffix
+
 @st.cache_data
 def load_data(uploaded_file, is_trx_nasional: bool = False):
     sheet_name = 'Trx_PJPJKT'
@@ -480,7 +482,6 @@ def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_t
 
 def process_data_profile_month(df_month: pd.DataFrame, trx_type: str) -> pd.DataFrame:
     df_domestic_month = df_month[['Year', 'Month', f'Sum of Fin Jumlah {trx_type}', f'Sum of Fin Nilai {trx_type}']].copy()
-    df_domestic_month[f'Sum of Fin Nilai {trx_type}'] = df_domestic_month[f'Sum of Fin Nilai {trx_type}'] / 1_000_000_000
     return df_domestic_month
 
 def process_grand_total_profile(df: pd.DataFrame, trx_type: str) -> pd.DataFrame:
@@ -600,16 +601,27 @@ def rename_format_profile_df(df: pd.DataFrame, trx_type: str):
     else:
         trx_var = "Domestik"
 
+    df = df.copy()
+
+    nominal_src_col = f"Sum of Fin Nilai {trx_type}"
+    unit = pick_rupiah_unit(df[nominal_src_col].max() if nominal_src_col in df.columns else None)
+    decimals = 2 if unit.label in {"Miliar", "Triliun"} else 0
+
+    if nominal_src_col in df.columns:
+        df[nominal_src_col] = df[nominal_src_col] / unit.divisor
+
+    nominal_label_col = f"Total Nominal {trx_var} {rupiah_unit_suffix(unit)}"
+
     df.rename(columns={
         f"Sum of Fin Jumlah {trx_type}": f"Total Frekuensi {trx_var}",
-        f"Sum of Fin Nilai {trx_type}": f"Total Nominal {trx_var} (Miliar)",
+        nominal_src_col: nominal_label_col,
     }, inplace=True)
 
     df = df.style.format(
         {
-            "Year": lambda x: "{:.0f}".format(x),
-            f"Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x),
-            f"Total Nominal {trx_var} (Miliar)": lambda x: '{:,.0f}'.format(x),
+            "Year": "{:.0f}",
+            f"Total Frekuensi {trx_var}": "{:,.0f}",
+            nominal_label_col: f"{{:,.{decimals}f}}",
         },
         thousands=".",
         decimal=",",
@@ -624,15 +636,26 @@ def format_profile_df_grand_total(df: pd.DataFrame, trx_type: str):
     else:
         trx_var = "Domestik"
 
+    df = df.copy()
+
+    nominal_src_col = f"Grand Total Nilai {trx_type}"
+    unit = pick_rupiah_unit(df[nominal_src_col].max() if nominal_src_col in df.columns else None)
+    decimals = 2 if unit.label in {"Miliar", "Triliun"} else 0
+
+    if nominal_src_col in df.columns:
+        df[nominal_src_col] = df[nominal_src_col] / unit.divisor
+
+    nominal_label_col = f"Grand Total Nominal {trx_var} {rupiah_unit_suffix(unit)}"
+
     df.rename(columns={
         f"Grand Total Jumlah {trx_type}": f"Grand Total Frekuensi {trx_var}",
-        f"Grand Total Nilai {trx_type}": f"Grand Total Nominal {trx_var} (Miliar)",
+        nominal_src_col: nominal_label_col,
     }, inplace=True)
 
     df = df.style.format(
         {
-            f"Grand Total Frekuensi {trx_var}": lambda x: '{:,.0f}'.format(x),
-            f"Grand Total Nominal {trx_var} (Miliar)": lambda x: '{:,.0f}'.format(x),
+            f"Grand Total Frekuensi {trx_var}": "{:,.0f}",
+            nominal_label_col: f"{{:,.{decimals}f}}",
         },
         thousands=".",
         decimal=",",
