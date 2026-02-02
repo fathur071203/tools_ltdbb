@@ -5,6 +5,53 @@ import numpy as np
 
 from service.units import pick_rupiah_unit, rupiah_unit_suffix
 
+
+def _to_number(series: pd.Series) -> pd.Series:
+    """Best-effort conversion of messy numeric-like strings to floats.
+
+    Handles common Excel/text cases like thousand separators (',' / '.'),
+    Indonesian decimal comma, and currency prefixes (e.g., 'Rp').
+    """
+    if pd.api.types.is_numeric_dtype(series):
+        return series
+
+    s = series.astype("string").str.strip()
+    # Common noise
+    s = s.str.replace("\u00a0", "", regex=False)  # non-breaking space
+    s = s.str.replace("Rp", "", regex=False)
+    s = s.str.replace(" ", "", regex=False)
+
+    has_comma = s.str.contains(",", na=False)
+    has_dot = s.str.contains("\\.", na=False)
+
+    if bool((has_comma & has_dot).any()):
+        # Assume '.' thousands and ',' decimals: 1.234,56 -> 1234.56
+        s = s.str.replace(".", "", regex=False)
+        s = s.str.replace(",", ".", regex=False)
+    elif bool(has_comma.any()):
+        # If it looks like a decimal comma (e.g. 12,5), convert to '.'
+        looks_decimal = s.str.contains(r",\d{1,2}$", regex=True, na=False)
+        if bool(looks_decimal.any()):
+            s = s.str.replace(",", ".", regex=False)
+        else:
+            s = s.str.replace(",", "", regex=False)
+    elif bool(has_dot.any()):
+        # If it doesn't look like a decimal dot, treat '.' as thousands
+        looks_decimal = s.str.contains(r"\.\d{1,2}$", regex=True, na=False)
+        if not bool(looks_decimal.any()):
+            s = s.str.replace(".", "", regex=False)
+
+    # Keep digits, minus sign, and decimal dot
+    s = s.str.replace(r"[^0-9\.-]", "", regex=True)
+    return pd.to_numeric(s, errors="coerce")
+
+
+def _coerce_numeric_columns(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    for col in cols:
+        if col in df.columns:
+            df[col] = _to_number(df[col])
+    return df
+
 @st.cache_data
 def load_data(uploaded_file, is_trx_nasional: bool = False):
     sheet_name = 'Trx_PJPJKT'
@@ -18,6 +65,19 @@ def load_data(uploaded_file, is_trx_nasional: bool = False):
     except Exception as e:
         st.error(f"An error occurred while loading the data: {e}")
         return None
+    # Make numeric columns stable across environments (local vs Streamlit Cloud)
+    df = _coerce_numeric_columns(
+        df,
+        [
+            # LTDBB (PJP)
+            'Fin Jumlah Inc', 'Fin Nilai Inc',
+            'Fin Jumlah Out', 'Fin Nilai Out',
+            'Fin Jumlah Dom', 'Fin Nilai Dom',
+            # Nasional
+            'Nom Nasional Out', 'Nom Nasional Inc', 'Nom Nasional Dom', 'Nom Nasional Total',
+            'Frek Nasional Out', 'Frek Nasional Inc', 'Frek Nasional Dom', 'Frek Nasional Total',
+        ],
+    )
     return df
 
 
@@ -142,24 +202,52 @@ def set_page_visuals(condition):
         st.image(".static/Logo.png")
 
 def aggregate_data(df, is_trx=False):
+    # Ensure aggregation inputs are numeric; Excel uploads sometimes load as strings
+    df = _coerce_numeric_columns(
+        df,
+        [
+            'Fin Jumlah Inc', 'Fin Nilai Inc',
+            'Fin Jumlah Out', 'Fin Nilai Out',
+            'Fin Jumlah Dom', 'Fin Nilai Dom',
+        ],
+    )
+    for col in ['Fin Jumlah Inc', 'Fin Nilai Inc', 'Fin Jumlah Out', 'Fin Nilai Out', 'Fin Jumlah Dom', 'Fin Nilai Dom']:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
+
     if is_trx:
         group_cols = ['Nama PJP', 'Year', 'Quarter', 'Month']
     else:
         group_cols = ['Nama PJP', 'Year', 'Quarter']
-    df = df.drop(columns=['Nama PJP Conv Final'])
+    df = df.drop(columns=['Nama PJP Conv Final'], errors='ignore')
     df = df.groupby(group_cols).agg({'Fin Jumlah Inc': 'sum', 'Fin Nilai Inc': 'sum',
                                      'Fin Jumlah Out': 'sum', 'Fin Nilai Out': 'sum',
                                      'Fin Jumlah Dom': 'sum', 'Fin Nilai Dom': 'sum', })
     df = df.rename(columns=lambda x: 'Sum of ' + x)
     df = df.reset_index()
-    df['Sum of Total Nom'] = df['Sum of Fin Nilai Inc'] + df['Sum of Fin Nilai Out'] + df['Sum of Fin Nilai Dom']
+
+    df = _coerce_numeric_columns(
+        df,
+        ['Sum of Fin Nilai Inc', 'Sum of Fin Nilai Out', 'Sum of Fin Nilai Dom'],
+    )
+    df['Sum of Total Nom'] = (
+        df['Sum of Fin Nilai Inc'].fillna(0)
+        + df['Sum of Fin Nilai Out'].fillna(0)
+        + df['Sum of Fin Nilai Dom'].fillna(0)
+    )
     return df
 
 
 def preprocess_data(df_non_agg, is_trx=False):
     if is_trx:
         df = aggregate_data(df_non_agg, is_trx=is_trx)
-        df['Month'] = df['Month'].apply(lambda x: calendar.month_name[x])
+        # Month can be int (1-12) or already a month name
+        if 'Month' in df.columns:
+            month_num = pd.to_numeric(df['Month'], errors='coerce')
+            if month_num.notna().any():
+                df.loc[month_num.notna(), 'Month'] = month_num[month_num.notna()].astype(int).apply(
+                    lambda x: calendar.month_name[x]
+                )
 
         months = ["January", "February", "March", "April", "May", "June",
                   "July", "August", "September", "October", "November", "December"]
