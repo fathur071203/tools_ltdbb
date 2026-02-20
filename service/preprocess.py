@@ -126,6 +126,91 @@ def filter_start_end_year(df, start_year, end_year, is_month: bool = False):
     return df_filtered
 
 
+def compute_average_ticket_size(df_jkt: pd.DataFrame, df_national: pd.DataFrame) -> dict:
+    """Compute average ticket size for DKI (JKT sheet) and outside DKI.
+
+    Definitions:
+    - avg_dki = total_nominal_dki / total_freq_dki
+    - avg_outside = (total_nominal_national - total_nominal_dki) / (total_freq_national - total_freq_dki)
+
+    The national sheet sometimes repeats the same national totals for every PJP row in a period.
+    We try to detect that and aggregate per-period totals safely.
+    """
+
+    def _safe_sum(df: pd.DataFrame, cols: list[str]) -> float:
+        present = [c for c in cols if c in df.columns]
+        if not present:
+            return 0.0
+        return float(pd.to_numeric(df[present].sum(axis=1), errors="coerce").fillna(0).sum())
+
+    def _get_jkt_totals(df: pd.DataFrame) -> tuple[float, float]:
+        # Prefer raw columns from Trx_PJPJKT
+        nom = _safe_sum(df, ["Fin Nilai Inc", "Fin Nilai Out", "Fin Nilai Dom"])
+        frek = _safe_sum(df, ["Fin Jumlah Inc", "Fin Jumlah Out", "Fin Jumlah Dom"])
+
+        # Fallback to aggregated columns if the page passes preprocessed data
+        if nom == 0.0 and frek == 0.0:
+            nom = _safe_sum(df, ["Sum of Fin Nilai Inc", "Sum of Fin Nilai Out", "Sum of Fin Nilai Dom"])
+            frek = _safe_sum(df, ["Sum of Fin Jumlah Inc", "Sum of Fin Jumlah Out", "Sum of Fin Jumlah Dom"])
+
+        return nom, frek
+
+    def _get_national_totals(df: pd.DataFrame) -> tuple[float, float]:
+        if "Nom Nasional Total" in df.columns and "Frek Nasional Total" in df.columns:
+            group_cols: list[str] = []
+            for col in ["Year", "Quarter", "Month"]:
+                if col in df.columns and df[col].notna().any():
+                    group_cols.append(col)
+
+            if group_cols:
+                tmp = df[group_cols + ["Nom Nasional Total", "Frek Nasional Total"]].copy()
+
+                # Heuristic: if within-period values are mostly identical, treat as repeated totals.
+                nunique_nom = tmp.groupby(group_cols, dropna=False)["Nom Nasional Total"].nunique()
+                nunique_frek = tmp.groupby(group_cols, dropna=False)["Frek Nasional Total"].nunique()
+                noisy_groups = ((nunique_nom > 1) | (nunique_frek > 1)).mean() if len(nunique_nom) else 0.0
+
+                if noisy_groups <= 0.05:
+                    # Repeated totals -> take max per period then sum periods
+                    per_period = tmp.groupby(group_cols, dropna=False).agg(
+                        {"Nom Nasional Total": "max", "Frek Nasional Total": "max"}
+                    )
+                    return float(per_period["Nom Nasional Total"].sum()), float(per_period["Frek Nasional Total"].sum())
+                else:
+                    # Values vary per row -> treat as per-row contributions
+                    return float(tmp["Nom Nasional Total"].sum()), float(tmp["Frek Nasional Total"].sum())
+
+            # No period columns -> safest is to de-duplicate identical pairs (avoid obvious overcount)
+            dedup = df[["Nom Nasional Total", "Frek Nasional Total"]].drop_duplicates()
+            return float(dedup["Nom Nasional Total"].sum()), float(dedup["Frek Nasional Total"].sum())
+
+        # Fallback: if only transaction-like columns exist, approximate via sums
+        nom = _safe_sum(df, ["Nom Nasional Inc", "Nom Nasional Out", "Nom Nasional Dom", "Nom Nasional Total"])
+        frek = _safe_sum(df, ["Frek Nasional Inc", "Frek Nasional Out", "Frek Nasional Dom", "Frek Nasional Total"])
+        if nom == 0.0 and frek == 0.0:
+            nom = _safe_sum(df, ["Fin Nilai Inc", "Fin Nilai Out", "Fin Nilai Dom"])
+            frek = _safe_sum(df, ["Fin Jumlah Inc", "Fin Jumlah Out", "Fin Jumlah Dom"])
+        return nom, frek
+
+    jkt_nom, jkt_frek = _get_jkt_totals(df_jkt)
+    nat_nom, nat_frek = _get_national_totals(df_national)
+
+    outside_nom = max(nat_nom - jkt_nom, 0.0)
+    outside_frek = max(nat_frek - jkt_frek, 0.0)
+
+    avg_dki = (jkt_nom / jkt_frek) if jkt_frek else 0.0
+    avg_outside = (outside_nom / outside_frek) if outside_frek else 0.0
+
+    return {
+        "total_nominal_dki": jkt_nom,
+        "total_freq_dki": jkt_frek,
+        "total_nominal_national": nat_nom,
+        "total_freq_national": nat_frek,
+        "avg_ticket_dki": avg_dki,
+        "avg_ticket_outside": avg_outside,
+    }
+
+
 def filter_by_quarter(df, start_year, start_quarter, end_year, end_quarter):
     """
     Filter data berdasarkan Year-Quarter range yang kontinyu
@@ -173,7 +258,15 @@ def set_data_settings():
     return
 
 
+def ensure_session_state_defaults() -> None:
+    """Initialize keys used across pages to avoid KeyError on first load."""
+    st.session_state.setdefault('df', None)
+    st.session_state.setdefault('df_national', None)
+    st.session_state.setdefault('file_name', None)
+
+
 def set_page_settings():
+    ensure_session_state_defaults()
     pages = [
         st.Page(page="views/summary.py", title="Summary", default=True),
         st.Page(page="views/growth.py", title="Growth"),
@@ -900,21 +993,20 @@ def format_pjp_growth_table(df: pd.DataFrame, is_total: bool = True):
     Format tabel growth data untuk PJP dengan tipe data numerik yang tepat
     """
     df_copy = df.copy()
+
+    from service.formatting import format_id_int_thousands, format_id_percent
     
     # Format function untuk percent
     def format_percent(x):
         if pd.isna(x):
             return 'None'
-        return '{:,.2f} %'.format(x).replace(',', '#').replace('.', ',').replace('#', '.')
+        return format_id_percent(x, decimals=2, show_sign=False, none='None', space_before_percent=True)
     
     # Format function untuk ribuan (dengan titik sebagai thousand separator, tanpa desimal)
     def format_thousands(x):
         if pd.isna(x):
             return ''
-        # Bulatkan ke angka terdekat sebelum format
-        rounded = int(round(x))
-        # Format dengan thousand separator
-        return '{:,}'.format(rounded).replace(',', '.')
+        return format_id_int_thousands(x, none='')
     
     # Format setiap kolom langsung di DataFrame
     for col in df_copy.columns:

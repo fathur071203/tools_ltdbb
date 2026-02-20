@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any, Callable, TypeVar
 
 import streamlit as st
 import pandas as pd
@@ -7,7 +8,91 @@ import io
 from streamlit_js_eval import streamlit_js_eval
 import time
 
+import httpcore
+import httpx
+
 from supabase import create_client
+
+
+T = TypeVar("T")
+
+_DB_LAST_ERROR_KEY = "_tools_ltdbb_db_last_error"
+
+
+def _is_transient_network_error(exc: Exception) -> bool:
+    return isinstance(exc, (httpx.HTTPError, httpcore.HTTPError, OSError, TimeoutError))
+
+
+def _store_db_error_once(exc: Exception, context: str) -> None:
+    if _DB_LAST_ERROR_KEY in st.session_state:
+        return
+    st.session_state[_DB_LAST_ERROR_KEY] = {
+        "time": datetime.now().isoformat(timespec="seconds"),
+        "context": context,
+        "error": repr(exc),
+    }
+
+
+def show_db_error_banner(clear: bool = True) -> None:
+    """Render a friendly DB connection error message if one was captured."""
+    err = st.session_state.get(_DB_LAST_ERROR_KEY)
+    if not err:
+        return
+
+    st.error(
+        "Koneksi database bermasalah (Supabase/PostgREST). "
+        "Beberapa fitur mungkin tidak tersedia sampai koneksi pulih."
+    )
+    with st.expander("Detail error"):
+        st.code(f"{err['time']} - {err['context']}\n{err['error']}")
+
+    if clear:
+        st.session_state.pop(_DB_LAST_ERROR_KEY, None)
+
+
+def connect_db_safe():
+    """Return Supabase client or None; never raises.
+
+    Streamlit pages run top-level code on every rerun; failing fast here keeps
+    the app usable when the DB is temporarily unreachable or secrets are missing.
+    """
+    try:
+        return connect_db()
+    except Exception as exc:
+        _store_db_error_once(exc, context="connect_db")
+        return None
+
+
+def _safe_postgrest_data(
+    query_fn: Callable[[], Any],
+    *,
+    default: T,
+    context: str,
+    attempts: int = 3,
+    initial_delay_s: float = 0.6,
+) -> T:
+    """Execute a PostgREST/Supabase query with retries for transient network errors."""
+    delay_s = initial_delay_s
+    last_exc: Exception | None = None
+
+    for attempt in range(1, max(1, attempts) + 1):
+        try:
+            resp = query_fn().execute()
+            return getattr(resp, "data", default)
+        except Exception as exc:
+            last_exc = exc
+            if not _is_transient_network_error(exc):
+                raise
+            if attempt < attempts:
+                time.sleep(delay_s)
+                delay_s = min(delay_s * 2, 5.0)
+            else:
+                _store_db_error_once(exc, context)
+                return default
+
+    if last_exc is not None:
+        _store_db_error_once(last_exc, context)
+    return default
 
 
 @st.cache_resource
@@ -17,19 +102,29 @@ def connect_db():
     return create_client(url, key)
 
 def get_user_logs_data(_db):
-    response = _db.table("user_logs").select("data").eq("username", "Rakan").execute()
-    return response.data
+    return _safe_postgrest_data(
+        lambda: _db.table("user_logs").select("data").eq("username", "Rakan"),
+        default=[],
+        context="SELECT user_logs (username=Rakan)",
+    )
 
 
 def get_pjp_jkt(_db):
-    response = _db.table("pjp_reference").select("code, name, second_name, pt_name").execute()
-    return response.data
+    return _safe_postgrest_data(
+        lambda: _db.table("pjp_reference").select("code, name, second_name, pt_name"),
+        default=[],
+        context="SELECT pjp_reference", 
+    )
 
 
 def get_city_ref(_db):
-    response = _db.table("city_reference").select("code, name, province_reference(name)").execute()
+    response_data = _safe_postgrest_data(
+        lambda: _db.table("city_reference").select("code, name, province_reference(name)"),
+        default=[],
+        context="SELECT city_reference", 
+    )
     transformed_data = []
-    for city in response.data:
+    for city in response_data:
         province_ref = city['province_reference']
         city_entry = {
             "code": city['code'],
@@ -41,9 +136,13 @@ def get_city_ref(_db):
 
 
 def get_province_ref(_db):
-    response = _db.table("province_reference").select("code, name, country_reference(name)").execute()
+    response_data = _safe_postgrest_data(
+        lambda: _db.table("province_reference").select("code, name, country_reference(name)"),
+        default=[],
+        context="SELECT province_reference",
+    )
     transformed_data = []
-    for province in response.data:
+    for province in response_data:
         country_ref = province['country_reference']
         province_entry = {
             "code": province['code'],
@@ -55,20 +154,31 @@ def get_province_ref(_db):
 
 
 def get_country_ref(_db):
-    response = _db.table("country_reference").select("code, name").execute()
-    return response.data
+    return _safe_postgrest_data(
+        lambda: _db.table("country_reference").select("code, name"),
+        default=[],
+        context="SELECT country_reference",
+    )
 
 
 def get_sus_peoples(_db):
-    response = _db.table("suspicious_person").select("name").execute()
-    return response.data
+    return _safe_postgrest_data(
+        lambda: _db.table("suspicious_person").select("name"),
+        default=[],
+        context="SELECT suspicious_person",
+    )
 
 
 def get_sus_city(_db, is_sus: bool):
-    response = _db.table("city_reference").select("code, name, province_reference(name)").eq("is_suspicious",
-                                                                                             is_sus).execute()
+    response_data = _safe_postgrest_data(
+        lambda: _db.table("city_reference")
+        .select("code, name, province_reference(name)")
+        .eq("is_suspicious", is_sus),
+        default=[],
+        context=f"SELECT city_reference (is_suspicious={is_sus})",
+    )
     transformed_data = []
-    for cities in response.data:
+    for cities in response_data:
         prov_ref = cities['province_reference']
         city_entry = {
             "code": cities['code'],
@@ -80,10 +190,15 @@ def get_sus_city(_db, is_sus: bool):
 
 
 def get_sus_prov(_db, is_sus: bool):
-    response = _db.table("province_reference").select("code, name, country_reference(name)").eq("is_suspicious",
-                                                                                                is_sus).execute()
+    response_data = _safe_postgrest_data(
+        lambda: _db.table("province_reference")
+        .select("code, name, country_reference(name)")
+        .eq("is_suspicious", is_sus),
+        default=[],
+        context=f"SELECT province_reference (is_suspicious={is_sus})",
+    )
     transformed_data = []
-    for prov in response.data:
+    for prov in response_data:
         country_ref = prov['country_reference']
         prov_entry = {
             "code": prov['code'],
@@ -95,13 +210,23 @@ def get_sus_prov(_db, is_sus: bool):
 
 
 def get_blacklisted_country(_db, is_blacklisted: bool):
-    response = _db.table("country_reference").select("code, name").eq("is_blacklisted", is_blacklisted).execute()
-    return response.data
+    return _safe_postgrest_data(
+        lambda: _db.table("country_reference")
+        .select("code, name")
+        .eq("is_blacklisted", is_blacklisted),
+        default=[],
+        context=f"SELECT country_reference (is_blacklisted={is_blacklisted})",
+    )
 
 
 def get_greylisted_country(_db, is_greylisted: bool):
-    response = _db.table("country_reference").select("code, name").eq("is_greylisted", is_greylisted).execute()
-    return response.data
+    return _safe_postgrest_data(
+        lambda: _db.table("country_reference")
+        .select("code, name")
+        .eq("is_greylisted", is_greylisted),
+        default=[],
+        context=f"SELECT country_reference (is_greylisted={is_greylisted})",
+    )
 
 
 def transform_options_province(list_province):
@@ -289,14 +414,16 @@ def upload_df(_db, username: str, df: pd.DataFrame):
 def get_country_participated(_db, list_countries_code):
     list_countries = []
     for code in list_countries_code:
-        response = _db.table("country_reference").select("code, name").eq("code", code).execute()
-        if response.data:
-            for country in response.data:
-                country_entry = {
-                    "code": country['code'],
-                    "name": country['name'],
-                }
-                list_countries.append(country_entry)
+        rows = _safe_postgrest_data(
+            lambda: _db.table("country_reference").select("code, name").eq("code", code),
+            default=[],
+            context=f"SELECT country_reference (code={code})",
+        )
+        for country in rows:
+            list_countries.append({
+                "code": country.get('code'),
+                "name": country.get('name'),
+            })
     return list_countries
 
 

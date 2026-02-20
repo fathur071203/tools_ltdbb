@@ -58,6 +58,77 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
 
     st.subheader(f"Market Share PJP LR Jakarta Triwulan {selected_quarter_pjp} Tahun {selected_year_pjp}")
 
+    # ===== Average ticket size (DKI vs luar DKI) mengikuti filter Year/Quarter =====
+    def _fmt_juta_per_trx(value: float) -> str:
+        s = f"Rp {value/1_000_000:,.2f} juta/transaksi"
+        return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def _fmt_rp(value: float) -> str:
+        s = f"Rp {value:,.0f}"
+        return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def _fmt_int(value: float) -> str:
+        s = f"{int(round(value)):,.0f}"
+        return s.replace(",", ".")
+
+    def _sum_cols(df_: pd.DataFrame, cols: list[str]) -> float:
+        present = [c for c in cols if c in df_.columns]
+        if not present or df_ is None or df_.empty:
+            return 0.0
+        values = pd.to_numeric(df_[present].sum(axis=1), errors="coerce").fillna(0)
+        return float(values.sum())
+
+    def _national_totals(df_nat_filtered: pd.DataFrame) -> tuple[float, float]:
+        """Return (nominal_total, frek_total) from national dataframe.
+
+        Some files have 'Nom Nasional Total' empty/0 while Inc/Out/Dom are filled.
+        In that case compute total = Inc+Out+Dom.
+        """
+        nom_total = _sum_cols(df_nat_filtered, ["Nom Nasional Total"])
+        frek_total = _sum_cols(df_nat_filtered, ["Frek Nasional Total"])
+
+        if nom_total == 0.0:
+            nom_total = _sum_cols(df_nat_filtered, ["Nom Nasional Inc", "Nom Nasional Out", "Nom Nasional Dom"])
+        if frek_total == 0.0:
+            frek_total = _sum_cols(df_nat_filtered, ["Frek Nasional Inc", "Frek Nasional Out", "Frek Nasional Dom"])
+
+        return nom_total, frek_total
+
+    # Raw_JKTNasional stores nominal in "miliar" (billions of Rupiah)
+    _NOMINAL_NATIONAL_SCALE_TO_RP = 1_000_000_000.0
+
+    try:
+        ticket_q = compute_average_ticket_size(df_preprocessed_filtered, df_national_filtered)
+        avg_dki_q = float(ticket_q.get("avg_ticket_dki", 0.0) or 0.0)
+
+        total_nom_dki_q = float(ticket_q.get("total_nominal_dki", 0.0) or 0.0)
+        total_freq_dki_q = float(ticket_q.get("total_freq_dki", 0.0) or 0.0)
+
+        # Luar DKI (requested): use National totals directly: Nominal Nasional / Frekuensi Nasional
+        total_nom_out_q, total_freq_out_q = _national_totals(df_national_filtered)
+        total_nom_out_q = total_nom_out_q * _NOMINAL_NATIONAL_SCALE_TO_RP
+        avg_outside_q = (total_nom_out_q / total_freq_out_q) if total_freq_out_q else 0.0
+
+        st.markdown("#### Rata-rata nominal per transaksi (Average Ticket)")
+        colA, colB = st.columns(2)
+        with colA:
+            st.metric("Average ticket size DKI Jakarta", _fmt_juta_per_trx(avg_dki_q))
+            st.caption(f"Total nominal DKI: {_fmt_rp(total_nom_dki_q)} | Total frekuensi DKI: {_fmt_int(total_freq_dki_q)}")
+        with colB:
+            st.metric("Average ticket size Luar DKI Jakarta", _fmt_juta_per_trx(avg_outside_q))
+            st.caption(f"Total nominal luar DKI: {_fmt_rp(total_nom_out_q)} | Total frekuensi luar DKI: {_fmt_int(total_freq_out_q)}")
+
+        if avg_dki_q > 0 and avg_outside_q > 0:
+            st.info(
+                f"Nominal transaksi PJP LR di wilayah kerja DKI Jakarta cenderung bernilai tinggi, meskipun jumlah "
+                f"frekuensinya tidak sebanyak wilayah lain (average ticket size transaksi PJP LR di wilayah kerja DKI "
+                f"Jakarta adalah {_fmt_juta_per_trx(avg_dki_q)}). Hal ini berbanding terbalik dengan transaksi PJP LR "
+                f"di luar wilayah DKI Jakarta, di mana transaksi memiliki frekuensi tinggi, namun secara nominal bernilai "
+                f"rendah yaitu {_fmt_juta_per_trx(avg_outside_q)}."
+            )
+    except Exception as _ticket_err:
+        st.warning(f"Gagal menghitung average ticket size: {_ticket_err}")
+
     df_out = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Out")
     df_inc = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Inc")
     df_dom = compile_data_market_share(df_preprocessed_filtered, df_national_filtered, "Dom")
@@ -110,6 +181,25 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
         make_pie_chart_market_share(df_total, "Total", is_nom=False, key="Total_False_NotAllTime")
 
     st.subheader(f"Market Share PJP Jakarta LR All-Time ({selected_year_pjp} - {max_year})")
+
+    # Average ticket size untuk periode All-Time (mengikuti filter Year start)
+    try:
+        ticket_y = compute_average_ticket_size(df_preprocessed_filtered_year, df_national_filtered_year)
+        avg_dki_y = float(ticket_y.get("avg_ticket_dki", 0.0) or 0.0)
+
+        total_nom_dki_y = float(ticket_y.get("total_nominal_dki", 0.0) or 0.0)
+        total_freq_dki_y = float(ticket_y.get("total_freq_dki", 0.0) or 0.0)
+
+        total_nom_out_y, total_freq_out_y = _national_totals(df_national_filtered_year)
+        total_nom_out_y = total_nom_out_y * _NOMINAL_NATIONAL_SCALE_TO_RP
+        avg_outside_y = (total_nom_out_y / total_freq_out_y) if total_freq_out_y else 0.0
+
+        st.caption(
+            f"All-Time average ticket size: DKI {_fmt_juta_per_trx(avg_dki_y)} (Nom {_fmt_rp(total_nom_dki_y)}, Frek {_fmt_int(total_freq_dki_y)}) "
+            f"| Luar DKI {_fmt_juta_per_trx(avg_outside_y)} (Nom {_fmt_rp(total_nom_out_y)}, Frek {_fmt_int(total_freq_out_y)})"
+        )
+    except Exception:
+        pass
     st.markdown("#### Market Share Outgoing All-Time")
     df_out_year_display = df_out_year.copy()
     df_out_year_display = format_profile_df(df_out_year_display, is_market_share=True)

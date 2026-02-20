@@ -1,4 +1,6 @@
 import pandas as pd
+
+from service.formatting import format_en_percent
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
@@ -389,7 +391,7 @@ def make_yearly_stacked_bar_yoy_chart(
                 y=y_used,
                 xref="x",
                 yref="y2",
-                text=f"{y_float:.2f}%{suffix}",
+                text=f"{format_en_percent(y_float, decimals=2, show_sign=False, none='')}{suffix}",
                 showarrow=False,
                 xanchor="center",
                 yanchor="bottom",
@@ -815,7 +817,7 @@ def make_yearly_stacked_bar_yoy_chart_ytd(
                 y=y_used,
                 xref="x",
                 yref="y2",
-                text=f"{y_float:.2f}%{suffix}",
+                text=f"{format_en_percent(y_float, decimals=2, show_sign=False, none='')}{suffix}",
                 showarrow=False,
                 xanchor="center",
                 yanchor="bottom",

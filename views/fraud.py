@@ -9,8 +9,8 @@ from service.preprocess import set_page_visuals
 from service.fds import load_models, read_excel, read_parquets, split_df, get_ml_model, \
     get_pjp_suspected_blacklisted_greylisted
 from datetime import datetime
-from service.database import connect_db, get_pjp_jkt, get_blacklisted_country, get_greylisted_country, get_sus_peoples, \
-    upload_df, get_user_logs_data, get_country_participated
+from service.database import connect_db, connect_db_safe, get_pjp_jkt, get_blacklisted_country, get_greylisted_country, get_sus_peoples, \
+    upload_df, get_user_logs_data, get_country_participated, show_db_error_banner
 from collections import Counter
 import json
 
@@ -601,12 +601,42 @@ known_names = [
 # Initial Page Setup
 set_page_visuals("fds")
 
-db = connect_db()
+# Load DB reference data lazily and keep app running if DB is unreachable.
+if "_fraud_db_refs" not in st.session_state:
+    st.session_state["_fraud_db_refs"] = None
 
-list_pjp_dki = get_pjp_jkt(db)
-list_blacklisted = get_blacklisted_country(db, True)
-list_greylisted = get_greylisted_country(db, True)
-list_sus_person = get_sus_peoples(db)
+if st.session_state.get("_fraud_db_refs") is None:
+    db = connect_db_safe()
+    refs = {
+        "list_pjp_dki": [],
+        "list_blacklisted": [],
+        "list_greylisted": [],
+        "list_sus_person": [],
+    }
+    if db is not None:
+        try:
+            refs["list_pjp_dki"] = get_pjp_jkt(db) or []
+            refs["list_blacklisted"] = get_blacklisted_country(db, True) or []
+            refs["list_greylisted"] = get_greylisted_country(db, True) or []
+            refs["list_sus_person"] = get_sus_peoples(db) or []
+        except Exception:
+            # Any unexpected error: keep defaults and show banner
+            pass
+    st.session_state["_fraud_db_refs"] = refs
+
+with st.sidebar:
+    if st.button("Refresh referensi DB", use_container_width=True, type="secondary"):
+        st.session_state["_fraud_db_refs"] = None
+        st.session_state.pop("_tools_ltdbb_db_last_error", None)
+        st.rerun()
+
+show_db_error_banner(clear=False)
+
+_refs = st.session_state.get("_fraud_db_refs") or {}
+list_pjp_dki = _refs.get("list_pjp_dki", [])
+list_blacklisted = _refs.get("list_blacklisted", [])
+list_greylisted = _refs.get("list_greylisted", [])
+list_sus_person = _refs.get("list_sus_person", [])
 
 list_code_blacklisted = []
 for country in list_blacklisted:

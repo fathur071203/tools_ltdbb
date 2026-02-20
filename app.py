@@ -41,7 +41,7 @@ def main():
     set_page_settings()
     set_data_settings()
     warnings.filterwarnings("ignore")
-    db = connect_db()
+
 
 if __name__ == '__main__':
     main()

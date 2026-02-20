@@ -1,5 +1,7 @@
 import pandas as pd
 import streamlit as st
+
+from service.formatting import format_id_percent
 import calendar
 
 from service.preprocess import *
@@ -9,9 +11,9 @@ from service.database import *
 # Initial Page Setup
 set_page_visuals("viz")
 
-db = connect_db()
-
-list_pjp_dki = get_pjp_jkt(db)
+# DB reference data is optional; fetch it only when needed.
+if "_pjp_reference_cache" not in st.session_state:
+    st.session_state["_pjp_reference_cache"] = None
 
 if 'df' not in st.session_state:
     st.session_state['df'] = None
@@ -41,12 +43,43 @@ else:
     df_national = st.session_state['df_national']
 
 if df is not None and df_national is not None:
-    list_pjp_code_dki = []
-    for pjp in list_pjp_dki:
-        list_pjp_code_dki.append(int(pjp['code']))
+    # Optional DB-based filter for DKI PJP reference
+    if st.session_state.get("_pjp_reference_cache") is None:
+        db = connect_db_safe()
+        if db is not None:
+            try:
+                st.session_state["_pjp_reference_cache"] = get_pjp_jkt(db)
+            except Exception:
+                st.session_state["_pjp_reference_cache"] = []
+        else:
+            st.session_state["_pjp_reference_cache"] = []
 
-    df = df[df['Kode'].isin(list_pjp_code_dki)]
-    st.session_state['df'] = df
+    list_pjp_dki = st.session_state.get("_pjp_reference_cache") or []
+
+    with st.sidebar:
+        if st.button("Retry koneksi DB", use_container_width=True, type="secondary"):
+            st.session_state["_pjp_reference_cache"] = None
+            st.session_state.pop("_tools_ltdbb_db_last_error", None)
+            st.rerun()
+
+    show_db_error_banner(clear=False)
+
+    if list_pjp_dki:
+        list_pjp_code_dki = []
+        for pjp in list_pjp_dki:
+            try:
+                list_pjp_code_dki.append(int(pjp['code']))
+            except Exception:
+                continue
+
+        if list_pjp_code_dki:
+            df = df[df['Kode'].isin(list_pjp_code_dki)]
+            st.session_state['df'] = df
+    else:
+        st.info(
+            "Referensi PJP dari database tidak tersedia saat ini; "
+            "filter DKI tidak diterapkan (menggunakan data dari file)."
+        )
 
     if not df['Year'].dtype == 'int64':
         df['Year'] = df['Year'].astype('int64')
@@ -144,7 +177,7 @@ if df is not None and df_national is not None:
             "Total Frekuensi Outgoing": lambda x: '{:,.0f}'.format(x),
             "Total Frekuensi Incoming": lambda x: '{:,.0f}'.format(x),
             "Total Frekuensi Domestik": lambda x: '{:,.0f}'.format(x),
-            "Market Share (%)": lambda x: '{:,.2f} %'.format(x),
+            "Market Share (%)": lambda x: format_id_percent(x, decimals=2, show_sign=False, none='-', space_before_percent=True),
         },
         thousands=".",
         decimal=",",

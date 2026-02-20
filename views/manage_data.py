@@ -38,19 +38,31 @@ def get_selected_person(name: str, list_person_db):
 # Initial Page Setup
 set_page_visuals("dm")
 
-db = connect_db()
+db = connect_db_safe()
+show_db_error_banner(clear=False)
 
-list_pjp = get_pjp_jkt(db).copy()
-list_sus_people = get_sus_peoples(db).copy()
-list_sus_cities = get_sus_city(db, True).copy()
-list_non_sus_cities = get_sus_city(db, False).copy()
-list_sus_prov = get_sus_prov(db, True).copy()
-list_non_sus_prov = get_sus_prov(db, False).copy()
+with st.sidebar:
+    if st.button("Retry koneksi DB", use_container_width=True, type="secondary"):
+        st.session_state.pop("_tools_ltdbb_db_last_error", None)
+        st.rerun()
 
-list_non_blacklisted = get_blacklisted_country(db, False).copy()
-list_non_greylisted = get_greylisted_country(db, False).copy()
-list_blacklisted = get_blacklisted_country(db, True).copy()
-list_greylisted = get_greylisted_country(db, True).copy()
+if db is None:
+    st.warning("Database tidak dapat diakses saat ini. Halaman Kelola Data dinonaktifkan sementara.")
+    st.stop()
+
+list_pjp = (get_pjp_jkt(db) or []).copy()
+list_sus_people = (get_sus_peoples(db) or []).copy()
+list_sus_cities = (get_sus_city(db, True) or []).copy()
+list_non_sus_cities = (get_sus_city(db, False) or []).copy()
+list_sus_prov = (get_sus_prov(db, True) or []).copy()
+list_non_sus_prov = (get_sus_prov(db, False) or []).copy()
+
+list_non_blacklisted = (get_blacklisted_country(db, False) or []).copy()
+list_non_greylisted = (get_greylisted_country(db, False) or []).copy()
+list_blacklisted = (get_blacklisted_country(db, True) or []).copy()
+list_greylisted = (get_greylisted_country(db, True) or []).copy()
+
+show_db_error_banner(clear=False)
 
 list_non_blacklisted = sorted(list_non_blacklisted, key=lambda x: x['name'])
 list_non_greylisted = sorted(list_non_greylisted, key=lambda x: x['name'])
