@@ -1338,7 +1338,7 @@ if st.session_state['df'] is not None:
         df_out_combined_month = merge_df_growth(df_jumlah_out_month_filtered, df_nom_out_month_filtered, True)
         df_dom_combined_month = merge_df_growth(df_jumlah_dom_month_filtered, df_nom_dom_month_filtered, True)
 
-        st.header("Growth in Transactions")
+        st.subheader("📈 Growth in Transactions")
         
         # Initialize default view mode
         if 'view_mode' not in st.session_state:
@@ -1496,41 +1496,6 @@ if st.session_state['df'] is not None:
             out_t = qround_float(total_out_value / 1e12, decimals=2, none=0.0) or 0.0
             dom_t = qround_float(total_dom_value / 1e12, decimals=2, none=0.0) or 0.0
             tot_t = qround_float(inc_t + out_t + dom_t, decimals=2, none=0.0) or 0.0
-            
-            # KPI Cards CSS
-            kpi_css = """
-            <style>
-                .kpi-card {
-                    background: white;
-                    border-radius: 12px;
-                    padding: 20px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-                    border-left: 5px solid;
-                    transition: transform 0.2s ease, box-shadow 0.2s ease;
-                }
-                .kpi-card:hover {
-                    transform: translateY(-4px);
-                    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-                }
-                .kpi-title {
-                    font-size: 14px;
-                    color: #6b7280;
-                    font-weight: 600;
-                    margin-bottom: 8px;
-                }
-                .kpi-value-main {
-                    font-size: 28px;
-                    font-weight: 700;
-                    margin-bottom: 4px;
-                }
-                .kpi-value-sub {
-                    font-size: 16px;
-                    color: #6b7280;
-                    font-weight: 500;
-                }
-            </style>
-            """
-            st.markdown(kpi_css, unsafe_allow_html=True)
             
             col1, col2, col3, col4 = st.columns(4)
             
@@ -2366,40 +2331,6 @@ if st.session_state['df'] is not None:
             if df_total_combined is None or df_total_combined.empty:
                 st.info("Tidak ada data pada rentang tahun/kuartal yang dipilih.")
             else:
-                kpi_css = """
-                <style>
-                    .kpi-card {
-                        background: white;
-                        border-radius: 12px;
-                        padding: 20px;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-                        border-left: 5px solid;
-                        transition: transform 0.2s ease, box-shadow 0.2s ease;
-                    }
-                    .kpi-card:hover {
-                        transform: translateY(-4px);
-                        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-                    }
-                    .kpi-title {
-                        font-size: 14px;
-                        color: #6b7280;
-                        font-weight: 600;
-                        margin-bottom: 8px;
-                    }
-                    .kpi-value-main {
-                        font-size: 28px;
-                        font-weight: 700;
-                        margin-bottom: 4px;
-                    }
-                    .kpi-value-sub {
-                        font-size: 16px;
-                        color: #6b7280;
-                        font-weight: 500;
-                    }
-                </style>
-                """
-                st.markdown(kpi_css, unsafe_allow_html=True)
-
                 def _safe_year_sum(df_src: pd.DataFrame | None, value_col: str) -> pd.Series:
                     if df_src is None or df_src.empty:
                         return pd.Series(dtype="float64")

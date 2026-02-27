@@ -92,7 +92,7 @@ def filter_data(df, selected_pjp=None, selected_year=None,
         df = df[df['Year'] == selected_year]
     if selected_quarter and selected_quarter != 'All':
         df = df[df['Quarter'] == selected_quarter]
-    if selected_month and selected_month != 'All':
+    if selected_month and selected_month != 'All' and 'Month' in df.columns:
         df = df[df['Month'] == selected_month]
     if selected_pjp and selected_pjp != 'All':
         df = df[df['Nama PJP'] == selected_pjp]
@@ -275,24 +275,227 @@ def set_page_settings():
         st.Page(page="views/fraud.py", title="Analisis TKM"),
         st.Page(page="views/manage_data.py", title="Kelola Data")
     ]
-    st.set_page_config(
-        page_title="Tools Analisa Data LTDBB",
-        page_icon=".static/favicon.png",
-        layout="wide",
-        initial_sidebar_state="expanded")
     pg = st.navigation(pages=pages)
     pg.run()
 
 
+def inject_global_theme_css() -> None:
+    """Tema global modern (biru-cyan) yang aman untuk semua halaman."""
+    st.markdown(
+        """
+        <style>
+            [data-testid="stAppViewContainer"] {
+                background: linear-gradient(180deg, #f8fbff 0%, #f1f7ff 52%, #f3fcff 100%);
+            }
+            .block-container {
+                /* Hindari tabrakan dengan App Toolbar/Header Streamlit */
+                padding-top: 4.2rem;
+                padding-bottom: 1.0rem;
+            }
+            [data-testid="stSidebarContent"] {
+                /* Pastikan menu navigasi halaman tidak ketutup toolbar */
+                padding-top: 3.4rem;
+            }
+            [data-testid="stSidebarNav"] {
+                margin-top: 0.2rem;
+            }
+            .page-hero {
+                background: linear-gradient(120deg, #1d4ed8 0%, #2563eb 45%, #06b6d4 100%);
+                border-radius: 14px;
+                padding: 0.9rem 1rem;
+                margin-bottom: 0.8rem;
+                color: #ffffff;
+                box-shadow: 0 12px 24px rgba(37, 99, 235, 0.24);
+                border: 1px solid rgba(255, 255, 255, 0.22);
+            }
+            .page-hero-title {
+                margin: 0;
+                font-size: 1.12rem;
+                font-weight: 750;
+                line-height: 1.2;
+            }
+            .page-hero-sub {
+                margin-top: 0.2rem;
+                font-size: 0.85rem;
+                opacity: 0.95;
+            }
+            [data-testid="stSidebar"] > div:first-child {
+                background: linear-gradient(180deg, #0b3f86 0%, #0f5db0 46%, #0b8bb0 100%);
+            }
+            /* Navigation tetap terang */
+            [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] a,
+            [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] span,
+            [data-testid="stSidebar"] .stRadio label,
+            [data-testid="stSidebar"] .stCheckbox label,
+            [data-testid="stSidebar"] .stSelectbox label,
+            [data-testid="stSidebar"] .stMultiSelect label {
+                color: #f8fbff !important;
+            }
+            [data-testid="stSidebarNav"] a {
+                color: #f8fbff !important;
+                border-radius: 10px;
+                margin: 2px 4px;
+                padding: 6px 10px;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.14);
+            }
+            [data-testid="stSidebarNav"] a * {
+                color: #f8fbff !important;
+            }
+            [data-testid="stSidebarNav"] a:hover {
+                background: rgba(255, 255, 255, 0.16);
+                border-color: rgba(255, 255, 255, 0.28);
+            }
+            [data-testid="stSidebarNav"] a[aria-current="page"] {
+                color: #0b2f63 !important;
+                background: linear-gradient(135deg, #e6f2ff 0%, #dff7ff 100%);
+                border-color: rgba(255, 255, 255, 0.85);
+                font-weight: 700;
+            }
+            [data-testid="stSidebarNav"] a[aria-current="page"] * {
+                color: #0b2f63 !important;
+            }
+
+            /* Filter/input di sidebar pakai teks gelap agar tidak nyaru */
+            [data-testid="stSidebar"] label,
+            [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+            [data-testid="stSidebar"] .stCaption,
+            [data-testid="stSidebar"] .stRadio label p,
+            [data-testid="stSidebar"] .stCheckbox label p,
+            [data-testid="stSidebar"] .stSelectbox label p,
+            [data-testid="stSidebar"] .stMultiSelect label p,
+            [data-testid="stSidebar"] .stSlider label p {
+                color: #0f172a !important;
+                font-weight: 600;
+            }
+            [data-testid="stSidebar"] [data-baseweb="select"] *,
+            [data-testid="stSidebar"] [data-baseweb="popover"] *,
+            [data-testid="stSidebar"] [role="listbox"] *,
+            [data-testid="stSidebar"] .stTextInput input,
+            [data-testid="stSidebar"] .stNumberInput input {
+                color: #0f172a !important;
+            }
+
+            /* Logo sidebar: paksa punya background putih agar tidak nyaru */
+            [data-testid="stSidebar"] [data-testid="stImage"] {
+                background: #ffffff;
+                border-radius: 12px;
+                border: 1px solid #dce8fb;
+                box-shadow: 0 8px 16px rgba(2, 12, 34, 0.18);
+                padding: 8px 8px 6px 8px;
+                margin: 4px 2px 12px 2px;
+            }
+            [data-testid="stSidebar"] [data-testid="stImage"] img {
+                border-radius: 8px;
+            }
+
+            [data-testid="stSidebar"] [data-baseweb="select"] > div,
+            [data-testid="stSidebar"] [data-baseweb="input"] > div,
+            [data-testid="stSidebar"] .stTextInput input,
+            [data-testid="stSidebar"] .stNumberInput input {
+                background: rgba(255, 255, 255, 0.98) !important;
+                color: #0f172a !important;
+                border-radius: 10px !important;
+                border: 1px solid #d6e7ff !important;
+            }
+            .stButton > button[kind="primary"],
+            .stButton > button[data-testid="stBaseButton-primary"] {
+                background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%) !important;
+                color: #ffffff !important;
+                border: none !important;
+                border-radius: 10px !important;
+                box-shadow: 0 8px 18px rgba(37, 99, 235, 0.24) !important;
+            }
+            .stButton > button[kind="primary"]:hover,
+            .stButton > button[data-testid="stBaseButton-primary"]:hover {
+                filter: brightness(1.03);
+                transform: translateY(-1px);
+            }
+            .stDownloadButton > button {
+                background: linear-gradient(135deg, #10b981 0%, #22c55e 100%) !important;
+                color: #ffffff !important;
+                border: none !important;
+                border-radius: 10px !important;
+                box-shadow: 0 8px 18px rgba(16, 185, 129, 0.24) !important;
+            }
+            .kpi-card {
+                background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+                border-radius: 14px;
+                padding: 14px;
+                border: 1px solid #dbeafe;
+                box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+            }
+            .kpi-card:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 14px 24px rgba(15, 23, 42, 0.12);
+            }
+            .kpi-title {
+                font-size: 12px;
+                color: #64748b;
+                font-weight: 700;
+                margin-bottom: 4px;
+            }
+            .kpi-value-main {
+                font-size: 22px;
+                font-weight: 800;
+                margin-bottom: 0;
+                line-height: 1.25;
+            }
+            .kpi-value-sub {
+                font-size: 12px;
+                color: #64748b;
+                font-weight: 600;
+            }
+            [data-testid="stAlert"] {
+                border-radius: 10px;
+                border: 1px solid #dbeafe;
+            }
+            [data-testid="stExpander"] {
+                border: 1px solid #dbeafe;
+                border-radius: 10px;
+                background: #ffffff;
+            }
+            [data-testid="stDataFrame"] {
+                border: 1px solid #dbeafe;
+                border-radius: 10px;
+                box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+                overflow: hidden;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def set_page_visuals(condition):
-    if condition == "viz":
-        st.title('Data LTDBB PJP LR JKT Visualization')
-    elif condition == "fds":
-        st.title('Analisis Transaksi Keuangan Mencurigakan (TKM)')
-    elif condition == "dm":
-        st.title('Kelola Data Sistem')
+    inject_global_theme_css()
+
+    title_map = {
+        "viz": "Data LTDBB PJP LR JKT Visualization",
+        "fds": "Analisis Transaksi Keuangan Mencurigakan (TKM)",
+        "dm": "Kelola Data Sistem",
+    }
+    subtitle_map = {
+        "viz": "Dashboard analitik transaksi dengan tampilan modern dan ringkas.",
+        "fds": "Pemantauan pola transaksi mencurigakan secara lebih terstruktur.",
+        "dm": "Pengelolaan data dan konfigurasi sistem dalam satu halaman.",
+    }
+
+    page_title = title_map.get(condition, "Dashboard")
+    page_subtitle = subtitle_map.get(condition, "")
+
+    st.markdown(
+        f"""
+        <div class="page-hero">
+            <div class="page-hero-title">{page_title}</div>
+            <div class="page-hero-sub">{page_subtitle}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     with st.sidebar:
-        st.image(".static/Logo.png")
+        st.image(".static/Logo.png", use_container_width=True)
 
 def aggregate_data(df, is_trx=False):
     # Ensure aggregation inputs are numeric; Excel uploads sometimes load as strings
