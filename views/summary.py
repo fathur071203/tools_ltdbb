@@ -81,12 +81,32 @@ if df is not None and df_national is not None:
             "filter DKI tidak diterapkan (menggunakan data dari file)."
         )
 
-    if not df['Year'].dtype == 'int64':
-        df['Year'] = df['Year'].astype('int64')
-    if not df['Quarter'].dtype == 'int64':
-        df['Quarter'] = df['Quarter'].astype('int64')
-    if not df['Month'].dtype == 'int64':
-        df['Month'] = df['Month'].astype('int64')
+    # Normalize time columns safely to avoid IntCastingNaNError
+    time_cols = ['Year', 'Quarter', 'Month']
+    for col in time_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce').replace([float('inf'), float('-inf')], pd.NA)
+
+    invalid_time_mask = (
+        df['Year'].isna()
+        | df['Quarter'].isna()
+        | df['Month'].isna()
+        | ~df['Quarter'].between(1, 4)
+        | ~df['Month'].between(1, 12)
+    )
+
+    if invalid_time_mask.any():
+        dropped_rows = int(invalid_time_mask.sum())
+        st.warning(
+            f"{dropped_rows} baris diabaikan karena nilai Year/Quarter/Month kosong atau tidak valid."
+        )
+        df = df.loc[~invalid_time_mask].copy()
+        st.session_state['df'] = df
+
+    if df.empty:
+        st.error("Tidak ada data valid setelah pembersihan kolom waktu (Year/Quarter/Month).")
+        st.stop()
+
+    df[time_cols] = df[time_cols].astype('int64')
 
     pjp_list = ['All'] + df['Nama PJP'].unique().tolist()
     years = ['All'] + list(df['Year'].unique())
