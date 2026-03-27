@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from datetime import date
 
 from service.formatting import format_id_percent
 import calendar
@@ -7,6 +8,113 @@ import calendar
 from service.preprocess import *
 from service.visualize import *
 from service.database import *
+
+
+# Rules multilicense: aktif mulai tanggal efektif (inclusive)
+_MULTILICENSE_RULES: list[dict] = [
+    {"sandi": "777930115", "pjp": "Brankas Teknologi Indonesia", "effective": date(2024, 9, 20)},
+    {"sandi": "777930112", "pjp": "Durian Pay Indonesia", "effective": date(2025, 6, 25)},
+    {"sandi": "777962497", "pjp": "Ionpay Network", "effective": date(2021, 7, 1)},
+    {"sandi": "777930038", "pjp": "Kharisma Catur Mandala", "effective": date(2021, 7, 1)},
+    {"sandi": "777962104", "pjp": "MCP Indo Utama", "effective": date(2021, 7, 1)},
+    {"sandi": "777930118", "pjp": "Smart Fintech For You", "effective": date(2024, 4, 24)},
+]
+
+
+def _norm_text(value) -> str:
+    if value is None:
+        return ""
+    return " ".join(str(value).strip().lower().split())
+
+
+def _month_to_int(value) -> int | None:
+    if value is None:
+        return None
+
+    if isinstance(value, (int, float)):
+        m = int(value)
+        return m if 1 <= m <= 12 else None
+
+    s = str(value).strip().lower()
+    if not s:
+        return None
+    if s.isdigit():
+        m = int(s)
+        return m if 1 <= m <= 12 else None
+
+    month_en = {
+        "january": 1, "february": 2, "march": 3, "april": 4,
+        "may": 5, "june": 6, "july": 7, "august": 8,
+        "september": 9, "october": 10, "november": 11, "december": 12,
+    }
+    month_id = {
+        "januari": 1, "februari": 2, "maret": 3, "april": 4,
+        "mei": 5, "juni": 6, "juli": 7, "agustus": 8,
+        "september": 9, "oktober": 10, "november": 11, "desember": 12,
+    }
+    return month_en.get(s) or month_id.get(s)
+
+
+def _effective_period_date(df: pd.DataFrame) -> pd.Series:
+    year = pd.to_numeric(df.get("Year"), errors="coerce")
+    if "Month" in df.columns:
+        month_series = df["Month"].map(_month_to_int)
+    elif "Quarter" in df.columns:
+        q = pd.to_numeric(df["Quarter"], errors="coerce")
+        month_series = (q * 3).astype("Int64")
+    else:
+        month_series = pd.Series([12] * len(df), index=df.index)
+
+    month_num = pd.to_numeric(month_series, errors="coerce")
+    out = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
+    valid = year.notna() & month_num.notna()
+    if valid.any():
+        y = year[valid].astype(int)
+        m = month_num[valid].astype(int)
+        out.loc[valid] = pd.to_datetime({"year": y, "month": m, "day": 1}, errors="coerce") + pd.offsets.MonthEnd(0)
+    return out
+
+
+def _multilicense_mask(df: pd.DataFrame) -> pd.Series:
+    if df is None or df.empty:
+        return pd.Series([], dtype=bool)
+
+    name_col = "Nama PJP" if "Nama PJP" in df.columns else ("PJP" if "PJP" in df.columns else None)
+    code_candidates = ["Sandi PJP", "Sandi_PJP", "SandiPJP", "Kode PJP", "Kode_PJP", "Kode"]
+    code_col = next((c for c in code_candidates if c in df.columns), None)
+
+    if name_col is None and code_col is None:
+        return pd.Series([False] * len(df), index=df.index)
+
+    period_date = _effective_period_date(df)
+    name_norm = df[name_col].astype(str).map(_norm_text) if name_col else pd.Series([""] * len(df), index=df.index)
+    code_norm = (
+        df[code_col].astype("string").str.replace(r"\D", "", regex=True).fillna("").astype(str)
+        if code_col else pd.Series([""] * len(df), index=df.index)
+    )
+
+    mask = pd.Series([False] * len(df), index=df.index)
+    for rule in _MULTILICENSE_RULES:
+        r_name = _norm_text(rule.get("pjp"))
+        r_code = str(rule.get("sandi", "")).strip()
+        r_date = pd.Timestamp(rule.get("effective"))
+
+        hit_name = (name_norm == r_name) if r_name else pd.Series([False] * len(df), index=df.index)
+        hit_code = (code_norm == r_code) if r_code else pd.Series([False] * len(df), index=df.index)
+        hit_entity = hit_name | hit_code
+        hit_period = period_date.notna() & (period_date >= r_date)
+        mask = mask | (hit_entity & hit_period)
+
+    return mask
+
+
+def _apply_multilicense_mode(df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame, pd.Series]:
+    if df is None or df.empty:
+        return df, pd.Series([], dtype=bool)
+    mask_ml = _multilicense_mask(df)
+    if str(mode) == "exclude":
+        return df.loc[~mask_ml].copy(), mask_ml
+    return df.copy(), mask_ml
 
 # Initial Page Setup
 set_page_visuals("viz")
@@ -74,12 +182,29 @@ if df is not None and df_national is not None:
 
         if list_pjp_code_dki:
             df = df[df['Kode'].isin(list_pjp_code_dki)]
-            st.session_state['df'] = df
     else:
         st.info(
             "Referensi PJP dari database tidak tersedia saat ini; "
             "filter DKI tidak diterapkan (menggunakan data dari file)."
         )
+
+        with st.sidebar:
+            with st.expander("Filter Multilicense", True):
+                ml_mode_ui = st.radio(
+                    "Mode Perhitungan",
+                    options=["Termasuk Multilicense", "Tanpa Multilicense"],
+                    index=0,
+                    key="summary_multilicense_mode",
+                    help="Tanpa Multilicense = data multilicense aktif (sesuai tanggal efektif) dikeluarkan.",
+                )
+                ml_mode = "exclude" if ml_mode_ui == "Tanpa Multilicense" else "include"
+                _df_before_ml = df
+                df, _ml_mask = _apply_multilicense_mode(_df_before_ml, ml_mode)
+
+                total_rows = int(len(_df_before_ml)) if _df_before_ml is not None else 0
+                ml_rows = int(_ml_mask.sum()) if len(_ml_mask) else 0
+                shown_rows = int(len(df)) if df is not None else 0
+                st.caption(f"Baris data: total {total_rows:,} | multilicense aktif {ml_rows:,} | digunakan {shown_rows:,}")
 
     # Normalize time columns safely to avoid IntCastingNaNError
     time_cols = ['Year', 'Quarter', 'Month']
@@ -100,7 +225,6 @@ if df is not None and df_national is not None:
             f"{dropped_rows} baris diabaikan karena nilai Year/Quarter/Month kosong atau tidak valid."
         )
         df = df.loc[~invalid_time_mask].copy()
-        st.session_state['df'] = df
 
     if df.empty:
         st.error("Tidak ada data valid setelah pembersihan kolom waktu (Year/Quarter/Month).")
