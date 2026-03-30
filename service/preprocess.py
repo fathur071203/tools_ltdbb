@@ -724,24 +724,56 @@ def preprocess_data_national(df: pd.DataFrame, is_year: bool = False, is_quarter
     if 'Nom Nasional Total.1' in df_copy.columns:
         df_copy.drop('Nom Nasional Total.1', axis=1, inplace=True)
 
-    aggregation_dict = {
-        'Nom Nasional Out': 'sum',
-        'Nom Nasional Inc': 'sum',
-        'Nom Nasional Dom': 'sum',
-        'Nom Nasional Total': 'sum',
-        'Frek Nasional Out': 'sum',
-        'Frek Nasional Inc': 'sum',
-        'Frek Nasional Dom': 'sum',
-        'Frek Nasional Total': 'sum',
-    }
+    national_cols = [
+        'Nom Nasional Out', 'Nom Nasional Inc', 'Nom Nasional Dom', 'Nom Nasional Total',
+        'Frek Nasional Out', 'Frek Nasional Inc', 'Frek Nasional Dom', 'Frek Nasional Total',
+    ]
+
+    for col in national_cols:
+        if col in df_copy.columns:
+            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
+
+    def _aggregate_group(g: pd.DataFrame) -> pd.Series:
+        """Agregasi aman untuk data nasional yang kadang diulang per baris PJP.
+
+        Jika dalam 1 periode nilainya identik (nunique<=1), ambil satu nilai (max).
+        Jika bervariasi, jumlahkan (sum).
+        """
+        out = {}
+        for col in national_cols:
+            if col not in g.columns:
+                continue
+            s = pd.to_numeric(g[col], errors='coerce').dropna()
+            if s.empty:
+                out[col] = np.nan
+            elif s.nunique(dropna=True) <= 1:
+                out[col] = float(s.max())
+            else:
+                out[col] = float(s.sum())
+        return pd.Series(out)
 
     if is_year:
         if is_quarter:
-            grouped_df = df_copy.groupby(['Year', 'Quarter']).agg(aggregation_dict).reset_index()
+            grouped_df = (
+                df_copy
+                .groupby(['Year', 'Quarter'], dropna=False)
+                .apply(_aggregate_group)
+                .reset_index()
+            )
         else:
-            grouped_df = df_copy.groupby('Year').agg(aggregation_dict).reset_index()
+            grouped_df = (
+                df_copy
+                .groupby('Year', dropna=False)
+                .apply(_aggregate_group)
+                .reset_index()
+            )
     else:
-        grouped_df = df_copy.groupby(['Year', 'Month']).agg(aggregation_dict).reset_index()
+        grouped_df = (
+            df_copy
+            .groupby(['Year', 'Month'], dropna=False)
+            .apply(_aggregate_group)
+            .reset_index()
+        )
 
     return grouped_df
 
@@ -911,6 +943,8 @@ def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_ty
         sum_trx_word = "Frekuensi"
         national_word = "Frek"
     else:
+        # Data PJP sumber dalam Rupiah -> konversi ke miliar dulu.
+        # Data nasional pada file sumber sudah dalam miliar.
         sum_trx_word = "Nominal Rp Miliar"
         national_word = "Nom"
         data_pjp = (data_pjp / 1_000_000_000).round(2)
@@ -923,7 +957,20 @@ def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_ty
         trx_word = "Domestik"
 
     data_national = df_national[f'{national_word} Nasional {trx_type}'].values[0]
-    data_percentage = ((data_pjp / data_national) * 100).round(2)
+
+    if sum_trx_type != "Jumlah":
+        # Samakan skala nominal antara Trx Perusahaan dan Trx Nasional.
+        # Jika nilainya besar, tampilkan keduanya dalam triliun.
+        max_nominal_miliar = max(abs(float(data_pjp)), abs(float(data_national)))
+        if max_nominal_miliar >= 1_000:
+            data_pjp = round(float(data_pjp) / 1_000, 2)
+            data_national = round(float(data_national) / 1_000, 2)
+            sum_trx_word = "Nominal Rp Triliun"
+
+    if data_national in [0, None] or (isinstance(data_national, float) and np.isnan(data_national)):
+        data_percentage = None
+    else:
+        data_percentage = round((float(data_pjp) / float(data_national)) * 100, 2)
 
     data = {
         "Transaction Type": ["Trx Perusahaan", "Trx Nasional", "Persentase (%)"],
@@ -1073,13 +1120,38 @@ def rename_format_growth_monthly_df(df: pd.DataFrame, trx_type: str):
     return df
 
 def format_profile_df(df: pd.DataFrame, is_market_share: bool = False):
-    df.iloc[:2] = df.iloc[:2].applymap(lambda x: f"{x:,.2f}".replace(",", ".") if isinstance(x, (int, float)) else x)
-    df.iloc[-1:] = df.iloc[-1:].applymap(lambda x: f"{x:,.2f} %".replace(".", ",") if isinstance(x, (int, float)) else x)
-    df = df.style.format(
-        thousands=".",
-        decimal=",",
-    )
-    return df
+    def _fmt_id_number(v):
+        if not isinstance(v, (int, float, np.number)) or pd.isna(v):
+            return v
+        s = f"{float(v):,.2f}"
+        # en: 1,234,567.89 -> id: 1.234.567,89
+        return s.replace(",", "_").replace(".", ",").replace("_", ".")
+
+    def _fmt_id_percent(v):
+        if not isinstance(v, (int, float, np.number)) or pd.isna(v):
+            return v
+        return f"{_fmt_id_number(v)} %"
+
+    out = df.copy()
+    if out.empty:
+        return out
+
+    value_cols = [c for c in out.columns if c != "Transaction Type"]
+    for col in value_cols:
+        if col not in out.columns:
+            continue
+
+        # Baris persentase: format persen. Baris lain: format angka biasa.
+        if "Persentase (%)" in out["Transaction Type"].values:
+            is_pct_row = out["Transaction Type"].eq("Persentase (%)")
+            out.loc[~is_pct_row, col] = out.loc[~is_pct_row, col].map(_fmt_id_number)
+            out.loc[is_pct_row, col] = out.loc[is_pct_row, col].map(_fmt_id_percent)
+        else:
+            # fallback untuk tabel market share (baris terakhir juga persentase)
+            out.loc[out.index[:-1], col] = out.loc[out.index[:-1], col].map(_fmt_id_number)
+            out.loc[out.index[-1:], col] = out.loc[out.index[-1:], col].map(_fmt_id_percent)
+
+    return out
 
 
 def rename_format_profile_df(df: pd.DataFrame, trx_type: str):

@@ -198,6 +198,10 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             st.dataframe(merged_data, use_container_width=True, hide_index=True)
             st.info(
                 "*Persentase merupakan persentase jumlah atau nilai transaksi PJP terhadap jumlah atau nilai transaksi nasional")
+            st.caption(
+                "Nominal pada tabel profil otomatis disetarakan pada unit yang sama (Miliar/Triliun) "
+                "antara Trx Perusahaan dan Trx Nasional sesuai hasil perhitungan periode terpilih."
+            )
             col1, col2, col3 = st.columns(3)
             with col1:
                 df_domestic_month_display = df_domestic_month.copy()
