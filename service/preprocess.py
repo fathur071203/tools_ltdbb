@@ -2,6 +2,8 @@ import pandas as pd
 import streamlit as st
 import calendar
 import numpy as np
+from io import BytesIO
+from datetime import datetime
 
 from service.units import pick_rupiah_unit, rupiah_unit_suffix
 
@@ -469,6 +471,7 @@ def inject_global_theme_css() -> None:
 
 
 def set_page_visuals(condition):
+    _install_dataframe_download_patch()
     inject_global_theme_css()
 
     title_map = {
@@ -496,6 +499,108 @@ def set_page_visuals(condition):
     )
     with st.sidebar:
         st.image(".static/Logo.png", use_container_width=True)
+        with st.expander("Pengaturan Tabel", False):
+            st.slider(
+                "Tinggi tabel",
+                min_value=280,
+                max_value=1200,
+                value=int(st.session_state.get("global_table_height", 420)),
+                step=20,
+                key="global_table_height",
+                help="Semua tabel dapat diperbesar/diperkecil tingginya.",
+            )
+
+
+def _extract_df_for_export(data) -> pd.DataFrame | None:
+    try:
+        if isinstance(data, pd.io.formats.style.Styler):
+            return data.data.copy()
+        if isinstance(data, pd.DataFrame):
+            return data.copy()
+        if isinstance(data, pd.Series):
+            return data.to_frame()
+        if data is None:
+            return None
+        return pd.DataFrame(data)
+    except Exception:
+        return None
+
+
+def _df_to_excel_bytes(df: pd.DataFrame) -> bytes:
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="data")
+    return buffer.getvalue()
+
+
+def _install_dataframe_download_patch() -> None:
+    """Tambahkan tombol download Excel di bawah setiap st.dataframe/st.table secara global."""
+    if getattr(st, "_tools_ltdbb_df_patched", False):
+        return
+
+    original_dataframe = st.dataframe
+    original_table = st.table
+
+    def _dataframe_with_download(data=None, *args, **kwargs):
+        height = st.session_state.get("global_table_height")
+        if "height" not in kwargs and height is not None:
+            kwargs["height"] = int(height)
+
+        result = original_dataframe(data, *args, **kwargs)
+
+        export_df = _extract_df_for_export(data)
+        if export_df is not None and not export_df.empty:
+            counter = int(st.session_state.get("_table_download_counter", 0)) + 1
+            st.session_state["_table_download_counter"] = counter
+
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_name = f"table_{counter}_{ts}.xlsx"
+            excel_bytes = _df_to_excel_bytes(export_df)
+
+            c1, c2 = st.columns([1.2, 3.8])
+            with c1:
+                st.download_button(
+                    label="⬇️ Download Excel",
+                    data=excel_bytes,
+                    file_name=file_name,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"table_download_{counter}",
+                    use_container_width=True,
+                )
+            with c2:
+                st.caption(f"{len(export_df):,} baris × {len(export_df.columns):,} kolom")
+
+        return result
+
+    st.dataframe = _dataframe_with_download
+
+    def _table_with_download(data=None, *args, **kwargs):
+        result = original_table(data, *args, **kwargs)
+        export_df = _extract_df_for_export(data)
+        if export_df is not None and not export_df.empty:
+            counter = int(st.session_state.get("_table_download_counter", 0)) + 1
+            st.session_state["_table_download_counter"] = counter
+
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_name = f"table_{counter}_{ts}.xlsx"
+            excel_bytes = _df_to_excel_bytes(export_df)
+
+            c1, c2 = st.columns([1.2, 3.8])
+            with c1:
+                st.download_button(
+                    label="⬇️ Download Excel",
+                    data=excel_bytes,
+                    file_name=file_name,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"table_download_{counter}",
+                    use_container_width=True,
+                )
+            with c2:
+                st.caption(f"{len(export_df):,} baris × {len(export_df.columns):,} kolom")
+        return result
+
+    st.table = _table_with_download
+    st._tools_ltdbb_df_patched = True
 
 def aggregate_data(df, is_trx=False):
     # Ensure aggregation inputs are numeric; Excel uploads sometimes load as strings
