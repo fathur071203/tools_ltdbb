@@ -28,11 +28,20 @@ def _month_to_int(value) -> int | None:
     if value is None:
         return None
 
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+
+    if isinstance(value, bool):
+        return None
+
     if isinstance(value, (int, float)):
-        m = int(value)
+        m = int(float(value))
         return m if 1 <= m <= 12 else None
 
-    s = str(value).strip().lower()
+    s = str(value).strip().lower().replace(".", "")
     if not s:
         return None
 
@@ -40,18 +49,39 @@ def _month_to_int(value) -> int | None:
         m = int(s)
         return m if 1 <= m <= 12 else None
 
-    month_en = {
-        "january": 1, "february": 2, "march": 3, "april": 4,
-        "may": 5, "june": 6, "july": 7, "august": 8,
-        "september": 9, "october": 10, "november": 11, "december": 12,
-    }
-    month_id = {
-        "januari": 1, "februari": 2, "maret": 3, "april": 4,
-        "mei": 5, "juni": 6, "juli": 7, "agustus": 8,
-        "september": 9, "oktober": 10, "november": 11, "desember": 12,
+    try:
+        f = float(s)
+        if f.is_integer():
+            m = int(f)
+            return m if 1 <= m <= 12 else None
+    except Exception:
+        pass
+
+    month_map = {
+        "january": 1, "jan": 1,
+        "february": 2, "feb": 2,
+        "march": 3, "mar": 3,
+        "april": 4, "apr": 4,
+        "may": 5,
+        "june": 6, "jun": 6,
+        "july": 7, "jul": 7,
+        "august": 8, "aug": 8,
+        "september": 9, "sep": 9, "sept": 9,
+        "october": 10, "oct": 10,
+        "november": 11, "nov": 11,
+        "december": 12, "dec": 12,
+        "januari": 1,
+        "februari": 2,
+        "maret": 3,
+        "mei": 5,
+        "juni": 6,
+        "juli": 7,
+        "agustus": 8,
+        "oktober": 10, "okt": 10,
+        "desember": 12, "des": 12,
     }
 
-    return month_en.get(s) or month_id.get(s)
+    return month_map.get(s)
 
 
 def _effective_period_date(df: pd.DataFrame) -> pd.Series:
