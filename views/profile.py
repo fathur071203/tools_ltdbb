@@ -12,10 +12,31 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
     df_national = st.session_state['df_national']
     df = st.session_state['df']
 
+    # Harden filter options against mixed types / nulls from source file
+    pjp_series = (
+        df.get('Nama PJP', pd.Series(dtype='object'))
+        .astype('string')
+        .str.strip()
+    )
+    pjp_series = pjp_series[~pjp_series.isna()]
+    pjp_series = pjp_series[pjp_series.str.lower().ne('nan') & pjp_series.str.lower().ne('none')]
+    pjp_values = sorted(pjp_series.unique().tolist(), key=lambda x: str(x).lower())
+
+    years_series = pd.to_numeric(df.get('Year', pd.Series(dtype='object')), errors='coerce').dropna()
+    years_values = sorted(years_series.astype(int).unique().tolist())
+
+    if not pjp_values:
+        st.error("Kolom Nama PJP kosong/tidak valid. Periksa file input.")
+        st.stop()
+
+    if not years_values:
+        st.error("Kolom Year kosong/tidak valid. Periksa file input.")
+        st.stop()
+
     with st.sidebar:
         with st.expander("Filter Individu", True):
-            pjp_list = ['All'] + sorted(df['Nama PJP'].unique().tolist())
-            years_list = sorted(list(df['Year'].unique()))
+            pjp_list = ['All'] + pjp_values
+            years_list = years_values
             months_list = ['January', 'February', 'March', 'April', 'May', 'June', 
                           'July', 'August', 'September', 'October', 'November', 'December']
             

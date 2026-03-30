@@ -1329,7 +1329,11 @@ if st.session_state['df'] is not None:
                 st.warning("Tidak ada data setelah filter multilicense. Ubah mode perhitungan.")
                 st.stop()
 
-            unique_years = sorted(df['Year'].unique().tolist())
+            years_series = pd.to_numeric(df.get('Year', pd.Series(dtype='object')), errors='coerce').dropna()
+            unique_years = sorted(years_series.astype(int).unique().tolist())
+            if not unique_years:
+                st.error("Kolom Year kosong/tidak valid setelah filtering. Periksa file input.")
+                st.stop()
             quarters = ['Q1', 'Q2', 'Q3', 'Q4']
             
             # Start Year & Quarter
@@ -1776,7 +1780,11 @@ if st.session_state['df'] is not None:
                 st.session_state["vs_year_b"] = int(selected_end_year)
                 st.session_state["vs_q_b"] = int(_end_q_int)
 
-            cmp_years = sorted(df_total_combined['Year'].unique().tolist()) if not df_total_combined.empty else sorted(df_preprocessed_time['Year'].unique().tolist())
+            _cmp_src = df_total_combined if not df_total_combined.empty else df_preprocessed_time
+            _cmp_year_series = pd.to_numeric(_cmp_src.get('Year', pd.Series(dtype='object')), errors='coerce').dropna()
+            cmp_years = sorted(_cmp_year_series.astype(int).unique().tolist())
+            if not cmp_years:
+                cmp_years = unique_years
             cmp_quarters = [1, 2, 3, 4]
 
             c1, c2, c3, c4 = st.columns([1.2, 1.2, 1.2, 1.2])
