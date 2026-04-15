@@ -1136,14 +1136,30 @@ def format_profile_df(df: pd.DataFrame, is_market_share: bool = False):
     if out.empty:
         return out
 
-    value_cols = [c for c in out.columns if c != "Transaction Type"]
+    # Kolom label baris berbeda antar tabel: "Transaction Type" atau "Transaksi ...".
+    label_col = None
+    if "Transaction Type" in out.columns:
+        label_col = "Transaction Type"
+    else:
+        trans_cols = [c for c in out.columns if str(c).startswith("Transaksi ")]
+        if trans_cols:
+            label_col = trans_cols[0]
+        elif len(out.columns) > 0:
+            # Fallback aman: biasanya kolom pertama adalah label kategori.
+            label_col = out.columns[0]
+
+    value_cols = [c for c in out.columns if c != label_col]
     for col in value_cols:
         if col not in out.columns:
             continue
 
         # Baris persentase: format persen. Baris lain: format angka biasa.
-        if "Persentase (%)" in out["Transaction Type"].values:
-            is_pct_row = out["Transaction Type"].eq("Persentase (%)")
+        if label_col is not None:
+            is_pct_row = out[label_col].astype(str).isin(["Persentase (%)", "Market Share (%)"])
+        else:
+            is_pct_row = pd.Series(False, index=out.index)
+
+        if bool(is_pct_row.any()):
             out.loc[~is_pct_row, col] = out.loc[~is_pct_row, col].map(_fmt_id_number)
             out.loc[is_pct_row, col] = out.loc[is_pct_row, col].map(_fmt_id_percent)
         else:

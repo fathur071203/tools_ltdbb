@@ -174,6 +174,85 @@ def _apply_multilicense_mode(df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame,
     return df.copy(), mask_ml
 
 
+def _get_dormant_pjp_last_n_months(df: pd.DataFrame, months: int = 3) -> tuple[pd.DataFrame, list[str]]:
+    """Cari PJP dorman: aktif sebelumnya, tapi tidak ada aktivitas pada N bulan terakhir."""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["Nama PJP", "Bulan Aktif Terakhir"]), []
+
+    name_col = "Nama PJP" if "Nama PJP" in df.columns else ("PJP" if "PJP" in df.columns else None)
+    if name_col is None or "Year" not in df.columns:
+        return pd.DataFrame(columns=["Nama PJP", "Bulan Aktif Terakhir"]), []
+
+    d = df.copy()
+    d["YearNum"] = pd.to_numeric(d.get("Year"), errors="coerce")
+
+    if "Month" in d.columns:
+        d["MonthNum"] = d["Month"].map(_month_to_int)
+    elif "Quarter" in d.columns:
+        q = pd.to_numeric(d.get("Quarter"), errors="coerce")
+        d["MonthNum"] = (q * 3).astype("Int64")
+    else:
+        return pd.DataFrame(columns=["Nama PJP", "Bulan Aktif Terakhir"]), []
+
+    d["MonthNum"] = pd.to_numeric(d["MonthNum"], errors="coerce")
+    d = d[d["YearNum"].notna() & d["MonthNum"].notna()].copy()
+    d = d[d["MonthNum"].between(1, 12)]
+    if d.empty:
+        return pd.DataFrame(columns=["Nama PJP", "Bulan Aktif Terakhir"]), []
+
+    d["YearNum"] = d["YearNum"].astype(int)
+    d["MonthNum"] = d["MonthNum"].astype(int)
+    d["PeriodIdx"] = d["YearNum"] * 12 + d["MonthNum"]
+
+    activity_cols = [
+        "Fin Jumlah Inc", "Fin Jumlah Out", "Fin Jumlah Dom",
+        "Fin Nilai Inc", "Fin Nilai Out", "Fin Nilai Dom",
+        "Sum of Fin Jumlah Inc", "Sum of Fin Jumlah Out", "Sum of Fin Jumlah Dom",
+        "Sum of Fin Nilai Inc", "Sum of Fin Nilai Out", "Sum of Fin Nilai Dom",
+    ]
+    present_cols = [c for c in activity_cols if c in d.columns]
+    if present_cols:
+        d["_activity"] = pd.to_numeric(d[present_cols].sum(axis=1), errors="coerce").fillna(0).abs()
+    else:
+        d["_activity"] = 1.0
+
+    def _idx_to_label(idx: int) -> str:
+        y = (int(idx) - 1) // 12
+        m = int(idx) - y * 12
+        return pd.Timestamp(year=y, month=m, day=1).strftime("%b %Y")
+
+    last_idx = int(d["PeriodIdx"].max())
+    start_recent = int(last_idx - (int(months) - 1))
+    recent_labels = [_idx_to_label(i) for i in range(start_recent, last_idx + 1)]
+
+    d["PJPName"] = d[name_col].astype("string").str.strip()
+    d = d[~d["PJPName"].isna()]
+    d = d[d["PJPName"].str.lower().ne("nan") & d["PJPName"].str.lower().ne("none")]
+    if d.empty:
+        return pd.DataFrame(columns=["Nama PJP", "Bulan Aktif Terakhir"]), recent_labels
+
+    recent = d[d["PeriodIdx"].between(start_recent, last_idx)].groupby("PJPName", dropna=False)["_activity"].sum()
+    before = d[d["PeriodIdx"] < start_recent].groupby("PJPName", dropna=False)["_activity"].sum()
+
+    active_hist = before[before > 0]
+    if active_hist.empty:
+        return pd.DataFrame(columns=["Nama PJP", "Bulan Aktif Terakhir"]), recent_labels
+
+    dormant_names = [n for n in active_hist.index if float(recent.get(n, 0.0)) == 0.0]
+    if not dormant_names:
+        return pd.DataFrame(columns=["Nama PJP", "Bulan Aktif Terakhir"]), recent_labels
+
+    active_rows = d[d["_activity"] > 0].copy()
+    last_active_idx = active_rows.groupby("PJPName", dropna=False)["PeriodIdx"].max()
+
+    out = pd.DataFrame({"Nama PJP": dormant_names})
+    out["_last_idx"] = out["Nama PJP"].map(last_active_idx)
+    out["Bulan Aktif Terakhir"] = out["_last_idx"].map(lambda x: _idx_to_label(int(x)) if pd.notna(x) else "-")
+    out = out.sort_values(by=["_last_idx", "Nama PJP"], ascending=[True, True]).drop(columns=["_last_idx"])
+
+    return out.reset_index(drop=True), recent_labels
+
+
 def _triwulan_label(year: int, quarter: int) -> str:
     roman = {1: "I", 2: "II", 3: "III", 4: "IV"}
     q = roman.get(int(quarter), str(quarter))
@@ -1352,6 +1431,24 @@ if st.session_state['df'] is not None:
 
             jenis_transaksi = ['All', 'Incoming', 'Outgoing', 'Domestik']
             selected_jenis_transaksi = st.selectbox('Select Jenis Transaksi:', jenis_transaksi)
+
+        with st.expander("Monitoring Dorman (3 Bulan)", False):
+            dormant_df, recent_labels = _get_dormant_pjp_last_n_months(df, months=3)
+
+            if recent_labels:
+                st.caption(f"Periode evaluasi: {recent_labels[0]} s.d. {recent_labels[-1]}")
+
+            if dormant_df.empty:
+                st.success("Tidak ada PJP dorman pada 3 bulan terakhir.")
+            else:
+                st.metric("Jumlah PJP Dorman", int(len(dormant_df)))
+                st.dataframe(
+                    dormant_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=220,
+                )
+                st.caption("Definisi dorman: sebelumnya pernah aktif, namun 3 bulan terakhir tidak ada aktivitas transaksi.")
 
         with st.expander("Pengaturan Tampilan Grafik (Growth)", True):
             st.slider(
