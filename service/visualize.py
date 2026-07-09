@@ -30,6 +30,8 @@ def make_stacked_bar_line_chart_combined(
     df_dom,
     is_month: bool = False,
     *,
+    quarter_label_style: str | None = None,
+    label_period_keys: list[str] | None = None,
     font_size: int | None = None,
     label_font_size: int | None = None,
     legend_font_size: int | None = None,
@@ -66,7 +68,54 @@ def make_stacked_bar_line_chart_combined(
         growth_label = 'Growth YoY (%)'
     
     # Filter rows with valid growth data
-    df_merged = df_merged[df_merged[growth_col].notnull()]
+    df_merged = df_merged[df_merged[growth_col].notnull()].copy()
+
+    # X axis values + hover period (quarterly: multi-level axis; monthly: flat)
+    if is_month:
+        x_values = df_merged[x_col]
+        hover_period = df_merged[x_col].astype(str).tolist()
+        period_keys = df_merged[x_col].astype(str).tolist()
+        x_tick_angle = -45
+    else:
+        style = (quarter_label_style or "Q").strip().upper()
+        roman = {1: "I", 2: "II", 3: "III", 4: "IV"}
+
+        year_vals = pd.to_numeric(df_merged.get("Year"), errors="coerce").fillna(0).astype(int)
+        quarter_vals = pd.to_numeric(df_merged.get("Quarter"), errors="coerce").fillna(0).astype(int)
+
+        year_labels = year_vals.astype(str).tolist()
+        q_nums = quarter_vals.tolist()
+        y_nums = year_vals.tolist()
+
+        period_keys = [f"{int(y)} Q{int(q)}" for y, q in zip(y_nums, q_nums)]
+
+        if style == "TW":
+            quarter_labels = [roman.get(int(q), str(int(q))) for q in q_nums]
+            hover_period = [f"TW {roman.get(int(q), str(int(q)))} {int(y)}" for y, q in zip(y_nums, q_nums)]
+        else:
+            quarter_labels = [f"Q{int(q)}" for q in q_nums]
+            hover_period = [f"Q{int(q)} {int(y)}" for y, q in zip(y_nums, q_nums)]
+
+        # Multi-category axis: outer=Year (bottom), inner=Quarter label (top)
+        x_values = [year_labels, quarter_labels]
+        x_tick_angle = 0
+
+    # Growth label filter (avoid clutter): only show labels for selected period keys
+    label_key_set: set[str] | None
+    if label_period_keys is None:
+        label_key_set = None
+    else:
+        label_key_set = {str(k) for k in (label_period_keys or [])}
+
+    def _growth_text(val, key: str) -> str:
+        if pd.isna(val):
+            return ""
+        if label_key_set is None:
+            return f"{float(val):.1f}%"
+        return f"{float(val):.1f}%" if str(key) in label_key_set else ""
+
+    growth_text = [_growth_text(v, k) for v, k in zip(df_merged[growth_col].tolist(), period_keys)]
+    show_growth_text = any(t for t in growth_text)
     
     # Scale to Miliar
     scale_factor = 1e12
@@ -99,52 +148,60 @@ def make_stacked_bar_line_chart_combined(
     
     # Stacked bars - Incoming (Pink)
     fig.add_trace(go.Bar(
-        x=df_merged[x_col],
+        x=x_values,
         y=df_merged['Sum of Fin Nilai Inc'] / scale_factor,
         name='Incoming',
         marker=dict(color='#F5B0CB', line=dict(width=0)),
-        hovertemplate='%{x}<br>Incoming: Rp %{y:,.2f} Miliar<extra></extra>',
+        hovertext=hover_period,
+        hovertemplate='%{hovertext}<br>Incoming: Rp %{y:,.2f} Miliar<extra></extra>',
         yaxis='y1'
     ))
     
     # Stacked bars - Outgoing (Peach/Orange)
     fig.add_trace(go.Bar(
-        x=df_merged[x_col],
+        x=x_values,
         y=df_merged['Sum of Fin Nilai Out'] / scale_factor,
         name='Outgoing',
         marker=dict(color='#F5CBA7', line=dict(width=0)),
-        hovertemplate='%{x}<br>Outgoing: Rp %{y:,.2f} Miliar<extra></extra>',
+        hovertext=hover_period,
+        hovertemplate='%{hovertext}<br>Outgoing: Rp %{y:,.2f} Miliar<extra></extra>',
         yaxis='y1'
     ))
     
     # Stacked bars - Domestik (Blue)
     fig.add_trace(go.Bar(
-        x=df_merged[x_col],
+        x=x_values,
         y=df_merged['Sum of Fin Nilai Dom'] / scale_factor,
         name='Domestik',
         marker=dict(color='#5DADE2', line=dict(width=0)),
-        hovertemplate='%{x}<br>Domestik: Rp %{y:,.2f} Miliar<extra></extra>',
+        hovertext=hover_period,
+        hovertemplate='%{hovertext}<br>Domestik: Rp %{y:,.2f} Miliar<extra></extra>',
         yaxis='y1'
     ))
     
     # Line - Growth (Dark Green) with data labels
     fig.add_trace(go.Scatter(
-        x=df_merged[x_col],
+        x=x_values,
         y=df_merged[growth_col],
         name=growth_label,
         yaxis='y2',
-        mode='lines+markers+text',
+        mode='lines+markers+text' if show_growth_text else 'lines+markers',
         line=dict(color='#1E8449', width=3),
         marker=dict(size=8, color='#1E8449', line=dict(color='white', width=2)),
-        text=[f"{val:.1f}%" for val in df_merged[growth_col]],
-        textposition='top center',
-        textfont=dict(
-            size=label_fs,
-            color='#1E8449',
-            family='Inter, Arial, sans-serif',
-            weight='bold'
+        text=growth_text if show_growth_text else None,
+        textposition='top center' if show_growth_text else None,
+        textfont=(
+            dict(
+                size=label_fs,
+                color='#1E8449',
+                family='Inter, Arial, sans-serif',
+                weight='bold'
+            )
+            if show_growth_text
+            else None
         ),
-        hovertemplate='%{x}<br>' + growth_label + ': %{y:.2f}%<extra></extra>'
+        hovertext=hover_period,
+        hovertemplate='%{hovertext}<br>' + growth_label + ': %{y:.2f}%<extra></extra>'
     ))
     
     fig.update_layout(
@@ -159,7 +216,7 @@ def make_stacked_bar_line_chart_combined(
             showline=True,
             linewidth=2,
             linecolor='#d1d5db',
-            tickangle=-45,
+            tickangle=x_tick_angle,
             tickfont=dict(size=x_tick_fs, family=x_tick_family, color=x_tick_color)
         ),
         yaxis=dict(

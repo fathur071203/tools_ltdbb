@@ -134,6 +134,33 @@ Evaluasi periode:
 
 ---
 
+## 4a. Aturan PJP Dicabut
+
+Di halaman Summary, Growth, dan Market Share tersedia filter terpisah **Filter PJP Dicabut** dengan mode:
+
+- **Termasuk PJP Dicabut** (default)
+- **Tanpa PJP Dicabut**
+
+Jika mode **Tanpa PJP Dicabut**, seluruh baris transaksi PJP berikut dikeluarkan (tanpa memandang periode; tidak ada tanggal efektif). Pencocokan dilakukan berdasarkan sandi PJP atau nama.
+
+Daftar PJP dicabut:
+
+1. 777930075 - KSP Indosurya Cipta - Dicabut
+2. 777958129 - PT Aryadana - Dicabut
+3. 777930081 - PT Asia Fintek Teknologi - Dicabut
+4. 777958117 - PT Dhasatra Moneytransfer - Dicabut
+5. 777930064 - PT Dompet Harapan Bangsa - Dicabut
+6. 777930100 - PT Giat Bangun Indonesia - Dicabut
+7. 777958116 - PT Indomarco Prismatama - Dicabut
+8. 777930045 - PT Media Indonusa - Dicabut
+9. 777930028 - PT Nusa Ekspresstama Remmitance - Dicabut
+10. 777958113 - PT Tiki Jalur Nugraha Ekakurir - Dicabut
+11. 777111113 - PT Tranglo Indonesia - Dicabut atas Permintaan sendiri
+
+Filter Multilicense dan Filter PJP Dicabut bersifat independen dan dapat diaktifkan bersamaan (Dicabut diterapkan setelah Multilicense).
+
+---
+
 ## 5. Rumus-Rumus Inti
 
 ## 5.1 Total nominal transaksi

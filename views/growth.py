@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 from datetime import date
+import calendar
 
 from service.preprocess import *
 from service.visualize import *
@@ -15,6 +16,23 @@ _MULTILICENSE_RULES: list[dict] = [
     {"sandi": "777930038", "pjp": "Kharisma Catur Mandala", "effective": date(2021, 7, 1)},
     {"sandi": "777962104", "pjp": "MCP Indo Utama", "effective": date(2021, 7, 1)},
     {"sandi": "777930118", "pjp": "Smart Fintech For You", "effective": date(2024, 4, 24)},
+]
+
+
+# PJP dengan izin dicabut (dikeluarkan dari perhitungan pada mode "Tanpa Dicabut").
+# Tidak memakai tanggal efektif: seluruh periode dikeluarkan saat mode exclude.
+_REVOKED_RULES: list[dict] = [
+    {"sandi": "777930075", "pjp": "KSP Indosurya Cipta", "note": "Dicabut"},
+    {"sandi": "777958129", "pjp": "PT Aryadana", "note": "Dicabut"},
+    {"sandi": "777930081", "pjp": "PT Asia Fintek Teknologi", "note": "Dicabut"},
+    {"sandi": "777958117", "pjp": "PT Dhasatra Moneytransfer", "note": "Dicabut"},
+    {"sandi": "777930064", "pjp": "PT Dompet Harapan Bangsa", "note": "Dicabut"},
+    {"sandi": "777930100", "pjp": "PT Giat Bangun Indonesia", "note": "Dicabut"},
+    {"sandi": "777958116", "pjp": "PT Indomarco Prismatama", "note": "Dicabut"},
+    {"sandi": "777930045", "pjp": "PT Media Indonusa", "note": "Dicabut"},
+    {"sandi": "777930028", "pjp": "PT Nusa Ekspresstama Remmitance", "note": "Dicabut"},
+    {"sandi": "777958113", "pjp": "PT Tiki Jalur Nugraha Ekakurir", "note": "Dicabut"},
+    {"sandi": "777111113", "pjp": "PT Tranglo Indonesia", "note": "Dicabut atas Permintaan sendiri"},
 ]
 
 
@@ -172,6 +190,57 @@ def _apply_multilicense_mode(df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame,
     if str(mode) == "exclude":
         return df.loc[~mask_ml].copy(), mask_ml
     return df.copy(), mask_ml
+
+
+def _revoked_mask(df: pd.DataFrame) -> pd.Series:
+    """Tandai baris PJP yang izinnya dicabut (match by sandi/nama, tanpa tanggal)."""
+    if df is None or df.empty:
+        return pd.Series([], dtype=bool)
+
+    name_col = "Nama PJP" if "Nama PJP" in df.columns else ("PJP" if "PJP" in df.columns else None)
+    code_candidates = ["Sandi PJP", "Sandi_PJP", "SandiPJP", "Kode PJP", "Kode_PJP", "Kode"]
+    code_col = next((c for c in code_candidates if c in df.columns), None)
+
+    if name_col is None and code_col is None:
+        return pd.Series([False] * len(df), index=df.index)
+
+    if name_col is not None:
+        name_norm = df[name_col].astype(str).map(_norm_text)
+    else:
+        name_norm = pd.Series([""] * len(df), index=df.index)
+
+    if code_col is not None:
+        code_norm = (
+            df[code_col]
+            .astype("string")
+            .str.replace(r"\D", "", regex=True)
+            .fillna("")
+            .astype(str)
+        )
+    else:
+        code_norm = pd.Series([""] * len(df), index=df.index)
+
+    mask = pd.Series([False] * len(df), index=df.index)
+    for rule in _REVOKED_RULES:
+        r_name = _norm_text(rule.get("pjp"))
+        r_code = str(rule.get("sandi", "")).strip()
+
+        hit_name = (name_norm == r_name) if r_name else pd.Series([False] * len(df), index=df.index)
+        hit_code = (code_norm == r_code) if r_code else pd.Series([False] * len(df), index=df.index)
+        mask = mask | (hit_name | hit_code)
+
+    return mask
+
+
+def _apply_revoked_mode(df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame, pd.Series]:
+    """mode: include | exclude"""
+    if df is None or df.empty:
+        return df, pd.Series([], dtype=bool)
+
+    mask_rv = _revoked_mask(df)
+    if str(mode) == "exclude":
+        return df.loc[~mask_rv].copy(), mask_rv
+    return df.copy(), mask_rv
 
 
 def _get_dormant_pjp_last_n_months(df: pd.DataFrame, months: int = 3) -> tuple[pd.DataFrame, list[str]]:
@@ -1403,9 +1472,32 @@ if st.session_state['df'] is not None:
                     f"Baris data: total {total_rows:,} | multilicense aktif {ml_rows:,} | digunakan {shown_rows:,}"
                 )
 
+        with st.expander("Filter PJP Dicabut", True):
+            rv_mode_ui = st.radio(
+                "Mode Perhitungan",
+                options=["Termasuk PJP Dicabut", "Tanpa PJP Dicabut"],
+                index=0,
+                key="growth_revoked_mode",
+                help=(
+                    "Tanpa PJP Dicabut = data PJP yang izinnya dicabut dikeluarkan dari seluruh periode."
+                ),
+            )
+
+            rv_mode = "exclude" if rv_mode_ui == "Tanpa PJP Dicabut" else "include"
+            _df_before_rv = df
+            df, _rv_mask = _apply_revoked_mode(_df_before_rv, rv_mode)
+
+            if _df_before_rv is not None and not _df_before_rv.empty:
+                base_rows = int(len(_df_before_rv))
+                rv_rows = int(_rv_mask.sum()) if len(_rv_mask) else 0
+                shown_rows = int(len(df))
+                st.caption(
+                    f"Baris data: total {base_rows:,} | PJP dicabut {rv_rows:,} | digunakan {shown_rows:,}"
+                )
+
         with st.expander("Filter Growth", True):
             if df is None or df.empty:
-                st.warning("Tidak ada data setelah filter multilicense. Ubah mode perhitungan.")
+                st.warning("Tidak ada data setelah filter Multilicense/Dicabut. Ubah mode perhitungan.")
                 st.stop()
 
             years_series = pd.to_numeric(df.get('Year', pd.Series(dtype='object')), errors='coerce').dropna()
@@ -1451,6 +1543,126 @@ if st.session_state['df'] is not None:
                 st.caption("Definisi dorman: sebelumnya pernah aktif, namun 3 bulan terakhir tidak ada aktivitas transaksi.")
 
         with st.expander("Pengaturan Tampilan Grafik (Growth)", True):
+            st.selectbox(
+                "Label Kuartal (Chart Kuartalan)",
+                options=["TW", "Q"],
+                index=["TW", "Q"].index(str(st.session_state.get("growth_quarter_label_style", "TW")).upper() if str(st.session_state.get("growth_quarter_label_style", "TW")).upper() in {"TW", "Q"} else "TW"),
+                key="growth_quarter_label_style",
+                help="Mengatur label kuartal pada grafik gabungan kuartalan. TW = I–IV, Q = Q1–Q4.",
+            )
+
+            _label_mode_options = [
+                "Periode terakhir saja",
+                "Semua periode",
+                "Pilih periode...",
+                "Sembunyikan",
+            ]
+            _label_mode_current = str(st.session_state.get("growth_value_label_mode", "Periode terakhir saja"))
+            if _label_mode_current not in _label_mode_options:
+                _label_mode_current = "Periode terakhir saja"
+
+            st.selectbox(
+                "Label Angka Growth (%)",
+                options=_label_mode_options,
+                index=_label_mode_options.index(_label_mode_current),
+                key="growth_value_label_mode",
+                help=(
+                    "Mengatur label persentase Growth (YoY/QtQ/MtM) pada garis agar tidak bertumpuk. "
+                    "Jika 'Pilih periode...', hanya periode terpilih yang ditampilkan labelnya."
+                ),
+            )
+
+            def _quarter_keys_range(
+                sy: int, sq: int, ey: int, eq: int
+            ) -> list[str]:
+                if (sy, sq) > (ey, eq):
+                    sy, sq, ey, eq = ey, eq, sy, sq
+                out: list[str] = []
+                y, q = int(sy), int(sq)
+                guard = 0
+                while (y, q) <= (int(ey), int(eq)) and guard < 500:
+                    out.append(f"{int(y)} Q{int(q)}")
+                    q += 1
+                    if q >= 5:
+                        q = 1
+                        y += 1
+                    guard += 1
+                return out
+
+            def _month_keys_range(
+                sy: int, sq: int, ey: int, eq: int
+            ) -> list[str]:
+                if (sy, sq) > (ey, eq):
+                    sy, sq, ey, eq = ey, eq, sy, sq
+                start_m = (int(sq) - 1) * 3 + 1
+                end_m = int(eq) * 3
+
+                out: list[str] = []
+                y, m = int(sy), int(start_m)
+                guard = 0
+                while (y, m) <= (int(ey), int(end_m)) and guard < 2000:
+                    month_name = calendar.month_name[int(m)] if 1 <= int(m) <= 12 else str(m)
+                    out.append(f"{int(y)}-{month_name}")
+                    m += 1
+                    if m >= 13:
+                        m = 1
+                        y += 1
+                    guard += 1
+                return out
+
+            _start_q_int = int(str(selected_start_quarter).replace("Q", ""))
+            _end_q_int = int(str(selected_end_quarter).replace("Q", ""))
+            _quarter_key_options = _quarter_keys_range(
+                int(selected_start_year), int(_start_q_int), int(selected_end_year), int(_end_q_int)
+            )
+            _month_key_options = _month_keys_range(
+                int(selected_start_year), int(_start_q_int), int(selected_end_year), int(_end_q_int)
+            )
+
+            roman = {1: "I", 2: "II", 3: "III", 4: "IV"}
+
+            def _fmt_quarter_key(key: str) -> str:
+                try:
+                    y_str, q_str = str(key).split(" ", 1)
+                    q_num = int(str(q_str).replace("Q", ""))
+                    style = str(st.session_state.get("growth_quarter_label_style", "TW")).strip().upper()
+                    if style == "TW":
+                        return f"TW {roman.get(q_num, q_num)} {y_str}"
+                    return f"Q{q_num} {y_str}"
+                except Exception:
+                    return str(key)
+
+            def _fmt_month_key(key: str) -> str:
+                try:
+                    y_str, month_name = str(key).split("-", 1)
+                    m_num = list(calendar.month_name).index(str(month_name)) if str(month_name) in calendar.month_name else None
+                    if m_num:
+                        return f"{calendar.month_abbr[int(m_num)]} {y_str}"
+                    return f"{month_name} {y_str}"
+                except Exception:
+                    return str(key)
+
+            _label_mode = str(st.session_state.get("growth_value_label_mode", "Periode terakhir saja"))
+            _active_view = str(st.session_state.get("view_mode", "quarterly"))
+            if _label_mode == "Pilih periode...":
+                if _active_view == "monthly":
+                    st.multiselect(
+                        "Periode (Bulan) yang diberi label",
+                        options=_month_key_options,
+                        default=[_month_key_options[-1]] if _month_key_options else None,
+                        format_func=_fmt_month_key,
+                        key="growth_value_label_periods_month",
+                        placeholder="Pilih bulan",
+                    )
+                else:
+                    st.multiselect(
+                        "Periode (Kuartal) yang diberi label",
+                        options=_quarter_key_options,
+                        default=[_quarter_key_options[-1]] if _quarter_key_options else None,
+                        format_func=_fmt_quarter_key,
+                        key="growth_value_label_periods_quarter",
+                        placeholder="Pilih kuartal",
+                    )
             st.slider(
                 "Ukuran Font (Global)",
                 min_value=9,
@@ -1843,11 +2055,38 @@ if st.session_state['df'] is not None:
             
             # Grafik Gabungan (Stacked Bar + Line)
             st.markdown("<h3 style='margin-bottom: 15px;'>📊 Grafik Gabungan - Nilai Transaksi</h3>", unsafe_allow_html=True)
+
+            _label_mode = str(st.session_state.get("growth_value_label_mode", "Periode terakhir saja"))
+            if _label_mode == "Semua periode":
+                _label_keys_quarter = None
+            elif _label_mode == "Sembunyikan":
+                _label_keys_quarter = []
+            elif _label_mode == "Pilih periode...":
+                _label_keys_quarter = list(st.session_state.get("growth_value_label_periods_quarter", []) or [])
+            else:
+                _label_keys_quarter = []
+                try:
+                    _tmp = df_dom_combined.copy()
+                    if "%YoY Nom" in _tmp.columns:
+                        _tmp = _tmp[_tmp["%YoY Nom"].notnull()].copy()
+                    _tmp["Year"] = pd.to_numeric(_tmp.get("Year"), errors="coerce")
+                    _tmp["Quarter"] = pd.to_numeric(_tmp.get("Quarter"), errors="coerce")
+                    _tmp = _tmp[_tmp["Year"].notna() & _tmp["Quarter"].notna()].copy()
+                    _tmp["Year"] = _tmp["Year"].astype(int)
+                    _tmp["Quarter"] = _tmp["Quarter"].astype(int)
+                    _tmp = _tmp.sort_values(["Year", "Quarter"])
+                    if not _tmp.empty:
+                        _last = _tmp.iloc[-1]
+                        _label_keys_quarter = [f"{int(_last['Year'])} Q{int(_last['Quarter'])}"]
+                except Exception:
+                    _label_keys_quarter = []
             make_stacked_bar_line_chart_combined(
                 df_inc_combined,
                 df_out_combined,
                 df_dom_combined,
                 is_month=False,
+                quarter_label_style=str(st.session_state.get("growth_quarter_label_style", "TW")),
+                label_period_keys=_label_keys_quarter,
                 font_size=_growth_font_size,
                 label_font_size=_growth_label_font_size,
                 legend_font_size=_growth_legend_font_size,
@@ -2389,11 +2628,40 @@ if st.session_state['df'] is not None:
             
             # Grafik Gabungan (Stacked Bar + Line) - Monthly
             st.markdown("<h3 style='margin-bottom: 15px;'>📊 Grafik Gabungan - Nilai Transaksi</h3>", unsafe_allow_html=True)
+
+            _label_mode = str(st.session_state.get("growth_value_label_mode", "Periode terakhir saja"))
+            if _label_mode == "Semua periode":
+                _label_keys_month = None
+            elif _label_mode == "Sembunyikan":
+                _label_keys_month = []
+            elif _label_mode == "Pilih periode...":
+                _label_keys_month = list(st.session_state.get("growth_value_label_periods_month", []) or [])
+            else:
+                _label_keys_month = []
+                try:
+                    _tmp = df_dom_combined_month.copy()
+                    if "%MtM Nom" in _tmp.columns:
+                        _tmp = _tmp[_tmp["%MtM Nom"].notnull()].copy()
+                    _tmp["Year"] = pd.to_numeric(_tmp.get("Year"), errors="coerce")
+                    _tmp["_mnum"] = _tmp.get("Month").map(
+                        lambda m: list(calendar.month_name).index(str(m)) if str(m) in calendar.month_name else None
+                    )
+                    _tmp = _tmp[_tmp["Year"].notna() & _tmp["_mnum"].notna()].copy()
+                    _tmp["Year"] = _tmp["Year"].astype(int)
+                    _tmp["_mnum"] = _tmp["_mnum"].astype(int)
+                    _tmp = _tmp.sort_values(["Year", "_mnum"])
+                    if not _tmp.empty:
+                        _last = _tmp.iloc[-1]
+                        _label_keys_month = [f"{int(_last['Year'])}-{str(_last['Month'])}"]
+                except Exception:
+                    _label_keys_month = []
+
             make_stacked_bar_line_chart_combined(
                 df_inc_combined_month,
                 df_out_combined_month,
                 df_dom_combined_month,
                 is_month=True,
+                label_period_keys=_label_keys_month,
                 font_size=_growth_font_size,
                 label_font_size=_growth_label_font_size,
                 legend_font_size=_growth_legend_font_size,

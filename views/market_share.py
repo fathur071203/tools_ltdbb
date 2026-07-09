@@ -18,6 +18,23 @@ _MULTILICENSE_RULES: list[dict] = [
 ]
 
 
+# PJP dengan izin dicabut (dikeluarkan dari perhitungan pada mode "Tanpa Dicabut").
+# Tidak memakai tanggal efektif: seluruh periode dikeluarkan saat mode exclude.
+_REVOKED_RULES: list[dict] = [
+    {"sandi": "777930075", "pjp": "KSP Indosurya Cipta", "note": "Dicabut"},
+    {"sandi": "777958129", "pjp": "PT Aryadana", "note": "Dicabut"},
+    {"sandi": "777930081", "pjp": "PT Asia Fintek Teknologi", "note": "Dicabut"},
+    {"sandi": "777958117", "pjp": "PT Dhasatra Moneytransfer", "note": "Dicabut"},
+    {"sandi": "777930064", "pjp": "PT Dompet Harapan Bangsa", "note": "Dicabut"},
+    {"sandi": "777930100", "pjp": "PT Giat Bangun Indonesia", "note": "Dicabut"},
+    {"sandi": "777958116", "pjp": "PT Indomarco Prismatama", "note": "Dicabut"},
+    {"sandi": "777930045", "pjp": "PT Media Indonusa", "note": "Dicabut"},
+    {"sandi": "777930028", "pjp": "PT Nusa Ekspresstama Remmitance", "note": "Dicabut"},
+    {"sandi": "777958113", "pjp": "PT Tiki Jalur Nugraha Ekakurir", "note": "Dicabut"},
+    {"sandi": "777111113", "pjp": "PT Tranglo Indonesia", "note": "Dicabut atas Permintaan sendiri"},
+]
+
+
 def _norm_text(value) -> str:
     if value is None:
         return ""
@@ -143,6 +160,55 @@ def _apply_multilicense_mode(df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame,
         return df.loc[~mask_ml].copy(), mask_ml
     return df.copy(), mask_ml
 
+
+def _revoked_mask(df: pd.DataFrame) -> pd.Series:
+    """Tandai baris PJP yang izinnya dicabut (match by sandi/nama, tanpa tanggal)."""
+    if df is None or df.empty:
+        return pd.Series([], dtype=bool)
+
+    name_col = "Nama PJP" if "Nama PJP" in df.columns else ("PJP" if "PJP" in df.columns else None)
+    code_candidates = ["Sandi PJP", "Sandi_PJP", "SandiPJP", "Kode PJP", "Kode_PJP", "Kode"]
+    code_col = next((c for c in code_candidates if c in df.columns), None)
+
+    if name_col is None and code_col is None:
+        return pd.Series([False] * len(df), index=df.index)
+
+    if name_col is not None:
+        name_norm = df[name_col].astype(str).map(_norm_text)
+    else:
+        name_norm = pd.Series([""] * len(df), index=df.index)
+
+    if code_col is not None:
+        code_norm = (
+            df[code_col]
+            .astype("string")
+            .str.replace(r"\D", "", regex=True)
+            .fillna("")
+            .astype(str)
+        )
+    else:
+        code_norm = pd.Series([""] * len(df), index=df.index)
+
+    mask = pd.Series([False] * len(df), index=df.index)
+    for rule in _REVOKED_RULES:
+        r_name = _norm_text(rule.get("pjp"))
+        r_code = str(rule.get("sandi", "")).strip()
+
+        hit_name = (name_norm == r_name) if r_name else pd.Series([False] * len(df), index=df.index)
+        hit_code = (code_norm == r_code) if r_code else pd.Series([False] * len(df), index=df.index)
+        mask = mask | (hit_name | hit_code)
+
+    return mask
+
+
+def _apply_revoked_mode(df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame, pd.Series]:
+    if df is None or df.empty:
+        return df, pd.Series([], dtype=bool)
+    mask_rv = _revoked_mask(df)
+    if str(mode) == "exclude":
+        return df.loc[~mask_rv].copy(), mask_rv
+    return df.copy(), mask_rv
+
 # Initial Page Setup
 set_page_visuals("viz")
 
@@ -167,9 +233,25 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             shown_rows = int(len(df)) if df is not None else 0
             st.caption(f"Baris data: total {total_rows:,} | multilicense aktif {ml_rows:,} | digunakan {shown_rows:,}")
 
+        with st.expander("Filter PJP Dicabut", True):
+            rv_mode_ui = st.radio(
+                "Mode Perhitungan",
+                options=["Termasuk PJP Dicabut", "Tanpa PJP Dicabut"],
+                index=0,
+                key="market_share_revoked_mode",
+                help="Tanpa PJP Dicabut = data PJP yang izinnya dicabut dikeluarkan dari seluruh periode.",
+            )
+            rv_mode = "exclude" if rv_mode_ui == "Tanpa PJP Dicabut" else "include"
+            _df_before_rv = df
+            df, _rv_mask = _apply_revoked_mode(_df_before_rv, rv_mode)
+            base_rows = int(len(_df_before_rv)) if _df_before_rv is not None else 0
+            rv_rows = int(_rv_mask.sum()) if len(_rv_mask) else 0
+            shown_rows = int(len(df)) if df is not None else 0
+            st.caption(f"Baris data: total {base_rows:,} | PJP dicabut {rv_rows:,} | digunakan {shown_rows:,}")
+
         with st.expander("Filter Profile", True):
             if df is None or df.empty:
-                st.warning("Tidak ada data setelah filter multilicense. Ubah mode perhitungan.")
+                st.warning("Tidak ada data setelah filter Multilicense/Dicabut. Ubah mode perhitungan.")
                 st.stop()
 
             min_year_national = df_national['Year'].min()
