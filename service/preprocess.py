@@ -6,46 +6,28 @@ from io import BytesIO
 from datetime import datetime
 
 from service.units import pick_rupiah_unit, rupiah_unit_suffix
+from service.formatting import (
+    format_id_decimal,
+    format_id_percent,
+    parse_number,
+    qround_float,
+)
 
 
 def _to_number(series: pd.Series) -> pd.Series:
-    """Best-effort conversion of messy numeric-like strings to floats.
+    """Convert a messy numeric-like column to floats, deciding value by value.
 
-    Handles common Excel/text cases like thousand separators (',' / '.'),
-    Indonesian decimal comma, and currency prefixes (e.g., 'Rp').
+    Excel exports mix genuine numbers with human-typed text (``'742.580.600'``,
+    ``'248,294,749,080'``). Inferring the separator meaning from the column as a
+    whole is unsafe: a handful of text cells would change how every real float in
+    that column is read, either stripping its decimal point or turning it into
+    NaN. ``parse_number`` applies the rules per value instead, and leaves values
+    that are already numeric untouched.
     """
     if pd.api.types.is_numeric_dtype(series):
         return series
 
-    s = series.astype("string").str.strip()
-    # Common noise
-    s = s.str.replace("\u00a0", "", regex=False)  # non-breaking space
-    s = s.str.replace("Rp", "", regex=False)
-    s = s.str.replace(" ", "", regex=False)
-
-    has_comma = s.str.contains(",", na=False)
-    has_dot = s.str.contains("\\.", na=False)
-
-    if bool((has_comma & has_dot).any()):
-        # Assume '.' thousands and ',' decimals: 1.234,56 -> 1234.56
-        s = s.str.replace(".", "", regex=False)
-        s = s.str.replace(",", ".", regex=False)
-    elif bool(has_comma.any()):
-        # If it looks like a decimal comma (e.g. 12,5), convert to '.'
-        looks_decimal = s.str.contains(r",\d{1,2}$", regex=True, na=False)
-        if bool(looks_decimal.any()):
-            s = s.str.replace(",", ".", regex=False)
-        else:
-            s = s.str.replace(",", "", regex=False)
-    elif bool(has_dot.any()):
-        # If it doesn't look like a decimal dot, treat '.' as thousands
-        looks_decimal = s.str.contains(r"\.\d{1,2}$", regex=True, na=False)
-        if not bool(looks_decimal.any()):
-            s = s.str.replace(".", "", regex=False)
-
-    # Keep digits, minus sign, and decimal dot
-    s = s.str.replace(r"[^0-9\.-]", "", regex=True)
-    return pd.to_numeric(s, errors="coerce")
+    return pd.to_numeric(series.map(lambda v: parse_number(v)), errors="coerce")
 
 
 def _coerce_numeric_columns(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
@@ -53,6 +35,58 @@ def _coerce_numeric_columns(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
         if col in df.columns:
             df[col] = _to_number(df[col])
     return df
+
+
+# Kolom nilai final (Fin ...) pada sheet Trx_PJPJKT, yaitu kolom M s.d. R.
+# Kolom G s.d. L ("Jumlah Inc", "Nilai Inc", dst) adalah versi sebelum
+# pembulatan/koreksi dan tidak dipakai di seluruh aplikasi.
+PJP_VALUE_COLUMNS = [
+    'Fin Jumlah Inc', 'Fin Nilai Inc',
+    'Fin Jumlah Out', 'Fin Nilai Out',
+    'Fin Jumlah Dom', 'Fin Nilai Dom',
+]
+
+NATIONAL_VALUE_COLUMNS = [
+    'Nom Nasional Out', 'Nom Nasional Inc', 'Nom Nasional Dom', 'Nom Nasional Total',
+    'Frek Nasional Out', 'Frek Nasional Inc', 'Frek Nasional Dom', 'Frek Nasional Total',
+]
+
+
+def round_half_up(value, decimals: int = 2):
+    """Round a scalar half-up, returning NaN instead of None for missing input.
+
+    numpy/pandas ``round`` breaks ties to even (2.675 -> 2.67), which does not
+    match how these figures are reported. Every displayed number goes through
+    this so the same input always yields the same output.
+    """
+    out = qround_float(value, decimals=decimals)
+    return np.nan if out is None else out
+
+
+def round_half_up_series(series: pd.Series, decimals: int = 2) -> pd.Series:
+    """Vectorised counterpart of :func:`round_half_up` for a column."""
+    numeric = pd.to_numeric(series, errors='coerce')
+    return numeric.map(lambda v: round_half_up(v, decimals))
+
+
+def _drop_non_data_rows(df: pd.DataFrame, key_cols: list[str]) -> pd.DataFrame:
+    """Drop spreadsheet leftovers that sit below the real table.
+
+    Both sheets carry trailing rows that are not observations: fully blank
+    spacer rows, and scratch/footer rows (e.g. the 'Nom'/'Trx' notes under
+    Raw_JKTNasional) that hold large stray values but no period. Keeping them
+    would inflate national totals and create a bogus NaN-period group.
+    """
+    out = df.loc[:, ~df.columns.astype(str).str.startswith('Unnamed:')]
+    out = out.dropna(how='all')
+
+    present = [c for c in key_cols if c in out.columns]
+    if present:
+        keys = pd.DataFrame({c: pd.to_numeric(out[c], errors='coerce') for c in present})
+        out = out[keys.notna().all(axis=1)]
+
+    return out.reset_index(drop=True)
+
 
 @st.cache_data
 def load_data(uploaded_file, is_trx_nasional: bool = False):
@@ -67,19 +101,26 @@ def load_data(uploaded_file, is_trx_nasional: bool = False):
     except Exception as e:
         st.error(f"An error occurred while loading the data: {e}")
         return None
-    # Make numeric columns stable across environments (local vs Streamlit Cloud)
-    df = _coerce_numeric_columns(
-        df,
-        [
-            # LTDBB (PJP)
-            'Fin Jumlah Inc', 'Fin Nilai Inc',
-            'Fin Jumlah Out', 'Fin Nilai Out',
-            'Fin Jumlah Dom', 'Fin Nilai Dom',
-            # Nasional
-            'Nom Nasional Out', 'Nom Nasional Inc', 'Nom Nasional Dom', 'Nom Nasional Total',
-            'Frek Nasional Out', 'Frek Nasional Inc', 'Frek Nasional Dom', 'Frek Nasional Total',
-        ],
-    )
+
+    # Buang baris sisa spreadsheet sebelum apa pun dijumlahkan.
+    # Hanya 'Year' yang dipakai sebagai penanda baris data: 'Month' pada
+    # sebagian file berisi nama bulan, bukan angka.
+    df = _drop_non_data_rows(df, ['Year'])
+
+    # Samakan pembacaan angka untuk data PJP (Fin) dan data Raw Nasional,
+    # supaya keduanya melewati parser yang sama dan tidak ada selisih pembulatan
+    # yang berasal dari perbedaan cara baca.
+    df = _coerce_numeric_columns(df, PJP_VALUE_COLUMNS + NATIONAL_VALUE_COLUMNS)
+
+    # Sheet nasional membaca Year/Month sebagai float karena baris sisa tadi;
+    # setelah dibersihkan kembalikan ke integer agar cocok dengan sheet PJP
+    # saat di-merge/di-group.
+    for col in ('Year', 'Quarter', 'Month'):
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            as_num = pd.to_numeric(df[col], errors='coerce')
+            if as_num.notna().all():
+                df[col] = as_num.astype(int)
+
     return df
 
 
@@ -724,14 +765,13 @@ def preprocess_data_national(df: pd.DataFrame, is_year: bool = False, is_quarter
     if 'Nom Nasional Total.1' in df_copy.columns:
         df_copy.drop('Nom Nasional Total.1', axis=1, inplace=True)
 
-    national_cols = [
-        'Nom Nasional Out', 'Nom Nasional Inc', 'Nom Nasional Dom', 'Nom Nasional Total',
-        'Frek Nasional Out', 'Frek Nasional Inc', 'Frek Nasional Dom', 'Frek Nasional Total',
-    ]
+    national_cols = NATIONAL_VALUE_COLUMNS
 
-    for col in national_cols:
-        if col in df_copy.columns:
-            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
+    # Baca angka nasional dengan parser yang sama seperti data PJP, bukan
+    # pd.to_numeric polos, supaya angka ber-format teks (mis. '1.234.567')
+    # tidak diam-diam menjadi NaN dan hilang dari total.
+    df_copy = _coerce_numeric_columns(df_copy, national_cols)
+    df_copy = _drop_non_data_rows(df_copy, ['Year'])
 
     def _aggregate_group(g: pd.DataFrame) -> pd.Series:
         """Agregasi aman untuk data nasional yang kadang diulang per baris PJP.
@@ -862,7 +902,10 @@ def sum_data_time(df, is_month):
 
 
 def calculate_market_share(df, total_sum_of_nom):
-    df['Market Share (%)'] = ((df['Sum of Total Nom'] / total_sum_of_nom) * 100).round(2)
+    # Bagi dulu pada presisi penuh, baru dibulatkan sekali di akhir.
+    share = (pd.to_numeric(df['Sum of Total Nom'], errors='coerce')
+             / pd.to_numeric(total_sum_of_nom, errors='coerce')) * 100
+    df['Market Share (%)'] = round_half_up_series(share, 2)
     return df
 
 
@@ -871,6 +914,19 @@ def calculate_growth(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_t
     df_copy = calculate_year_on_year(df_copy, first_year, sum_trx_type, trx_type)
     df_copy = calculate_quarter_to_quarter(df_copy, first_year, sum_trx_type, trx_type)
     return df_copy
+
+
+def _pct_change(current, previous):
+    """Percent change on full precision, rounded once, half-up.
+
+    Returns NaN when the base is missing or zero so the cell shows blank rather
+    than an infinite or misleading growth figure.
+    """
+    cur = parse_number(current)
+    prev = parse_number(previous)
+    if cur is None or not prev:
+        return np.nan
+    return round_half_up(((cur - prev) / prev) * 100, 2)
 
 
 def calculate_year_on_year(df: pd.DataFrame, first_year: int, sum_trx_type: str, trx_type: str):
@@ -883,8 +939,7 @@ def calculate_year_on_year(df: pd.DataFrame, first_year: int, sum_trx_type: str,
 
             if not previous_year_value.empty:
                 previous_year_value = previous_year_value.values[0]
-                growth_val = (((current_value - previous_year_value) / previous_year_value) * 100).round(2)
-                df.at[i, '%YoY'] = growth_val
+                df.at[i, '%YoY'] = _pct_change(current_value, previous_year_value)
     return df
 
 
@@ -893,9 +948,7 @@ def calculate_quarter_to_quarter(df: pd.DataFrame, first_year: int, sum_trx_type
         if df.iloc[i]['Year'] > first_year:
             current_value = df.iloc[i][f'Sum of Fin {sum_trx_type} {trx_type}']
             previous_year_value = df.iloc[i - 1][f'Sum of Fin {sum_trx_type} {trx_type}']
-            if not previous_year_value is None:
-                growth_val = (((current_value - previous_year_value) / previous_year_value) * 100).round(2)
-                df.at[i, '%QtQ'] = growth_val
+            df.at[i, '%QtQ'] = _pct_change(current_value, previous_year_value)
     return df
 
 
@@ -914,12 +967,7 @@ def calculate_month_to_month(df_original: pd.DataFrame, first_year: int, sum_trx
             if not previous_month_value.empty:
                 previous_month_value = previous_month_value[f'Sum of Fin {sum_trx_type} {trx_type}'].values[0]
 
-                if previous_month_value == 0 or np.isnan(previous_month_value):
-                    growth_val = np.nan
-                else:
-                    growth_val = (((current_value - previous_month_value) / previous_month_value) * 100).round(2)
-
-                df.at[i, '%MtM'] = growth_val
+                df.at[i, '%MtM'] = _pct_change(current_value, previous_month_value)
 
     df['Month'] = df['Month'].apply(lambda x: calendar.month_name[x])
     return df
@@ -938,16 +986,17 @@ def merge_df_growth(left_df, right_df, is_month: bool = False):
 def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_type: str, trx_type: str) -> pd.DataFrame:
     if len(df_national) <= 0:
         return pd.DataFrame()
-    data_pjp = df[f'Sum of Fin {sum_trx_type} {trx_type}'].values[0]
+    data_pjp = parse_number(df[f'Sum of Fin {sum_trx_type} {trx_type}'].values[0])
     if sum_trx_type == "Jumlah":
         sum_trx_word = "Frekuensi"
         national_word = "Frek"
+        scale = 1.0
     else:
         # Data PJP sumber dalam Rupiah -> konversi ke miliar dulu.
         # Data nasional pada file sumber sudah dalam miliar.
         sum_trx_word = "Nominal Rp Miliar"
         national_word = "Nom"
-        data_pjp = (data_pjp / 1_000_000_000).round(2)
+        scale = 1_000_000_000.0
 
     if trx_type == "Inc":
         trx_word = "Incoming"
@@ -956,21 +1005,30 @@ def compile_data_profile(df: pd.DataFrame, df_national: pd.DataFrame, sum_trx_ty
     else:
         trx_word = "Domestik"
 
-    data_national = df_national[f'{national_word} Nasional {trx_type}'].values[0]
+    data_national = parse_number(df_national[f'{national_word} Nasional {trx_type}'].values[0])
 
-    if sum_trx_type != "Jumlah":
+    # Semua hitungan memakai presisi penuh; pembulatan hanya sekali, saat nilai
+    # siap ditampilkan. Sebelumnya persentase dihitung dari angka yang sudah
+    # dibulatkan (miliar 2 desimal, lalu dibagi 1.000 dan dibulatkan lagi),
+    # sehingga market share bisa meleset dari hasil bagi yang sebenarnya.
+    value_pjp = None if data_pjp is None else data_pjp / scale
+    value_national = data_national
+
+    if sum_trx_type != "Jumlah" and value_pjp is not None and value_national is not None:
         # Samakan skala nominal antara Trx Perusahaan dan Trx Nasional.
         # Jika nilainya besar, tampilkan keduanya dalam triliun.
-        max_nominal_miliar = max(abs(float(data_pjp)), abs(float(data_national)))
-        if max_nominal_miliar >= 1_000:
-            data_pjp = round(float(data_pjp) / 1_000, 2)
-            data_national = round(float(data_national) / 1_000, 2)
+        if max(abs(value_pjp), abs(value_national)) >= 1_000:
+            value_pjp /= 1_000
+            value_national /= 1_000
             sum_trx_word = "Nominal Rp Triliun"
 
-    if data_national in [0, None] or (isinstance(data_national, float) and np.isnan(data_national)):
+    if not value_national or value_pjp is None:
         data_percentage = None
     else:
-        data_percentage = round((float(data_pjp) / float(data_national)) * 100, 2)
+        data_percentage = round_half_up((value_pjp / value_national) * 100, 2)
+
+    data_pjp = round_half_up(value_pjp, 2)
+    data_national = round_half_up(value_national, 2)
 
     data = {
         "Transaction Type": ["Trx Perusahaan", "Trx Nasional", "Persentase (%)"],
@@ -990,31 +1048,41 @@ def compile_data_market_share(df: pd.DataFrame, df_national: pd.DataFrame, trx_t
     else:
         trx_word = "Total"
 
-    if trx_type == "Total":
-        nominal_jkt = df_inc['Nominal (dalam triliun)'].values[0] + df_out['Nominal (dalam triliun)'].values[0] + \
-                      df_dom['Nominal (dalam triliun)'].values[0]
-        frek_jkt = df_inc['Frekuensi (dalam jutaan)'].values[0] + df_out['Frekuensi (dalam jutaan)'].values[0] + \
-                   df_dom['Frekuensi (dalam jutaan)'].values[0]
-        nominal_nasional = df_inc['Nominal (dalam triliun)'].values[1] + df_out['Nominal (dalam triliun)'].values[1] + \
-                           df_dom['Nominal (dalam triliun)'].values[1]
-        frek_nasional = df_inc['Frekuensi (dalam jutaan)'].values[1] + df_out['Frekuensi (dalam jutaan)'].values[1] + \
-                        df_dom['Frekuensi (dalam jutaan)'].values[1]
-    else:
-        # sums return Python/numpy scalars; use built-in round() to avoid AttributeError on float
-        nominal_jkt = round(df[f'Sum of Fin Nilai {trx_type}'].sum() / 1_000_000_000_000, 2)
-        frek_jkt = round(df[f'Sum of Fin Jumlah {trx_type}'].sum() / 1_000_000, 2)
-        nominal_nasional = round(df_national[f'Nom Nasional {trx_type}'].sum() / 1_000, 2)
-        frek_nasional = round(df_national[f'Frek Nasional {trx_type}'].sum() / 1_000_000, 2)
+    def _total(frame: pd.DataFrame, column: str, divisor: float) -> float:
+        if frame is None or column not in frame.columns:
+            return 0.0
+        return float(pd.to_numeric(frame[column], errors='coerce').fillna(0).sum()) / divisor
+
+    # "Total" dijumlahkan dari data sumber, bukan dari tabel Inc/Out/Dom yang
+    # sudah dibulatkan, supaya total tidak menyerap tiga kali error pembulatan.
+    parts = ["Inc", "Out", "Dom"] if trx_type == "Total" else [trx_type]
+
+    nominal_jkt = sum(_total(df, f'Sum of Fin Nilai {t}', 1_000_000_000_000) for t in parts)
+    frek_jkt = sum(_total(df, f'Sum of Fin Jumlah {t}', 1_000_000) for t in parts)
+    # Kolom nasional sudah dalam miliar -> /1.000 untuk jadi triliun.
+    nominal_nasional = sum(_total(df_national, f'Nom Nasional {t}', 1_000) for t in parts)
+    frek_nasional = sum(_total(df_national, f'Frek Nasional {t}', 1_000_000) for t in parts)
+
+    def _share(jkt: float, nasional: float):
+        # Rasio dihitung pada presisi penuh, lalu dibulatkan satu kali.
+        if not nasional:
+            return None
+        return round_half_up((jkt / nasional) * 100, 2)
 
     data = {
         f"Transaksi {trx_word}": ['Jakarta', 'Nasional', 'Market Share (%)'],
-    "Nominal (dalam triliun)": [nominal_jkt, nominal_nasional,
-                    round(((nominal_jkt / nominal_nasional) * 100), 2) if nominal_nasional else None],
-    "Frekuensi (dalam jutaan)": [frek_jkt, frek_nasional,
-                     round(((frek_jkt / frek_nasional) * 100), 2) if frek_nasional else None],
+        "Nominal (dalam triliun)": [
+            round_half_up(nominal_jkt, 2),
+            round_half_up(nominal_nasional, 2),
+            _share(nominal_jkt, nominal_nasional),
+        ],
+        "Frekuensi (dalam jutaan)": [
+            round_half_up(frek_jkt, 2),
+            round_half_up(frek_nasional, 2),
+            _share(frek_jkt, frek_nasional),
+        ],
     }
-    df_out = pd.DataFrame(data)
-    return df_out
+    return pd.DataFrame(data)
 
 def process_data_profile_month(df_month: pd.DataFrame, trx_type: str) -> pd.DataFrame:
     df_domestic_month = df_month[['Year', 'Month', f'Sum of Fin Jumlah {trx_type}', f'Sum of Fin Nilai {trx_type}']].copy()
@@ -1120,17 +1188,21 @@ def rename_format_growth_monthly_df(df: pd.DataFrame, trx_type: str):
     return df
 
 def format_profile_df(df: pd.DataFrame, is_market_share: bool = False):
+    # Pembulatan tampilan memakai HALF_UP yang sama dengan perhitungannya,
+    # bukan format '%.2f' bawaan Python yang membulatkan ke genap terdekat.
     def _fmt_id_number(v):
-        if not isinstance(v, (int, float, np.number)) or pd.isna(v):
+        if v is None or (isinstance(v, (int, float, np.number)) and pd.isna(v)):
+            return "-"
+        if not isinstance(v, (int, float, np.number)):
             return v
-        s = f"{float(v):,.2f}"
-        # en: 1,234,567.89 -> id: 1.234.567,89
-        return s.replace(",", "_").replace(".", ",").replace("_", ".")
+        return format_id_decimal(v, decimals=2, none="-")
 
     def _fmt_id_percent(v):
-        if not isinstance(v, (int, float, np.number)) or pd.isna(v):
+        if v is None or (isinstance(v, (int, float, np.number)) and pd.isna(v)):
+            return "-"
+        if not isinstance(v, (int, float, np.number)):
             return v
-        return f"{_fmt_id_number(v)} %"
+        return format_id_percent(v, decimals=2, show_sign=False, none="-", space_before_percent=True)
 
     out = df.copy()
     if out.empty:
@@ -1149,6 +1221,11 @@ def format_profile_df(df: pd.DataFrame, is_market_share: bool = False):
             label_col = out.columns[0]
 
     value_cols = [c for c in out.columns if c != label_col]
+    # Kolom diubah ke object dulu: isinya akan menjadi teks terformat, dan
+    # menulis teks ke kolom float sudah deprecated di pandas.
+    for col in value_cols:
+        out[col] = out[col].astype(object)
+
     for col in value_cols:
         if col not in out.columns:
             continue

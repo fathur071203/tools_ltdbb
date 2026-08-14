@@ -5,7 +5,13 @@ import calendar
 
 from service.preprocess import *
 from service.visualize import *
-from service.formatting import format_en_decimal, format_id_decimal, format_id_percent, qround_float
+from service.formatting import (
+    format_en_decimal,
+    format_id_decimal,
+    format_id_int_thousands,
+    format_id_percent,
+    qround_float,
+)
 
 
 # Rules multilicense: aktif mulai tanggal efektif (inclusive)
@@ -520,17 +526,17 @@ def _render_pjp_supporting_tw_table(
         return None
 
 
-    def _fmt_tril_id(amount_rp: float | None) -> str:
+    def _fmt_tril_id(amount_rp: float | None, decimals: int = 2) -> str:
         if amount_rp is None:
             return "-"
         try:
             v = float(amount_rp) / 1e12
         except Exception:
             return "-"
-        return _fmt_id_decimal(v, decimals=2)
+        return _fmt_id_decimal(v, decimals=int(decimals))
 
 
-    def _fmt_tril_delta_id(amount_rp: float | None) -> str:
+    def _fmt_tril_delta_id(amount_rp: float | None, decimals: int = 1) -> str:
         if amount_rp is None:
             return "-"
         try:
@@ -538,51 +544,194 @@ def _render_pjp_supporting_tw_table(
         except Exception:
             return "-"
         # always positive number in text: "sebesar RpX triliun"
-        return _fmt_id_decimal(abs(v), decimals=2)
+        return _fmt_id_decimal(abs(v), decimals=int(decimals))
 
 
-    def _render_narrative_for_flow(flow: str) -> None:
+    def _fmt_pct_narr(value: float | None, *, absolute: bool = False) -> str:
+        """Persen gaya laporan: tanpa tanda '+', minus tetap ditampilkan.
+
+        absolute=True dipakai pada kalimat yang kata kerjanya sudah menyatakan
+        arah ("penurunan ... sebesar 82,49%"), agar tidak dobel negatif.
+        """
+        if value is None:
+            return "-"
+        try:
+            v = abs(float(value)) if absolute else float(value)
+        except Exception:
+            return "-"
+        return format_id_percent(v, decimals=2, show_sign=False, none="-", space_before_percent=False)
+
+
+    def _narr_tw_label(y: int, q: int) -> str:
+        """Label triwulan gaya narasi laporan: 'Triwulan II 2026' (tanpa tanda '-')."""
+        roman = {1: "I", 2: "II", 3: "III", 4: "IV"}
+        return f"Triwulan {roman.get(int(q), str(q))} {int(y)}"
+
+
+    def _driver_change(pjp: str | None, *, flow: str, basis: str) -> tuple[float, float | None] | None:
+        """Delta (Rp) dan growth (%) satu PJP untuk basis QtQ/YoY."""
+        if not pjp:
+            return None
+        if str(basis).upper() == "YOY":
+            y0, q0 = int(year) - 1, int(quarter)
+        else:
+            y0, q0 = _prev_quarter(int(year), int(quarter))
+
+        v_cur = _pjp_metric_value(df_base, year=int(year), quarter=int(quarter), pjp_name=pjp, flow=flow, measure="Nilai")
+        v_prev = _pjp_metric_value(df_base, year=int(y0), quarter=int(q0), pjp_name=pjp, flow=flow, measure="Nilai")
+        if v_cur is None and v_prev is None:
+            return None
+        d = float(v_cur or 0.0) - float(v_prev or 0.0)
+        return d, _pct_growth(v_cur, v_prev)
+
+
+    def _contributor_frame(*, flow: str, basis: str, top_n: int = 5) -> pd.DataFrame:
+        """Tabel ringkas 'kenaikannya dari siapa': PJP dengan delta terbesar."""
+        basis_u = str(basis).upper()
+        if basis_u == "YOY":
+            p_y, p_q = int(year) - 1, int(quarter)
+        else:
+            p_y, p_q = _prev_quarter(int(year), int(quarter))
+
+        cur = _series_pjp_value(y=int(year), q=int(quarter), flow=flow, measure="Nilai")
+        prev = _series_pjp_value(y=int(p_y), q=int(p_q), flow=flow, measure="Nilai")
+        if cur.empty and prev.empty:
+            return pd.DataFrame()
+
+        idx = cur.index.union(prev.index)
+        cur2 = cur.reindex(idx).fillna(0.0)
+        prev2 = prev.reindex(idx).fillna(0.0)
+
+        out = pd.DataFrame(
+            {
+                "Nama PJP": idx.astype(str),
+                "_cur": cur2.to_numpy(),
+                "_prev": prev2.to_numpy(),
+            }
+        )
+        out["_delta"] = out["_cur"] - out["_prev"]
+        # PJP tanpa transaksi di kedua periode tidak informatif untuk pembahasan
+        out = out[(out["_cur"] != 0) | (out["_prev"] != 0)]
+        if out.empty:
+            return pd.DataFrame()
+
+        out["_pct"] = [_pct_growth(c, p) for c, p in zip(out["_cur"], out["_prev"])]
+        out = out.loc[out["_delta"].abs().sort_values(ascending=False).index].head(int(top_n))
+
+        return pd.DataFrame(
+            {
+                "Nama PJP": out["Nama PJP"].to_numpy(),
+                f"Q{int(quarter)} {int(year)} (Rp T)": [_fmt_tril_id(v, 2) for v in out["_cur"]],
+                f"Q{int(p_q)} {int(p_y)} (Rp T)": [_fmt_tril_id(v, 2) for v in out["_prev"]],
+                "Delta (Rp T)": [
+                    ("+" if float(v) >= 0 else "-") + _fmt_tril_delta_id(v, 2) for v in out["_delta"]
+                ],
+                "Growth (%)": [
+                    _fmt_id_percent(v) if pd.notna(v) else "-" for v in out["_pct"]
+                ],
+            }
+        ).reset_index(drop=True)
+
+
+    def _build_narrative(flow: str, *, rich: bool = True) -> str:
+        """Susun paragraf pembahasan QtQ (triwulanan) + YoY (tahunan) gaya laporan."""
         flow = str(flow)
         prev_y, prev_q = _prev_quarter(int(year), int(quarter))
+
+        def _em(text: str, kind: str) -> str:
+            if not rich:
+                return text
+            return f"*{text}*" if kind == "flow" else f"**{text}**"
+
+        flow_word = {"Domestik": "domestik", "Incoming": "incoming", "Outgoing": "outgoing"}.get(flow, flow.lower())
+        flow_md = flow_word if flow == "Domestik" else _em(flow_word, "flow")
 
         cur_total = _pjp_metric_value(df_base, year=int(year), quarter=int(quarter), pjp_name="", flow=flow, measure="Nilai")
         prevq_total = _pjp_metric_value(df_base, year=int(prev_y), quarter=int(prev_q), pjp_name="", flow=flow, measure="Nilai")
         prevy_total = _pjp_metric_value(df_base, year=int(year) - 1, quarter=int(quarter), pjp_name="", flow=flow, measure="Nilai")
 
-        delta_q = None if (cur_total is None or prevq_total is None) else (cur_total - prevq_total)
-        delta_y = None if (cur_total is None or prevy_total is None) else (cur_total - prevy_total)
+        if cur_total is None:
+            return ""
+
+        delta_q = None if prevq_total is None else (cur_total - prevq_total)
+        delta_y = None if prevy_total is None else (cur_total - prevy_total)
         pct_q = _pct_growth(cur_total, prevq_total)
         pct_y = _pct_growth(cur_total, prevy_total)
 
         trend_q = "meningkat" if (delta_q is not None and delta_q >= 0) else "menurun"
         trend_y = "meningkat" if (delta_y is not None and delta_y >= 0) else "menurun"
 
-        # pick drivers that match direction
+        # --- Kalimat utama: nominal TW berjalan + pembanding triwulanan + tahunan
+        parts = [
+            f"Jumlah nominal transaksi {flow_md} pada {_narr_tw_label(int(year), int(quarter))} "
+            f"sebesar Rp{_fmt_tril_id(cur_total, 2)} triliun"
+        ]
+
+        if delta_q is not None:
+            parts.append(
+                f", {trend_q} sebesar Rp{_fmt_tril_delta_id(delta_q, 2)} triliun atau {_fmt_pct_narr(pct_q)} "
+                f"dibandingkan dengan triwulan sebelumnya sebesar Rp{_fmt_tril_id(prevq_total, 2)} triliun"
+            )
+        else:
+            parts.append(" (data pembanding triwulan sebelumnya tidak tersedia)")
+
+        if delta_y is not None:
+            juga = "juga " if (delta_q is not None and trend_y == trend_q) else ""
+            parts.append(
+                f" dan bila dibandingkan dengan tahun sebelumnya hal tersebut {juga}{trend_y} "
+                f"sebesar Rp{_fmt_tril_delta_id(delta_y, 2)} triliun atau {_fmt_pct_narr(pct_y)}, "
+                f"yaitu sebesar Rp{_fmt_tril_id(prevy_total, 2)} triliun"
+            )
+        else:
+            parts.append(" (data pembanding tahun sebelumnya tidak tersedia)")
+
+        parts.append(". ")
+
+        # --- Kalimat pendorong: PJP penyumbang terbesar (searah dengan total)
         driver_q = _pick_driver_by_direction(flow=flow, basis="QtQ")
         driver_y = _pick_driver_by_direction(flow=flow, basis="YoY")
+        chg_q = _driver_change(driver_q, flow=flow, basis="QtQ")
+        chg_y = _driver_change(driver_y, flow=flow, basis="YoY")
 
-        def _pjp_driver_sentence(pjp: str | None, basis: str) -> str:
-            if not pjp:
-                return ""
-            basis_u = str(basis).upper()
-            if basis_u == "YOY":
-                y0, q0 = int(year) - 1, int(quarter)
-            else:
-                y0, q0 = _prev_quarter(int(year), int(quarter))
+        def _noun(d: float) -> str:
+            return "peningkatan" if d >= 0 else "penurunan"
 
-            v_cur = _pjp_metric_value(df_base, year=int(year), quarter=int(quarter), pjp_name=pjp, flow=flow, measure="Nilai")
-            v_prev = _pjp_metric_value(df_base, year=int(y0), quarter=int(q0), pjp_name=pjp, flow=flow, measure="Nilai")
-            d = None if (v_cur is None or v_prev is None) else (v_cur - v_prev)
-            p = _pct_growth(v_cur, v_prev)
+        def _verb(d: float) -> str:
+            return "meningkat" if d >= 0 else "menurun"
 
-            if d is None:
-                return ""
-            verb = "peningkatan" if d >= 0 else "penurunan"
-            return (
-                f"Hal tersebut terutama disebabkan oleh {verb} transaksi dari **{pjp}** "
-                f"sebesar Rp{_fmt_tril_delta_id(d)} triliun atau {_fmt_id_percent(p)} ({basis_u})."
+        if chg_q and chg_y and driver_q == driver_y and (chg_q[0] >= 0) == (chg_y[0] >= 0):
+            # Satu PJP mendorong QtQ maupun YoY -> satu kalimat gabungan
+            noun = _noun(chg_q[0])
+            parts.append(
+                f"Kontribusi {noun} tersebut terutama disebabkan oleh {noun} transaksi dari penyelenggara "
+                f"a.n {_em(str(driver_q), 'pjp')}, yaitu sebesar Rp{_fmt_tril_delta_id(chg_q[0])} triliun atau "
+                f"{_fmt_pct_narr(chg_q[1], absolute=True)} (secara triwulanan) dan sebesar "
+                f"Rp{_fmt_tril_delta_id(chg_y[0])} triliun atau {_fmt_pct_narr(chg_y[1], absolute=True)} (secara tahunan)."
             )
+        elif chg_q and chg_y:
+            # Pendorong berbeda antara triwulanan dan tahunan -> dua klausa
+            parts.append(
+                f"{_noun(chg_q[0]).capitalize()} transaksi secara triwulanan terutama berasal dari transaksi "
+                f"{_em(str(driver_q), 'pjp')} yang {_verb(chg_q[0])} sebesar Rp{_fmt_tril_delta_id(chg_q[0])} triliun "
+                f"atau {_fmt_pct_narr(chg_q[1], absolute=True)}, sedangkan {_noun(chg_y[0])} transaksi secara tahunan "
+                f"terutama disebabkan adanya {_noun(chg_y[0])} transaksi {_em(str(driver_y), 'pjp')} sebesar "
+                f"Rp{_fmt_tril_delta_id(chg_y[0])} triliun atau {_fmt_pct_narr(chg_y[1], absolute=True)}."
+            )
+        else:
+            for chg, drv, basis_word in ((chg_q, driver_q, "triwulanan"), (chg_y, driver_y, "tahunan")):
+                if not chg:
+                    continue
+                parts.append(
+                    f"{_noun(chg[0]).capitalize()} transaksi secara {basis_word} terutama disebabkan oleh "
+                    f"transaksi {_em(str(drv), 'pjp')} yang {_verb(chg[0])} sebesar Rp{_fmt_tril_delta_id(chg[0])} triliun "
+                    f"atau {_fmt_pct_narr(chg[1], absolute=True)}. "
+                )
 
+        return "".join(parts).strip()
+
+
+    def _render_narrative_for_flow(flow: str) -> None:
+        flow = str(flow)
         flow_title = {
             "Domestik": "Transaksi Domestik",
             "Incoming": "Transaksi Incoming",
@@ -590,40 +739,25 @@ def _render_pjp_supporting_tw_table(
         }.get(flow, f"Transaksi {flow}")
 
         st.markdown(f"**{flow_title}**")
-        if cur_total is None:
+
+        narrative = _build_narrative(flow, rich=True)
+        if not narrative:
             st.info("Data tidak tersedia untuk periode ini.")
             return
 
-        # Main sentence
-        st.markdown(
-            " ".join(
-                [
-                    f"Nominal transaksi {flow.lower()} pada {_triwulan_label(int(year), int(quarter))} sebesar Rp{_fmt_tril_id(cur_total)} triliun,",
-                    (
-                        f"{trend_q} sebesar Rp{_fmt_tril_delta_id(delta_q)} triliun dibandingkan dengan triwulan sebelumnya "
-                        f"Rp{_fmt_tril_id(prevq_total)} triliun (QtQ: {_fmt_id_percent(pct_q).replace('+', '')})"
-                        if prevq_total is not None and delta_q is not None and pct_q is not None
-                        else "(data pembanding triwulan sebelumnya tidak tersedia)"
-                    )
-                    +
-                    " dan ",
-                    (
-                        f"{trend_y} sebesar Rp{_fmt_tril_delta_id(delta_y)} triliun dibandingkan dengan {_triwulan_label(int(year) - 1, int(quarter))} "
-                        f"Rp{_fmt_tril_id(prevy_total)} triliun (YoY: {_fmt_id_percent(pct_y).replace('+', '')})."
-                        if prevy_total is not None and delta_y is not None and pct_y is not None
-                        else "(data pembanding tahun sebelumnya tidak tersedia)."
-                    ),
-                ]
-            )
-        )
+        st.markdown(narrative)
 
-        # Driver sentences
-        s_q = _pjp_driver_sentence(driver_q, "QtQ")
-        s_y = _pjp_driver_sentence(driver_y, "YoY")
-        if s_q:
-            st.markdown(s_q)
-        if s_y and (driver_y != driver_q):
-            st.markdown(s_y)
+        with st.expander(f"Rincian pendorong {flow_title.lower()} (QtQ & YoY)", expanded=False):
+            for basis, judul in (("QtQ", "Triwulanan (QtQ)"), ("YoY", "Tahunan (YoY)")):
+                st.caption(f"{judul} — 5 PJP dengan perubahan nominal terbesar")
+                frame = _contributor_frame(flow=flow, basis=basis, top_n=5)
+                if frame.empty:
+                    st.write("Data pembanding tidak tersedia.")
+                else:
+                    st.dataframe(frame, use_container_width=True, hide_index=True)
+
+            st.caption("Teks siap salin (tanpa format tebal/miring)")
+            st.code(_build_narrative(flow, rich=False), language=None)
 
     # Render narrative paragraphs (matching report style)
     _render_narrative_for_flow("Domestik")
@@ -1337,9 +1471,11 @@ def _render_overall_growth_detail_table_quarterly(
 
     if sum_trx_type == "Jumlah":
         value_unit = "Volume (Jutaan)"
+        full_unit = "Volume Penuh (Transaksi)"
         scale = 1e6
     else:
         value_unit = "Nilai (Rp Triliun)"
+        full_unit = "Nilai Penuh (Rp)"
         scale = 1e12
 
     periods_df = pd.DataFrame(parsed, columns=["Year", "Quarter"]).drop_duplicates()
@@ -1379,10 +1515,13 @@ def _render_overall_growth_detail_table_quarterly(
         dfc = periods_df.merge(dfc, on=["Year", "Quarter"], how="left")
         dfc["Periode"] = "Q" + dfc["Quarter"].astype(int).astype(str) + " " + dfc["Year"].astype(int).astype(str)
         dfc["Jenis"] = jenis
+        # Nilai penuh disimpan apa adanya (tanpa dibagi skala) supaya angka asli
+        # tetap terbaca di samping versi yang sudah dibulatkan.
+        dfc["__full__"] = _num(dfc[value_col]).fillna(0.0)
         dfc[value_unit] = (_num(dfc[value_col]) / scale).map(lambda x: qround_float(x, decimals=2, none=0.0))
         dfc["YoY (%)"] = _num(dfc[yoy_col]).map(lambda x: qround_float(x, decimals=2, none=0.0))
         dfc["QtQ (%)"] = _num(dfc[qoq_col]).map(lambda x: qround_float(x, decimals=2, none=0.0))
-        return dfc[["Periode", "Jenis", value_unit, "YoY (%)", "QtQ (%)"]]
+        return dfc[["Periode", "Jenis", value_unit, "__full__", "YoY (%)", "QtQ (%)"]]
 
     df_total_block = _build_block(
         df_total_combined,
@@ -1415,29 +1554,51 @@ def _render_overall_growth_detail_table_quarterly(
 
     # Make Total display consistent with the sum of displayed components
     if not df_total_block.empty and not df_inc_block.empty and not df_out_block.empty and not df_dom_block.empty:
-        comp = (
-            df_inc_block[["Periode", value_unit]]
-            .rename(columns={value_unit: "__inc__"})
-            .merge(df_out_block[["Periode", value_unit]].rename(columns={value_unit: "__out__"}), on="Periode", how="left")
-            .merge(df_dom_block[["Periode", value_unit]].rename(columns={value_unit: "__dom__"}), on="Periode", how="left")
-        )
-        comp["__inc__"] = pd.to_numeric(comp["__inc__"], errors="coerce").fillna(0.0)
-        comp["__out__"] = pd.to_numeric(comp["__out__"], errors="coerce").fillna(0.0)
-        comp["__dom__"] = pd.to_numeric(comp["__dom__"], errors="coerce").fillna(0.0)
+        def _components(col: str) -> pd.DataFrame:
+            out = (
+                df_inc_block[["Periode", col]]
+                .rename(columns={col: "__inc__"})
+                .merge(df_out_block[["Periode", col]].rename(columns={col: "__out__"}), on="Periode", how="left")
+                .merge(df_dom_block[["Periode", col]].rename(columns={col: "__dom__"}), on="Periode", how="left")
+            )
+            for part in ("__inc__", "__out__", "__dom__"):
+                out[part] = pd.to_numeric(out[part], errors="coerce").fillna(0.0)
+            return out
+
+        comp = _components(value_unit)
         comp[value_unit] = (comp["__inc__"] + comp["__out__"] + comp["__dom__"]).map(lambda x: qround_float(x, decimals=2, none=0.0))
-        df_total_block = df_total_block.drop(columns=[value_unit]).merge(comp[["Periode", value_unit]], on="Periode", how="left")
+
+        # Nilai penuh dijumlah pada presisi penuh, tidak dari kolom yang sudah dibulatkan.
+        comp_full = _components("__full__")
+        comp["__full__"] = comp_full["__inc__"] + comp_full["__out__"] + comp_full["__dom__"]
+
+        df_total_block = (
+            df_total_block
+            .drop(columns=[value_unit, "__full__"])
+            .merge(comp[["Periode", value_unit, "__full__"]], on="Periode", how="left")
+        )
 
     df_detail = pd.concat([df_total_block, df_inc_block, df_out_block, df_dom_block], ignore_index=True)
     if df_detail.empty:
         return
 
-    st.caption("Detail perbandingan untuk semua periode yang sedang ditampilkan pada chart (sesuai filter 'Tampilkan Kuartal').")
+    # Streamlit 1.40 hanya menerima format printf, sehingga angka penuh dirender
+    # sebagai teks agar pemisah ribuan Indonesia tetap muncul. Kolom versi
+    # bulat di sebelahnya tetap numerik supaya masih bisa diurutkan.
+    df_detail[full_unit] = df_detail["__full__"].map(lambda x: format_id_int_thousands(x, none="-"))
+    df_detail = df_detail[["Periode", "Jenis", value_unit, full_unit, "YoY (%)", "QtQ (%)"]]
+
+    st.caption(
+        "Detail perbandingan untuk semua periode yang sedang ditampilkan pada chart "
+        "(sesuai filter 'Tampilkan Kuartal'). Kolom penuh menampilkan angka asli tanpa pembulatan."
+    )
     st.dataframe(
         df_detail,
         use_container_width=True,
         hide_index=True,
         column_config={
             value_unit: st.column_config.NumberColumn(value_unit, format="%.2f"),
+            full_unit: st.column_config.TextColumn(full_unit),
             "YoY (%)": st.column_config.NumberColumn("YoY (%)", format="%+.2f%%"),
             "QtQ (%)": st.column_config.NumberColumn("QtQ (%)", format="%+.2f%%"),
         },
