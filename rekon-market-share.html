@@ -1,0 +1,609 @@
+<title>Rekon Market Share LTDBB</title>
+<style>
+  :root{
+    --ground:#F4F6F9;
+    --surface:#FFFFFF;
+    --surface-2:#EDF0F5;
+    --ink:#141922;
+    --ink-2:#48536880;
+    --ink-mid:#586377;
+    --rule:#D9DEE7;
+    --rule-strong:#B8C1D0;
+    --accent:#2D4A7C;
+    --accent-soft:#E6ECF6;
+    --brass:#8A6224;
+    --brass-soft:#F4EBDA;
+    --ok:#1B6650;
+    --ok-soft:#E0EFE9;
+    --warn:#8A6224;
+    --warn-soft:#F4EBDA;
+    --crit:#9E2F45;
+    --crit-soft:#F7E4E8;
+    --shadow:0 1px 2px rgba(20,25,34,.05), 0 8px 24px -16px rgba(20,25,34,.28);
+
+    --serif:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,"Times New Roman",serif;
+    --sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","Cascadia Code",SFMono-Regular,"SF Mono",Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#101319;
+      --surface:#181C25;
+      --surface-2:#1F2430;
+      --ink:#E6EAF2;
+      --ink-2:#8C97AB80;
+      --ink-mid:#9AA4B8;
+      --rule:#2A303D;
+      --rule-strong:#3A4253;
+      --accent:#89ABDF;
+      --accent-soft:#1D2739;
+      --brass:#D7A863;
+      --brass-soft:#2A2318;
+      --ok:#68C4A2;
+      --ok-soft:#16261F;
+      --warn:#D7A863;
+      --warn-soft:#2A2318;
+      --crit:#E68098;
+      --crit-soft:#2C1A20;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#101319;
+    --surface:#181C25;
+    --surface-2:#1F2430;
+    --ink:#E6EAF2;
+    --ink-2:#8C97AB80;
+    --ink-mid:#9AA4B8;
+    --rule:#2A303D;
+    --rule-strong:#3A4253;
+    --accent:#89ABDF;
+    --accent-soft:#1D2739;
+    --brass:#D7A863;
+    --brass-soft:#2A2318;
+    --ok:#68C4A2;
+    --ok-soft:#16261F;
+    --warn:#D7A863;
+    --warn-soft:#2A2318;
+    --crit:#E68098;
+    --crit-soft:#2C1A20;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:17px;
+    line-height:1.62;
+    margin:0;
+    padding:clamp(1.4rem,4vw,3.5rem) clamp(1rem,5vw,2rem) 5rem;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:60rem;margin:0 auto;display:flex;flex-direction:column;gap:2.75rem}
+
+  /* ---- masthead ---- */
+  .masthead{display:flex;flex-direction:column;gap:.85rem}
+  .eyebrow{
+    font-family:var(--mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink-mid);display:flex;flex-wrap:wrap;gap:.5rem 1.1rem;
+  }
+  h1{
+    font-family:var(--sans);font-weight:760;letter-spacing:-.025em;text-wrap:balance;
+    font-size:clamp(1.85rem,4.6vw,2.7rem);line-height:1.1;margin:0;
+  }
+  .rule-double{border-top:3px solid var(--ink);border-bottom:1px solid var(--rule-strong);height:4px}
+  .standfirst{font-size:1.1rem;color:var(--ink-mid);margin:0;max-width:62ch}
+
+  /* ---- verdict ---- */
+  .verdict{
+    background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+    box-shadow:var(--shadow);overflow:hidden;
+  }
+  .verdict-head{
+    padding:1.1rem 1.35rem;border-bottom:1px solid var(--rule);background:var(--surface-2);
+    display:flex;flex-wrap:wrap;align-items:baseline;gap:.6rem 1rem;
+  }
+  .verdict-head h2{margin:0;font-family:var(--sans);font-size:1rem;font-weight:700;letter-spacing:-.01em}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
+  .tile{padding:1.25rem 1.35rem;display:flex;flex-direction:column;gap:.4rem;border-right:1px solid var(--rule)}
+  .tile:last-child{border-right:0}
+  @media (max-width:52rem){
+    .tile{border-right:0;border-bottom:1px solid var(--rule)}
+    .tile:last-child{border-bottom:0}
+  }
+  .tile-label{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mid)}
+  .tile-value{font-family:var(--sans);font-size:1.5rem;font-weight:730;letter-spacing:-.02em;line-height:1.15;font-variant-numeric:tabular-nums}
+  .tile-note{font-size:.92rem;color:var(--ink-mid);line-height:1.45}
+  .v-ok{color:var(--ok)} .v-warn{color:var(--warn)} .v-crit{color:var(--crit)}
+
+  /* ---- sections ---- */
+  section{display:flex;flex-direction:column;gap:1.1rem}
+  .sec-head{display:flex;align-items:baseline;gap:.85rem;border-bottom:1px solid var(--rule-strong);padding-bottom:.5rem}
+  .sec-num{font-family:var(--mono);font-size:.78rem;color:var(--accent);letter-spacing:.06em;flex:none;padding-top:.15rem}
+  h2.sec-title{margin:0;font-family:var(--sans);font-size:1.32rem;font-weight:720;letter-spacing:-.02em;text-wrap:balance}
+  p{margin:0;max-width:68ch}
+  .lede{color:var(--ink-mid)}
+  ul{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.5rem;max-width:68ch}
+  li::marker{color:var(--accent)}
+  strong{font-weight:700}
+  code,.num{font-family:var(--mono);font-size:.88em;font-variant-numeric:tabular-nums}
+  code{background:var(--surface-2);padding:.1em .35em;border-radius:2px;color:var(--ink)}
+  a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:2px}
+
+  /* ---- chips ---- */
+  .chip{
+    display:inline-flex;align-items:center;gap:.4rem;flex:none;
+    font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;
+    padding:.28rem .55rem;border-radius:2px;border:1px solid currentColor;line-height:1;
+  }
+  .chip::before{content:"";width:.45rem;height:.45rem;background:currentColor;flex:none}
+  .chip-ok{color:var(--ok);background:var(--ok-soft)}
+  .chip-warn{color:var(--warn);background:var(--warn-soft)}
+  .chip-crit{color:var(--crit);background:var(--crit-soft)}
+  .chip-info{color:var(--accent);background:var(--accent-soft)}
+
+  /* ---- tables ---- */
+  .tablewrap{
+    overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface);box-shadow:var(--shadow);
+  }
+  table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:.82rem;font-variant-numeric:tabular-nums}
+  caption{
+    caption-side:top;text-align:left;padding:.85rem 1rem;background:var(--surface-2);
+    border-bottom:1px solid var(--rule);font-family:var(--sans);font-size:.88rem;font-weight:640;color:var(--ink);
+  }
+  th,td{padding:.5rem .8rem;text-align:right;white-space:nowrap;border-bottom:1px solid var(--rule)}
+  th{
+    font-weight:600;font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-mid);background:var(--surface);position:sticky;top:0;border-bottom:1px solid var(--rule-strong);
+  }
+  th:first-child,td:first-child{text-align:left}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover td{background:var(--surface-2)}
+  td.flag{color:var(--crit);font-weight:700}
+  td.good{color:var(--ok)}
+  tfoot td{background:var(--surface-2);font-weight:700;border-top:1px solid var(--rule-strong)}
+
+  /* ---- finding cards ---- */
+  .findings{display:flex;flex-direction:column;gap:1rem}
+  .find{background:var(--surface);border:1px solid var(--rule);border-radius:3px;box-shadow:var(--shadow);overflow:hidden}
+  .find-head{
+    display:flex;flex-wrap:wrap;align-items:center;gap:.65rem .85rem;
+    padding:.8rem 1.1rem;background:var(--surface-2);border-bottom:1px solid var(--rule);
+  }
+  .find-id{font-family:var(--mono);font-size:.78rem;font-weight:700;color:var(--ink-mid);letter-spacing:.06em}
+  .find-title{font-family:var(--sans);font-size:1.02rem;font-weight:670;letter-spacing:-.012em;margin:0;flex:1 1 16rem;min-width:0}
+  .find-body{padding:1.1rem;display:flex;flex-direction:column;gap:.8rem}
+  .loc{font-family:var(--mono);font-size:.78rem;color:var(--ink-mid);word-break:break-word}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:.3rem 1rem;font-family:var(--mono);font-size:.82rem;font-variant-numeric:tabular-nums}
+  .kv dt{color:var(--ink-mid)}
+  .kv dd{margin:0}
+  pre{
+    margin:0;overflow-x:auto;background:var(--surface-2);border:1px solid var(--rule);border-radius:2px;
+    padding:.75rem .9rem;font-family:var(--mono);font-size:.78rem;line-height:1.55;color:var(--ink);
+  }
+  .callout{
+    border-left:2px solid var(--accent);padding:.15rem 0 .15rem .9rem;color:var(--ink-mid);
+    font-size:.98rem;max-width:66ch;
+  }
+  footer{
+    border-top:1px solid var(--rule);padding-top:1.1rem;color:var(--ink-mid);
+    font-family:var(--mono);font-size:.74rem;line-height:1.7;
+  }
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">
+      <span>Tools Analisa Data LTDBB</span>
+      <span>PJP LR Jakarta</span>
+      <span>18 Agustus 2026</span>
+    </div>
+    <h1>Rekonsiliasi Data Transaksi &amp; Market Share</h1>
+    <div class="rule-double"></div>
+    <p class="standfirst">
+      Rumus market share sudah benar dan cocok persis dengan kertas kerja Excel. Yang belum sesuai
+      ada di data sumbernya — 20 dari 102 bulan menghasilkan market share di atas 100%.
+    </p>
+  </header>
+
+  <div class="verdict">
+    <div class="verdict-head">
+      <h2>Kesimpulan</h2>
+      <span class="chip chip-warn">Sebagian belum sesuai</span>
+    </div>
+    <div class="tiles">
+      <div class="tile">
+        <span class="tile-label">Logika perhitungan</span>
+        <span class="tile-value v-ok">Sesuai</span>
+        <span class="tile-note">Rekon Triwulan I 2025 cocok sampai 2 desimal dengan sheet <code>Market Share</code>. Skala, pembulatan, dan mode Quarter vs Range konsisten.</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Data sumber</span>
+        <span class="tile-value v-crit">20 bulan bermasalah</span>
+        <span class="tile-note">19,6% periode menghasilkan pangsa Jakarta melebihi nasional — mustahil secara definisi.</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Temuan kode</span>
+        <span class="tile-value v-warn">3 defect</span>
+        <span class="tile-note">Semua di luar rumus market share: average ticket size dan format tampilan.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== 1 =================== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">§1</span>
+      <h2 class="sec-title">Yang sudah terverifikasi benar</h2>
+    </div>
+    <p class="lede">
+      Saya jalankan ulang pipeline aplikasi di luar Streamlit dan bandingkan dengan angka referensi
+      yang sudah ada di workbook. Triwulan I 2025 dipakai sebagai titik uji karena sheet
+      <code>Market Share</code> memuat blok perhitungan manual untuk periode tersebut.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <caption>Triwulan I 2025 — hasil aplikasi vs kertas kerja Excel</caption>
+        <thead>
+          <tr>
+            <th>Jenis transaksi</th>
+            <th>MS nominal (app)</th>
+            <th>MS nominal (Excel)</th>
+            <th>MS frekuensi (app)</th>
+            <th>MS frekuensi (Excel)</th>
+            <th>Selisih</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Outgoing</td><td>45,45%</td><td>45,4509%</td><td>84,26%</td><td>84,2622%</td><td class="good">nihil</td></tr>
+          <tr><td>Incoming</td><td>80,43%</td><td>80,4327%</td><td>92,12%</td><td>92,1239%</td><td class="good">nihil</td></tr>
+          <tr><td>Domestik</td><td>41,69%</td><td>41,6907%</td><td>6,63%</td><td>6,6257%</td><td class="good">nihil</td></tr>
+          <tr><td>Total</td><td>45,66%</td><td>45,6599%</td><td>6,96%</td><td>6,9609%</td><td class="good">nihil</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Hal-hal berikut ikut tervalidasi dan tidak perlu diragukan lagi:</p>
+    <ul>
+      <li><strong>Konversi satuan.</strong> Nominal PJP (rupiah, dibagi 10<sup>12</sup>) dan nominal nasional (miliar, dibagi 10<sup>3</sup>) bertemu di satuan triliun yang sama. Frekuensi dua-duanya dibagi 10<sup>6</sup>.</li>
+      <li><strong>Mode Quarter dan mode Range identik.</strong> Range Januari–Maret 2025 menghasilkan angka yang sama persis dengan Triwulan 1 2025 — jadi tidak ada bulan yang bocor atau terhitung dua kali di jalur bulanan.</li>
+      <li><strong>Baris "Total" dihitung dari data sumber</strong> (Inc + Out + Dom), bukan dari tabel yang sudah dibulatkan. Selisihnya terhadap kolom <code>Nom Nasional Total</code> maksimum 0,32 miliar dari 7.218 triliun — dapat diabaikan.</li>
+      <li><strong>Agregasi nasional aman.</strong> Heuristik <code>nunique&nbsp;≤&nbsp;1&nbsp;→&nbsp;max</code> di <code>preprocess_data_national</code> tidak pernah aktif salah pada data ini; hasilnya identik dengan penjumlahan biasa untuk seluruh 102 bulan.</li>
+      <li><strong>Grand total Jakarta 2025</strong> cocok dengan pivot di workbook untuk Incoming dan Outgoing. Frekuensi Domestik berbeda 76.936 transaksi — itu memang efek "koreksi frekuensi" yang sudah diterapkan di file ini tapi belum di pivot lama.</li>
+      <li><strong>Kolom yang dipakai sudah tepat</strong> — hanya kolom <code>Fin&nbsp;…</code> (M–R), bukan kolom mentah G–L yang belum dikoreksi.</li>
+    </ul>
+
+    <p class="callout">
+      Catatan: blok "Jan–Sep 2024" dan "All Time" di sheet <code>Market Share</code> tidak akan cocok dengan
+      aplikasi. Blok itu ditulis dari snapshot lama, dan blok "All Time" memasangkan Jakarta periode 2025
+      dengan nasional periode 2023&nbsp;Q1–2025&nbsp;Q1. Ketidakcocokan di situ ada pada kertas kerjanya, bukan aplikasi.
+    </p>
+  </section>
+
+  <!-- =================== 2 =================== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">§2</span>
+      <h2 class="sec-title">Yang belum sesuai: market share di atas 100%</h2>
+    </div>
+    <p class="lede">
+      Rumusnya benar, tapi keluarannya tidak masuk akal di sebagian periode. Pangsa Jakarta terhadap
+      nasional tidak mungkin melebihi 100% — Jakarta adalah bagian dari nasional. Ini terjadi di
+      <strong>20 dari 102 bulan (19,6%)</strong>, dan aplikasi menampilkannya apa adanya tanpa peringatan.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <caption>Periode dengan market share &gt; 100% — 21 kombinasi periode &amp; jenis transaksi</caption>
+        <thead>
+          <tr>
+            <th>Periode</th><th>Jenis</th><th>MS nominal</th><th>MS frekuensi</th>
+            <th>Jakarta (frek)</th><th>Nasional (frek)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Feb 2018</td><td>Domestik</td><td class="flag">104,7%</td><td>12,9%</td><td>272.118</td><td>2.105.943</td></tr>
+          <tr><td>Mei 2022</td><td>Outgoing</td><td>34,0%</td><td class="flag">268,4%</td><td>315.763</td><td>117.638</td></tr>
+          <tr><td>Jun 2022</td><td>Outgoing</td><td>28,9%</td><td class="flag">223,3%</td><td>313.464</td><td>140.362</td></tr>
+          <tr><td>Okt 2022</td><td>Outgoing</td><td>32,3%</td><td class="flag">180,7%</td><td>347.348</td><td>192.221</td></tr>
+          <tr><td>Nov 2022</td><td>Outgoing</td><td>33,3%</td><td class="flag">192,8%</td><td>349.029</td><td>180.990</td></tr>
+          <tr><td>Okt 2023</td><td>Domestik</td><td>86,1%</td><td class="flag">2.827,2%</td><td>23.441.197</td><td>829.121</td></tr>
+          <tr><td>Nov 2023</td><td>Domestik</td><td>86,9%</td><td class="flag">2.456,2%</td><td>20.364.548</td><td>829.099</td></tr>
+          <tr><td>Jan 2024</td><td>Incoming</td><td>89,2%</td><td class="flag">100,2%</td><td>1.576.709</td><td>1.574.252</td></tr>
+          <tr><td>Apr 2024</td><td>Incoming</td><td>94,1%</td><td class="flag">104,4%</td><td>1.961.285</td><td>1.878.298</td></tr>
+          <tr><td>Mei 2024</td><td>Incoming</td><td class="flag">107,2%</td><td class="flag">109,9%</td><td>1.863.984</td><td>1.696.566</td></tr>
+          <tr><td>Jun 2024</td><td>Incoming</td><td class="flag">155,6%</td><td class="flag">139,8%</td><td>2.307.338</td><td>1.650.732</td></tr>
+          <tr><td>Jul 2024</td><td>Incoming</td><td class="flag">112,6%</td><td class="flag">107,4%</td><td>1.711.589</td><td>1.593.987</td></tr>
+          <tr><td>Agu 2024</td><td>Incoming</td><td class="flag">112,9%</td><td class="flag">111,5%</td><td>1.754.222</td><td>1.573.204</td></tr>
+          <tr><td>Sep 2024</td><td>Incoming</td><td class="flag">116,4%</td><td class="flag">115,2%</td><td>1.550.978</td><td>1.346.712</td></tr>
+          <tr><td>Okt 2024</td><td>Incoming</td><td class="flag">114,2%</td><td class="flag">115,9%</td><td>1.711.793</td><td>1.476.498</td></tr>
+          <tr><td>Nov 2024</td><td>Incoming</td><td class="flag">116,1%</td><td class="flag">117,6%</td><td>1.659.746</td><td>1.411.890</td></tr>
+          <tr><td>Des 2024</td><td>Incoming</td><td class="flag">116,6%</td><td class="flag">117,7%</td><td>1.863.028</td><td>1.583.206</td></tr>
+          <tr><td>Jan 2025</td><td>Incoming</td><td class="flag">104,6%</td><td class="flag">120,9%</td><td>1.907.754</td><td>1.577.564</td></tr>
+          <tr><td>Feb 2026</td><td>Incoming</td><td>85,1%</td><td class="flag">102,9%</td><td>1.649.127</td><td>1.602.169</td></tr>
+          <tr><td>Feb 2026</td><td>Outgoing</td><td>56,3%</td><td class="flag">114,3%</td><td>217.765</td><td>190.571</td></tr>
+          <tr><td>Mei 2026</td><td>Outgoing</td><td>69,1%</td><td class="flag">580,2%</td><td>1.676.297</td><td>288.929</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Penelusuran akar masalahnya mengarah ke empat kelompok, dua di sisi nasional dan dua di sisi Jakarta.</p>
+
+    <div class="findings">
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">A-1</span>
+          <h3 class="find-title">Frekuensi Domestik nasional Okt–Nov 2023 turun ~400×</h3>
+          <span class="chip chip-crit">Data nasional</span>
+        </div>
+        <div class="find-body">
+          <p>Nilai bulan-bulan tetangganya berada di kisaran 350–470 juta transaksi, lalu Oktober dan November 2023 tercatat hanya 829 ribu. September 2023 juga sudah turun ke 63 juta. Polanya bukan penurunan bisnis, melainkan salah skala atau salah tarik data.</p>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Bulan</th><th>Frek Nasional Dom</th><th>Rasio thd median 12 bulan</th></tr></thead>
+              <tbody>
+                <tr><td>Agu 2023</td><td>369.839.630</td><td>1,104</td></tr>
+                <tr><td>Sep 2023</td><td>63.029.367</td><td class="flag">0,181</td></tr>
+                <tr><td>Okt 2023</td><td>829.121</td><td class="flag">0,002</td></tr>
+                <tr><td>Nov 2023</td><td>829.099</td><td class="flag">0,002</td></tr>
+                <tr><td>Des 2023</td><td>470.857.619</td><td>1,136</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="loc">Sumber: sheet <span class="num">Raw_JKTNasional</span>, kolom <span class="num">Frek Nasional Dom</span>.</p>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">A-2</span>
+          <h3 class="find-title">Frekuensi Outgoing nasional 2022 tidak sinkron dengan Jakarta</h3>
+          <span class="chip chip-crit">Data nasional</span>
+        </div>
+        <div class="find-body">
+          <p>Jakarta melonjak dari 60 ribu (April) ke 316 ribu (Mei) 2022, tetapi nasional baru ikut naik dua bulan kemudian di Juli. Lalu Oktober–November nasional turun lagi ke ~190 ribu sementara Jakarta bertahan di ~348 ribu. Terlihat seperti keterlambatan atau ketidaklengkapan pelaporan di sisi nasional, sehingga market share frekuensi 2022 secara tahunan menjadi <strong>122,53%</strong>.</p>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Bulan 2022</th><th>Jakarta</th><th>Nasional</th><th>MS frekuensi</th></tr></thead>
+              <tbody>
+                <tr><td>April</td><td>60.384</td><td>87.554</td><td>69,0%</td></tr>
+                <tr><td>Mei</td><td>315.763</td><td>117.638</td><td class="flag">268,4%</td></tr>
+                <tr><td>Juni</td><td>313.464</td><td>140.362</td><td class="flag">223,3%</td></tr>
+                <tr><td>Juli</td><td>337.911</td><td>364.282</td><td>92,8%</td></tr>
+                <tr><td>Oktober</td><td>347.348</td><td>192.221</td><td class="flag">180,7%</td></tr>
+                <tr><td>November</td><td>349.029</td><td>180.990</td><td class="flag">192,8%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">A-3</span>
+          <h3 class="find-title">Nilai Incoming Wise Payments 2024 melonjak 3× lalu kembali turun</h3>
+          <span class="chip chip-crit">Data Jakarta</span>
+        </div>
+        <div class="find-body">
+          <p>Ini penyebab tunggal terbesar dari 10 bulan Incoming di atas 100% sepanjang 2024. Nilai Incoming Wise naik dari 16.445 miliar (2023) ke 49.971 miliar (2024), lalu turun lagi ke 13.320 miliar (2025) — sementara PJP besar lain bergerak wajar. Puncaknya Juni 2024: Wise sendiri menyumbang Rp 8,44 triliun, dibanding Rp 1,52 triliun pada Juni 2023 dan Rp 0,83 triliun pada Juni 2025.</p>
+          <div class="tablewrap">
+            <table>
+              <caption>Fin Nilai Inc per tahun, dalam miliar rupiah — 5 PJP terbesar 2024</caption>
+              <thead><tr><th>PJP</th><th>2022</th><th>2023</th><th>2024</th><th>2025</th></tr></thead>
+              <tbody>
+                <tr><td>Wise Payments Indonesia</td><td>7.876</td><td>16.445</td><td class="flag">49.971</td><td>13.320</td></tr>
+                <tr><td>Syaftraco</td><td>10.646</td><td>16.377</td><td>30.658</td><td>30.084</td></tr>
+                <tr><td>Western Union Indonesia</td><td>8.312</td><td>12.591</td><td>17.196</td><td>23.905</td></tr>
+                <tr><td>Eka Bakti Amerta Yoga S.</td><td>9.332</td><td>14.173</td><td>11.485</td><td>10.684</td></tr>
+                <tr><td>Moneygram Payment Systems</td><td>3.506</td><td>4.999</td><td>8.030</td><td>6.726</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="loc">Workbook sudah memuat sheet <span class="num">Wise</span> — kemungkinan isu ini sudah pernah ditelusuri sebelumnya.</p>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">A-4</span>
+          <h3 class="find-title">Frekuensi Outgoing Jakarta Mei 2026 melonjak 6,7×</h3>
+          <span class="chip chip-warn">Data Jakarta</span>
+        </div>
+        <div class="find-body">
+          <p>Jakarta mencatat 1.676.297 transaksi outgoing pada Mei 2026, dibanding ~250 ribu di bulan sebelum dan sesudahnya. Nominalnya tidak ikut melonjak (market share nominal tetap wajar di 69,1%), jadi masalahnya khusus di frekuensi. Lonjakan terjadi serentak di banyak PJP — Syaftraco 705.803, Western Union 307.804, Indogo Express 198.907 — yang mengindikasikan kesalahan proses muat data, bukan perilaku satu PJP.</p>
+          <p class="loc">Perlu dicek apakah "koreksi frekuensi" pada file ini sudah mencakup periode 2026.</p>
+        </div>
+      </article>
+
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <caption>Market share tahunan — untuk melihat sebaran dampaknya</caption>
+        <thead>
+          <tr><th>Tahun</th><th>Inc nominal</th><th>Inc frek</th><th>Out nominal</th><th>Out frek</th><th>Dom nominal</th><th>Dom frek</th><th>Total nominal</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>2018</td><td>48,07%</td><td>57,79%</td><td>55,88%</td><td>60,23%</td><td>40,23%</td><td>12,16%</td><td>46,85%</td></tr>
+          <tr><td>2019</td><td>41,62%</td><td>49,40%</td><td>25,78%</td><td>54,31%</td><td>33,19%</td><td>10,25%</td><td>34,68%</td></tr>
+          <tr><td>2020</td><td>50,31%</td><td>64,09%</td><td>22,05%</td><td>51,24%</td><td>38,98%</td><td>12,87%</td><td>39,32%</td></tr>
+          <tr><td>2021</td><td>52,27%</td><td>65,97%</td><td>26,00%</td><td>59,35%</td><td>52,45%</td><td>16,03%</td><td>48,19%</td></tr>
+          <tr><td>2022</td><td>58,66%</td><td>62,20%</td><td>31,86%</td><td class="flag">122,53%</td><td>48,17%</td><td>9,54%</td><td>47,05%</td></tr>
+          <tr><td>2023</td><td>72,91%</td><td>68,74%</td><td>28,13%</td><td>51,36%</td><td>47,90%</td><td>7,29%</td><td>47,98%</td></tr>
+          <tr><td>2024</td><td class="flag">109,70%</td><td class="flag">110,56%</td><td>40,45%</td><td>81,44%</td><td>38,79%</td><td>4,92%</td><td>44,62%</td></tr>
+          <tr><td>2025</td><td>77,12%</td><td>82,38%</td><td>50,34%</td><td>86,49%</td><td>40,46%</td><td>5,82%</td><td>43,87%</td></tr>
+          <tr><td>2026 <span style="opacity:.6">(s.d. Jun)</span></td><td>79,54%</td><td>68,91%</td><td>48,17%</td><td class="flag">174,17%</td><td>33,44%</td><td>5,41%</td><td>37,67%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- =================== 3 =================== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">§3</span>
+      <h2 class="sec-title">Defect di kode</h2>
+    </div>
+    <p class="lede">
+      Tidak ada satupun yang menyentuh rumus market share. Dua di antaranya membuat angka
+      <em>average ticket size</em> yang ditampilkan tidak sesuai labelnya.
+    </p>
+
+    <div class="findings">
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">D-1</span>
+          <h3 class="find-title">Angka "Luar DKI Jakarta" sebenarnya angka nasional</h3>
+          <span class="chip chip-crit">Salah label</span>
+        </div>
+        <div class="find-body">
+          <p>Halaman mengambil total nasional lewat <code>_national_totals()</code> lalu menampilkannya dengan label "Average ticket size Luar DKI Jakarta". Nasional mencakup DKI, jadi pembaginya salah. Narasi otomatis di bawahnya ikut memakai angka ini, sehingga kontras DKI vs luar DKI tampil lebih kecil dari yang sebenarnya.</p>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Periode</th><th>DKI</th><th>Tampil sbg "Luar DKI"</th><th>Seharusnya luar DKI</th><th>Rasio tampil</th><th>Rasio benar</th></tr></thead>
+              <tbody>
+                <tr><td>Triwulan I 2025</td><td>Rp 1,72 jt</td><td class="flag">Rp 0,26 jt</td><td class="good">Rp 0,15 jt</td><td>6,6×</td><td>11,2×</td></tr>
+                <tr><td>2018–2026</td><td>Rp 2,03 jt</td><td class="flag">Rp 0,33 jt</td><td class="good">Rp 0,20 jt</td><td>6,2×</td><td>10,3×</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="loc">views/market_share.py — baris 441–443 (scope terpilih) dan 527–529 (All-Time)</p>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">D-2</span>
+          <h3 class="find-title"><code>avg_ticket_outside</code> selalu bernilai nol</h3>
+          <span class="chip chip-warn">Salah satuan</span>
+        </div>
+        <div class="find-body">
+          <p>Nominal Jakarta dihitung dalam rupiah, nominal nasional dibiarkan dalam miliar rupiah, lalu keduanya langsung dikurangkan. Hasilnya selalu negatif dan ter-<em>clamp</em> ke nol oleh <code>max(…, 0.0)</code>.</p>
+          <pre>jkt_nom, jkt_frek = _get_jkt_totals(df_jkt)          # rupiah
+nat_nom, nat_frek = _get_national_totals(df_national) # MILIAR rupiah
+
+outside_nom = max(nat_nom - jkt_nom, 0.0)   # 390.178 - 178.155.126.830.648 -> 0</pre>
+          <p>Perbaikannya: kalikan <code>nat_nom</code> dengan 1e9 sebelum pengurangan. Frekuensi tidak terdampak karena satuannya sudah sama. Field ini belum dikonsumsi halaman manapun, jadi dampaknya laten — tapi begitu D-1 diperbaiki dengan memakai fungsi ini, hasilnya akan nol.</p>
+          <p class="loc">service/preprocess.py — baris 238–245, dan <code>total_nominal_national</code> yang dikembalikan juga masih dalam miliar</p>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">D-3</span>
+          <h3 class="find-title">Tabel Incoming All-Time tampil tanpa format</h3>
+          <span class="chip chip-info">Tampilan</span>
+        </div>
+        <div class="find-body">
+          <p>Variabel <code>df_inc_year_display</code> sudah disiapkan lewat <code>format_profile_df()</code> tapi yang diteruskan ke <code>st.dataframe</code> adalah <code>df_inc_year</code> yang mentah. Tiga tabel All-Time lainnya sudah benar — hanya Incoming yang terlewat, sehingga pemisah ribuan dan format persen Indonesia tidak muncul di tabel itu.</p>
+          <pre>541  df_inc_year_display = format_profile_df(df_inc_year_display, is_market_share=True)
+542  st.dataframe(df_inc_year, hide_index=True, use_container_width=True)
+                  ^^^^^^^^^^^ seharusnya df_inc_year_display</pre>
+          <p class="loc">views/market_share.py — baris 552</p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- =================== 4 =================== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">§4</span>
+      <h2 class="sec-title">Perlu konfirmasi bisnis</h2>
+    </div>
+    <p class="lede">
+      Empat hal berikut bukan bug — keputusannya ada di sisi kebijakan, bukan teknis. Tapi ketiganya
+      mengubah angka market share cukup besar, jadi sebaiknya dipastikan dulu.
+    </p>
+
+    <div class="findings">
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">K-1</span>
+          <h3 class="find-title">Empat aturan filter tidak cocok dengan data manapun</h3>
+          <span class="chip chip-warn">Filter tak aktif</span>
+        </div>
+        <div class="find-body">
+          <p>Sandi maupun namanya tidak ditemukan di <code>Trx_PJPJKT</code>, jadi aturan-aturan ini tidak pernah mengecualikan apapun. Kemungkinan PJP-nya memang di luar wilayah kerja Jakarta — tapi kalau seharusnya ada, sandinya perlu dikoreksi.</p>
+          <dl class="kv">
+            <dt>777962497</dt><dd>Ionpay Network — <em>multilicense</em></dd>
+            <dt>777930038</dt><dd>Kharisma Catur Mandala — <em>multilicense</em></dd>
+            <dt>777962104</dt><dd>MCP Indo Utama — <em>multilicense</em></dd>
+            <dt>777930045</dt><dd>PT Media Indonusa — <em>dicabut</em></dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">K-2</span>
+          <h3 class="find-title">Pencocokan nama PJP dicabut hampir selalu gagal</h3>
+          <span class="chip chip-info">Rapuh</span>
+        </div>
+        <div class="find-body">
+          <p>Daftar <code>_REVOKED_RULES</code> menulis nama dengan awalan "PT", sedangkan data tidak. 10 dari 11 aturan hanya cocok lewat sandi; pencocokan namanya mati. Saat ini tidak berdampak karena semua sandinya benar, tapi begitu ada satu sandi yang salah ketik, PJP tersebut lolos tanpa peringatan — persis seperti K-1.</p>
+          <p>Contoh: aturan <code>"PT Aryadana"</code> vs data <code>"Aryadana (d/h CV. Aryadana)"</code>; <code>"PT Tiki Jalur Nugraha Ekakurir"</code> vs <code>"Tiki Jalur Nugraha Ekakurir"</code>.</p>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">K-3</span>
+          <h3 class="find-title">Filter hanya mengurangi pembilang, penyebut tetap</h3>
+          <span class="chip chip-warn">Definisi</span>
+        </div>
+        <div class="find-body">
+          <p>Mode "Tanpa PJP Dicabut" mengeluarkan 1.179 baris senilai <strong>15,00% dari total nominal Jakarta</strong>, tapi angka nasional tidak ikut disesuaikan. Market share otomatis turun ~15% relatif. Mode "Tanpa Multilicense" dampaknya jauh lebih kecil (0,07%).</p>
+          <p>Kalau yang dimaksud adalah "pangsa PJP Jakarta yang masih berizin terhadap seluruh transaksi nasional", perilaku sekarang sudah benar. Kalau maksudnya perbandingan yang setara, penyebutnya juga harus dikurangi — dan itu tidak mungkin dari data nasional yang tersedia sekarang. Sebaiknya ditulis eksplisit di keterangan halaman agar tidak salah baca.</p>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="find-head">
+          <span class="find-id">K-4</span>
+          <h3 class="find-title">Satu sandi dipakai dua PJP berbeda</h3>
+          <span class="chip chip-info">Kualitas data</span>
+        </div>
+        <div class="find-body">
+          <p>Sandi <code>777930079</code> muncul untuk <em>Indogo Express Remittance</em> (126 baris, 2016–2026) dan <em>Indomarco Prismatama</em> (37 baris, 2023–2026). Indomarco juga punya sandi sendiri, <code>777958116</code> (2016–2023).</p>
+          <p>Saat ini tidak berdampak: 37 baris Indomarco di sandi tersebut semuanya bernilai nol, dan aturan pencabutan sudah menangkap sandi <code>777958116</code>. Tapi begitu Indogo Express masuk ke salah satu daftar filter berdasarkan sandi, baris Indomarco ikut terhapus — dan sebaliknya.</p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- =================== 5 =================== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">§5</span>
+      <h2 class="sec-title">Rekomendasi</h2>
+    </div>
+    <ul>
+      <li><strong>Perbaiki data nasional Okt–Nov 2023 dan 2022 lebih dulu (A-1, A-2).</strong> Ini kesalahan sumber yang jelas dan perbaikannya langsung menghilangkan angka 2.827% dan 268% dari dashboard.</li>
+      <li><strong>Konfirmasi angka Wise Payments 2024 (A-3).</strong> Kalau memang salah lapor, seluruh market share Incoming 2024 harus dihitung ulang — sekarang tercatat 109,70% untuk setahun penuh.</li>
+      <li><strong>Cek ulang cakupan "koreksi frekuensi" untuk 2026 (A-4).</strong></li>
+      <li><strong>Tambahkan penanda di aplikasi ketika market share melampaui 100%.</strong> Saat ini <code>compile_data_market_share</code> menampilkan hasil bagi apa adanya. Satu peringatan singkat mencegah angka mustahil terbawa ke laporan tanpa disadari.</li>
+      <li><strong>Perbaiki D-1 dan D-2 bersamaan</strong> — gunakan <code>avg_ticket_outside</code> dari <code>compute_average_ticket_size</code> setelah satuannya diseragamkan, sehingga hanya ada satu sumber kebenaran untuk average ticket size.</li>
+      <li><strong>Tambahkan validasi saat unggah data:</strong> aturan filter yang tidak cocok dengan sandi manapun (K-1) sebaiknya dilaporkan, bukan didiamkan.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Rekonsiliasi dijalankan ulang di luar Streamlit memakai pipeline aplikasi yang sama
+    (load_data → preprocess_data → preprocess_data_national → compile_data_market_share).<br>
+    Sumber data: datastatic/Data LTDBB PJP LR JKT FIX (koreksi frekuensi).xlsx — 9.361 baris Trx_PJPJKT (2016-01 s.d. 2026-06),
+    102 baris Raw_JKTNasional (2018-01 s.d. 2026-06, tanpa bulan hilang).<br>
+    Angka referensi diambil dari sheet Market Share dan MarketShare di workbook yang sama.
+  </footer>
+
+</div>
