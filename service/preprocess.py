@@ -316,6 +316,7 @@ def set_page_settings():
         st.Page(page="views/profile.py", title="Profile"),
         st.Page(page="views/market_share.py", title="Market Share"),
         st.Page(page="views/fraud.py", title="Analisis TKM"),
+        st.Page(page="views/anomaly.py", title="Deteksi Anomali"),
         st.Page(page="views/manage_data.py", title="Kelola Data")
     ]
     pg = st.navigation(pages=pages)
@@ -519,11 +520,13 @@ def set_page_visuals(condition):
         "viz": "Data LTDBB PJP LR JKT Visualization",
         "fds": "Analisis Transaksi Keuangan Mencurigakan (TKM)",
         "dm": "Kelola Data Sistem",
+        "anomali": "Deteksi Anomali & Early Warning Data LTDBB",
     }
     subtitle_map = {
         "viz": "Dashboard analitik transaksi dengan tampilan modern dan ringkas.",
         "fds": "Pemantauan pola transaksi mencurigakan secara lebih terstruktur.",
         "dm": "Pengelolaan data dan konfigurasi sistem dalam satu halaman.",
+        "anomali": "Penyaringan dugaan kesalahan data dan peringatan dini lonjakan transaksi.",
     }
 
     page_title = title_map.get(condition, "Dashboard")

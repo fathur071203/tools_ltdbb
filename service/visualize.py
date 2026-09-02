@@ -2645,3 +2645,229 @@ def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_p
 
     st.plotly_chart(fig, use_container_width=True)
 
+
+
+# ---------------------------------------------------------------------------
+# Deteksi anomali (halaman Deteksi Anomali)
+# ---------------------------------------------------------------------------
+
+SEVERITY_COLORS = {
+    "Kritis": "#b91c1c",
+    "Tinggi": "#ea580c",
+    "Sedang": "#ca8a04",
+    "Rendah": "#64748b",
+}
+
+_ANOMALY_LAYOUT = dict(
+    template="plotly_white",
+    font=dict(family="Inter, Arial, sans-serif", size=12, color="#1f2937"),
+    paper_bgcolor="white",
+    plot_bgcolor="white",
+    margin=dict(l=10, r=10, t=56, b=10),
+)
+
+
+def make_anomaly_timeline_chart(df, title: str, key: str, height: int = 320):
+    """Jumlah temuan per bulan, ditumpuk menurut severitas."""
+    if df is None or df.empty:
+        st.info("Tidak ada temuan untuk ditampilkan pada grafik ini.")
+        return
+
+    data = df.copy()
+    data["Periode"] = pd.to_datetime(data["Periode"], errors="coerce")
+    counted = (
+        data.dropna(subset=["Periode"])
+        .groupby(["Periode", "Severitas"], as_index=False)
+        .size()
+        .rename(columns={"size": "Jumlah Temuan"})
+    )
+    if counted.empty:
+        st.info("Tidak ada temuan untuk ditampilkan pada grafik ini.")
+        return
+
+    order = [s for s in ["Kritis", "Tinggi", "Sedang", "Rendah"] if s in set(counted["Severitas"])]
+    fig = px.bar(
+        counted,
+        x="Periode",
+        y="Jumlah Temuan",
+        color="Severitas",
+        title=title,
+        color_discrete_map=SEVERITY_COLORS,
+        category_orders={"Severitas": order},
+    )
+    fig.update_traces(hovertemplate="%{x|%b %Y}<br>%{fullData.name}: %{y} temuan<extra></extra>")
+    fig.update_layout(
+        barmode="stack",
+        title_font=dict(size=16, family="Inter, Arial, sans-serif", color="#1f2937"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1, title=""),
+        height=height,
+        **_ANOMALY_LAYOUT,
+    )
+    fig.update_xaxes(title="", showgrid=False)
+    fig.update_yaxes(title="Jumlah temuan", gridcolor="#eef2f7")
+    st.plotly_chart(fig, use_container_width=True, key=key)
+
+
+def make_anomaly_type_chart(df, column: str, title: str, key: str, top_n: int = 12,
+                            height: int = 340):
+    """Peringkat jenis temuan (atau sinyal) terbanyak."""
+    if df is None or df.empty or column not in df.columns:
+        st.info("Tidak ada temuan untuk ditampilkan pada grafik ini.")
+        return
+
+    counted = (
+        df.groupby([column, "Severitas"], as_index=False)
+        .size()
+        .rename(columns={"size": "Jumlah Temuan"})
+    )
+    urutan = (
+        counted.groupby(column)["Jumlah Temuan"].sum()
+        .sort_values(ascending=False).head(top_n).index.tolist()
+    )
+    counted = counted[counted[column].isin(urutan)]
+
+    order = [s for s in ["Kritis", "Tinggi", "Sedang", "Rendah"] if s in set(counted["Severitas"])]
+    fig = px.bar(
+        counted,
+        y=column,
+        x="Jumlah Temuan",
+        color="Severitas",
+        orientation="h",
+        title=title,
+        color_discrete_map=SEVERITY_COLORS,
+        category_orders={column: list(reversed(urutan)), "Severitas": order},
+    )
+    fig.update_traces(hovertemplate="%{y}<br>%{fullData.name}: %{x} temuan<extra></extra>")
+    fig.update_layout(
+        barmode="stack",
+        title_font=dict(size=16, family="Inter, Arial, sans-serif", color="#1f2937"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1, title=""),
+        height=height,
+        **_ANOMALY_LAYOUT,
+    )
+    fig.update_xaxes(title="Jumlah temuan", gridcolor="#eef2f7")
+    fig.update_yaxes(title="")
+    st.plotly_chart(fig, use_container_width=True, key=key)
+
+
+def make_swap_inspect_chart(df_series, sorot_periode, judul: str, key: str,
+                            satuan: str = "Nominal", height: int = 380):
+    """Incoming vs Outgoing di sekitar periode temuan.
+
+    Dipakai untuk memastikan dugaan tertukar secara visual: kalau memang
+    tertukar, batang Incoming dan Outgoing tampak bertukar tempat persis pada
+    periode yang disorot.
+    """
+    if df_series is None or df_series.empty:
+        st.info("Deret data tidak tersedia untuk periode ini.")
+        return
+
+    data = df_series.copy()
+    is_nominal = satuan == "Nominal"
+    puncak = pd.to_numeric(data[["Incoming", "Outgoing"]].max(axis=1), errors="coerce").max()
+    unit = pick_rupiah_unit(0.0 if pd.isna(puncak) else float(puncak)) if is_nominal else None
+    divisor = unit.divisor if unit is not None else 1.0
+    if unit is None:
+        suffix = ""
+    elif unit.label == "Rp":
+        suffix = " (Rp)"
+    else:
+        suffix = f" (Rp {unit.label})"
+
+    fig = go.Figure()
+    for nama, warna in (("Incoming", "#2563eb"), ("Outgoing", "#f97316")):
+        fig.add_trace(go.Bar(
+            x=data["Label Periode"],
+            y=pd.to_numeric(data[nama], errors="coerce") / divisor,
+            name=nama,
+            marker=dict(color=warna, line=dict(color="white", width=1)),
+            hovertemplate="%{x}<br>" + nama + ": %{y:,.2f}<extra></extra>",
+        ))
+
+    if sorot_periode is not None and sorot_periode in set(data["Label Periode"]):
+        fig.add_vrect(
+            x0=sorot_periode, x1=sorot_periode,
+            fillcolor="#dc2626", opacity=0.14, line_width=0,
+            annotation_text="periode temuan", annotation_position="top left",
+            annotation_font=dict(size=11, color="#b91c1c"),
+        )
+
+    fig.update_layout(
+        barmode="group",
+        title=judul,
+        title_font=dict(size=16, family="Inter, Arial, sans-serif", color="#1f2937"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1, title=""),
+        height=height,
+        **_ANOMALY_LAYOUT,
+    )
+    fig.update_xaxes(title="", showgrid=False)
+    fig.update_yaxes(title=(f"Nominal{suffix}" if is_nominal else "Frekuensi"), gridcolor="#eef2f7")
+    st.plotly_chart(fig, use_container_width=True, key=key)
+
+
+def make_ew_series_chart(df_series, judul: str, key: str, satuan: str = "Nominal",
+                         height: int = 400):
+    """Deret bulanan satu PJP: nilai aktual, baseline musiman, dan titik alert."""
+    if df_series is None or df_series.empty:
+        st.info("Deret data tidak tersedia untuk pilihan ini.")
+        return
+
+    data = df_series.copy()
+    nilai = pd.to_numeric(data["Nilai"], errors="coerce")
+    baseline = pd.to_numeric(data["Baseline"], errors="coerce") if "Baseline" in data.columns \
+        else pd.Series(float("nan"), index=data.index)
+
+    is_nominal = satuan == "Nominal"
+    puncak = float(pd.concat([nilai, baseline]).max(skipna=True) or 0.0)
+    if pd.isna(puncak):
+        puncak = 0.0
+    unit = pick_rupiah_unit(puncak) if is_nominal else None
+    divisor = unit.divisor if unit is not None else 1.0
+    if unit is None:
+        suffix = ""
+    elif unit.label == "Rp":
+        suffix = " (Rp)"
+    else:
+        suffix = f" (Rp {unit.label})"
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=data["Periode"], y=baseline / divisor,
+        name="Baseline musiman", mode="lines",
+        line=dict(color="#94a3b8", width=2, dash="dot"),
+        hovertemplate="Baseline: %{y:,.2f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=data["Periode"], y=nilai / divisor,
+        name="Nilai dilaporkan", mode="lines+markers",
+        line=dict(color="#2563eb", width=2.5),
+        marker=dict(size=5),
+        hovertemplate="Nilai: %{y:,.2f}<extra></extra>",
+    ))
+
+    if "Severitas Alert" in data.columns:
+        alert = data[data["Severitas Alert"].notna()]
+        for sev, warna in SEVERITY_COLORS.items():
+            titik = alert[alert["Severitas Alert"] == sev]
+            if titik.empty:
+                continue
+            fig.add_trace(go.Scatter(
+                x=titik["Periode"],
+                y=pd.to_numeric(titik["Nilai"], errors="coerce") / divisor,
+                name=f"Alert {sev}", mode="markers",
+                marker=dict(size=13, color=warna, symbol="diamond",
+                            line=dict(color="white", width=1.5)),
+                hovertemplate="Alert " + sev + ": %{y:,.2f}<extra></extra>",
+            ))
+
+    fig.update_layout(
+        title=judul,
+        title_font=dict(size=16, family="Inter, Arial, sans-serif", color="#1f2937"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1, title=""),
+        height=height,
+        hovermode="x unified",
+        **_ANOMALY_LAYOUT,
+    )
+    fig.update_xaxes(title="", showgrid=False)
+    fig.update_yaxes(title=(f"Nominal{suffix}" if is_nominal else "Frekuensi"), gridcolor="#eef2f7")
+    st.plotly_chart(fig, use_container_width=True, key=key)
