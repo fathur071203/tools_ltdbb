@@ -44,10 +44,61 @@ def _norm_text(value) -> str:
     return " ".join(str(value).strip().lower().split())
 
 
+def _month_to_number(value):
+    """Nomor bulan 1-12 dari angka, teks angka, atau nama bulan (ID/EN).
+
+    Sengaja didefinisikan lokal, tidak mengandalkan `from service.preprocess import *`:
+    saat modul service.preprocess yang ter-cache tertinggal versi (mis. setelah deploy
+    ulang di Streamlit Cloud), nama dari star-import bisa hilang dan memicu NameError.
+    """
+    if value is None:
+        return None
+
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, (int, float)):
+        m = int(value)
+        return m if 1 <= m <= 12 else None
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    try:
+        f = float(raw)
+    except ValueError:
+        pass
+    else:
+        m = int(f)
+        return m if f.is_integer() and 1 <= m <= 12 else None
+
+    # Titik dibuang supaya singkatan bertitik ('Jan.', 'Des.') tetap dikenali.
+    s = raw.lower().replace(".", "")
+
+    for i in range(1, 13):
+        if s in (calendar.month_name[i].lower(), calendar.month_abbr[i].lower()):
+            return i
+
+    return {
+        "januari": 1, "februari": 2, "pebruari": 2, "maret": 3, "mei": 5,
+        "juni": 6, "juli": 7, "agustus": 8, "agu": 8, "ags": 8,
+        "oktober": 10, "okt": 10, "nopember": 11, "nop": 11,
+        "desember": 12, "des": 12,
+    }.get(s)
+
+
 def _effective_period_date(df: pd.DataFrame) -> pd.Series:
     year = pd.to_numeric(df.get("Year"), errors="coerce")
     if "Month" in df.columns:
-        month_series = df["Month"].map(month_to_number)
+        # astype(object): kolom Month bisa bertipe category setelah preprocess
+        month_series = df["Month"].astype(object).map(_month_to_number)
     elif "Quarter" in df.columns:
         q = pd.to_numeric(df["Quarter"], errors="coerce")
         month_series = (q * 3).astype("Int64")
