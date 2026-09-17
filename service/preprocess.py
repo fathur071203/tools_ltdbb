@@ -169,6 +169,289 @@ def filter_start_end_year(df, start_year, end_year, is_month: bool = False):
     return df_filtered
 
 
+def normalize_period_mode(mode) -> str:
+    """Samakan label satuan periode ke 'month' | 'quarter' | 'year'."""
+    s = str(mode or "").strip().lower()
+    if s.startswith("month") or s.startswith("bulan"):
+        return "month"
+    if s.startswith("year") or s.startswith("tahun"):
+        return "year"
+    return "quarter"
+
+
+def month_to_number(value):
+    """Nomor bulan (1-12) dari angka, teks angka, atau nama bulan ID/EN.
+
+    Mengembalikan None bila nilainya kosong atau tidak dikenali, supaya
+    pemanggil bisa membuang baris tanpa periode yang jelas.
+    """
+    if value is None:
+        return None
+
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        m = int(value)
+        return m if 1 <= m <= 12 else None
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    if raw.isdigit():
+        m = int(raw)
+        return m if 1 <= m <= 12 else None
+
+    try:
+        f = float(raw)
+    except ValueError:
+        pass
+    else:
+        m = int(f)
+        return m if f.is_integer() and 1 <= m <= 12 else None
+
+    # Titik dibuang supaya singkatan bertitik ('Jan.', 'Des.') tetap dikenali.
+    s = raw.lower().replace(".", "")
+
+    for i in range(1, 13):
+        if s in (calendar.month_name[i].lower(), calendar.month_abbr[i].lower()):
+            return i
+
+    month_map_id = {
+        "januari": 1, "februari": 2, "pebruari": 2, "maret": 3, "mei": 5,
+        "juni": 6, "juli": 7, "agustus": 8, "agu": 8, "ags": 8,
+        "oktober": 10, "okt": 10, "nopember": 11, "nop": 11,
+        "desember": 12, "des": 12,
+    }
+    return month_map_id.get(s)
+
+
+def _month_number_series(df: pd.DataFrame) -> pd.Series:
+    if 'Month' in df.columns:
+        return pd.to_numeric(df['Month'].map(month_to_number), errors='coerce')
+    if 'Quarter' in df.columns:
+        # Tanpa kolom Month, wakilkan periode dengan bulan terakhir kuartalnya.
+        return pd.to_numeric(df['Quarter'], errors='coerce') * 3
+    return pd.Series(np.nan, index=df.index, dtype='float64')
+
+
+def _quarter_number_series(df: pd.DataFrame) -> pd.Series:
+    if 'Quarter' in df.columns:
+        q = pd.to_numeric(df['Quarter'], errors='coerce')
+        if q.notna().any():
+            return q
+    return (_month_number_series(df) - 1) // 3 + 1
+
+
+def period_ordinal(df: pd.DataFrame, mode: str) -> pd.Series:
+    """Nomor urut periode yang kontinu lintas tahun.
+
+    Dipakai supaya rentang seperti "November 2024 s.d. Februari 2025" bisa
+    dibandingkan dengan satu operasi >= / <=, bukan kombinasi kondisi tahun
+    dan bulan yang mudah salah di batas tahun.
+    """
+    mode = normalize_period_mode(mode)
+    year = pd.to_numeric(df.get('Year'), errors='coerce')
+
+    if mode == 'year':
+        return year
+    if mode == 'month':
+        return year * 12 + _month_number_series(df)
+    return year * 4 + _quarter_number_series(df)
+
+
+def period_to_ordinal(mode: str, year, period=None) -> int:
+    mode = normalize_period_mode(mode)
+    year = int(year)
+    if mode == 'year':
+        return year
+    if mode == 'month':
+        return year * 12 + int(period if period else 1)
+    return year * 4 + int(period if period else 1)
+
+
+def ordinal_to_period(mode: str, ordinal):
+    """Kebalikan dari :func:`period_to_ordinal`; ``period`` None untuk mode tahun."""
+    mode = normalize_period_mode(mode)
+    o = int(ordinal)
+    if mode == 'year':
+        return o, None
+    size = 12 if mode == 'month' else 4
+    year, rem = divmod(o - 1, size)
+    return year, rem + 1
+
+
+def period_bounds(df: pd.DataFrame, mode: str):
+    """Periode paling awal dan paling akhir yang ada di data.
+
+    Mengembalikan ``((tahun_awal, periode_awal), (tahun_akhir, periode_akhir))``
+    atau None bila tidak ada periode valid.
+    """
+    if df is None or len(df) == 0:
+        return None
+
+    ordinal = period_ordinal(df, mode).dropna()
+    if ordinal.empty:
+        return None
+
+    return ordinal_to_period(mode, ordinal.min()), ordinal_to_period(mode, ordinal.max())
+
+
+def filter_period_range(df: pd.DataFrame, mode: str, start_year, end_year,
+                        start_period=None, end_period=None) -> pd.DataFrame:
+    """Ambil baris dalam rentang periode kontinu (inklusif di kedua ujung).
+
+    Baris tanpa periode valid ikut dibuang; rentang yang terbalik dinormalkan
+    agar pilihan akhir yang lebih awal tidak menghasilkan tabel kosong.
+    """
+    if df is None or len(df) == 0:
+        return df
+
+    mode = normalize_period_mode(mode)
+    ordinal = period_ordinal(df, mode)
+
+    start = period_to_ordinal(mode, start_year, start_period)
+    end = period_to_ordinal(mode, end_year, end_period)
+    if start > end:
+        start, end = end, start
+
+    return df[ordinal.notna() & (ordinal >= start) & (ordinal <= end)].copy()
+
+
+def format_period_label(mode: str, year, period=None) -> str:
+    mode = normalize_period_mode(mode)
+    if mode == 'year':
+        return f"{int(year)}"
+    if mode == 'month':
+        return f"{calendar.month_name[int(period)]} {int(year)}"
+    return f"Q{int(period)} {int(year)}"
+
+
+def build_period_label(df: pd.DataFrame, mode: str) -> pd.Categorical:
+    """Label periode ('January 2024', 'Q1 2024', '2024') sebagai kategori terurut.
+
+    Grafik ringkasan mengelompokkan pada label ini, jadi urutannya harus
+    kronologis dan bukan alfabetis; kategori terurut menjaga itu tanpa perlu
+    logika sort tambahan di sisi grafik.
+    """
+    mode = normalize_period_mode(mode)
+    ordinal = period_ordinal(df, mode)
+
+    def _fmt(o):
+        if pd.isna(o):
+            return None
+        return format_period_label(mode, *ordinal_to_period(mode, o))
+
+    labels = ordinal.map(_fmt)
+    categories = [_fmt(o) for o in sorted(ordinal.dropna().unique())]
+    return pd.Categorical(labels, categories=categories, ordered=True)
+
+
+# Kolom 'Bundling' pada sheet Trx_PJPJKT: kelompok pengawasan yang melekat pada
+# PJP, bukan pada transaksi. Agregasi per PJP membuang kolom ini, jadi ringkasan
+# per bundling selalu dihitung ulang dari baris mentah.
+BUNDLING_COLUMN = 'Bundling'
+BUNDLING_UNASSIGNED = 'Tanpa Bundling'
+
+
+def has_bundling(df: pd.DataFrame) -> bool:
+    """True bila data punya kolom Bundling yang benar-benar terisi."""
+    if df is None or df.empty or BUNDLING_COLUMN not in df.columns:
+        return False
+    return bool(df[BUNDLING_COLUMN].notna().any())
+
+
+def normalize_bundling(df: pd.DataFrame) -> pd.Series:
+    """Label bundling yang siap dikelompokkan.
+
+    PJP yang belum masuk referensi bundling tetap ditampilkan sebagai
+    'Tanpa Bundling'; membuangnya akan membuat total per bundling tidak lagi
+    sama dengan total transaksi di bagian atas halaman.
+    """
+    if BUNDLING_COLUMN not in df.columns:
+        return pd.Series([BUNDLING_UNASSIGNED] * len(df), index=df.index, dtype='object')
+
+    label = df[BUNDLING_COLUMN].astype('string').str.strip()
+    label = label.mask(label.eq(''), pd.NA)
+    return label.fillna(BUNDLING_UNASSIGNED).astype('object')
+
+
+def sort_bundling_labels(labels) -> list[str]:
+    """Urutkan label bundling secara alami, 'Tanpa Bundling' selalu terakhir."""
+    unique = {str(v) for v in labels if v is not None}
+    named = sorted(unique - {BUNDLING_UNASSIGNED})
+    return named + ([BUNDLING_UNASSIGNED] if BUNDLING_UNASSIGNED in unique else [])
+
+
+def aggregate_by_bundling(df: pd.DataFrame, period_mode: str | None = None,
+                          by_pjp: bool = False) -> pd.DataFrame:
+    """Total transaksi per Bundling, opsional dipecah per periode dan per PJP.
+
+    Dihitung dari kolom mentah ('Fin ...') dan menghasilkan nama kolom
+    'Sum of Fin ...' supaya bisa dipakai ulang oleh formatter dan grafik yang
+    sudah ada di halaman ringkasan.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    work = df.copy()
+    work[BUNDLING_COLUMN] = normalize_bundling(work)
+    work = _coerce_numeric_columns(work, PJP_VALUE_COLUMNS)
+
+    value_cols = [c for c in PJP_VALUE_COLUMNS if c in work.columns]
+    if not value_cols:
+        return pd.DataFrame()
+
+    # Sandi (Kode) adalah identitas PJP yang sebenarnya: file sumber memuat nama
+    # yang dipakai dua sandi berbeda, sehingga menghitung per nama akan
+    # menggabungkan dua entitas atau menghitungnya dua kali antar bundling.
+    if 'Kode' in work.columns:
+        work['Kode'] = pd.to_numeric(work['Kode'], errors='coerce').astype('Int64')
+    id_col = 'Kode' if 'Kode' in work.columns else 'Nama PJP'
+
+    group_cols = [BUNDLING_COLUMN]
+    if by_pjp:
+        group_cols += [c for c in ('Kode', 'Nama PJP') if c in work.columns]
+    if period_mode:
+        mode = normalize_period_mode(period_mode)
+        group_cols.append('Year')
+        if mode == 'month':
+            group_cols.append('Month')
+        elif mode == 'quarter':
+            group_cols.append('Quarter')
+
+    grouped = work.groupby(group_cols, dropna=False, observed=False)
+    out = grouped[value_cols].sum()
+
+    if not by_pjp and id_col in work.columns:
+        out = out.join(grouped[id_col].nunique().rename('Jumlah PJP'))
+
+    out = out.reset_index().rename(columns={c: f'Sum of {c}' for c in value_cols})
+
+    jumlah_cols = [f'Sum of {c}' for c in value_cols if 'Jumlah' in c]
+    nilai_cols = [f'Sum of {c}' for c in value_cols if 'Nilai' in c]
+    out['Sum of Total Jumlah'] = out[jumlah_cols].sum(axis=1)
+    out['Sum of Total Nom'] = out[nilai_cols].sum(axis=1)
+
+    return out
+
+
+def add_share_column(df: pd.DataFrame, value_col: str, share_col: str) -> pd.DataFrame:
+    """Porsi tiap baris terhadap total kolom, dibulatkan sekali di akhir."""
+    df = df.copy()
+    total = pd.to_numeric(df[value_col], errors='coerce').sum()
+    share = pd.to_numeric(df[value_col], errors='coerce') / total * 100 if total else np.nan
+    df[share_col] = round_half_up_series(pd.Series(share, index=df.index), 2)
+    return df
+
+
 def compute_average_ticket_size(df_jkt: pd.DataFrame, df_national: pd.DataFrame) -> dict:
     """Compute average ticket size for DKI (JKT sheet) and outside DKI.
 
@@ -887,9 +1170,19 @@ def process_growth_combined(df_jumlah_total: pd.DataFrame, df_nom_total: pd.Data
     return df_total_combined
 
 
-def sum_data_time(df, is_month):
-    if is_month:
+def sum_data_time(df, is_month, mode: str | None = None):
+    """Total transaksi per periode.
+
+    ``mode`` ('month' | 'quarter' | 'year') menang atas ``is_month`` bila diisi,
+    supaya pemanggil bisa meminta agregasi tahunan yang tidak bisa diwakili
+    flag boolean.
+    """
+    period_mode = normalize_period_mode(mode) if mode else ('month' if is_month else 'quarter')
+
+    if period_mode == 'month':
         group_cols = ['Year', 'Month']
+    elif period_mode == 'year':
+        group_cols = ['Year']
     else:
         group_cols = ['Year', 'Quarter']
     df_sum = df.groupby(group_cols, observed=False).agg({

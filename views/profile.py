@@ -372,6 +372,59 @@ if st.session_state['df_national'] is not None and st.session_state['df'] is not
             make_combined_bar_line_chart_profile(df_domestic_month, "Dom", selected_pjp, f"{start_year}-{end_year}")
             make_combined_bar_line_chart_profile(df_incoming_month, "Inc", selected_pjp, f"{start_year}-{end_year}")
             make_combined_bar_line_chart_profile(df_outgoing_month, "Out", selected_pjp, f"{start_year}-{end_year}")
+
+            # Grafik Gabungan (Incoming + Outgoing + Domestik)
+            st.divider()
+            st.subheader(f"📊 Grafik Gabungan (Incoming + Outgoing + Domestik) - {selected_pjp}")
+            st.caption(
+                "Batang bertumpuk menampilkan kontribusi Incoming, Outgoing, dan Domestik. "
+                "Garis hijau adalah pertumbuhan total: YoY pada grafik per kuartal dan MtM pada grafik per bulan. "
+                "Kedua grafik mengikuti rentang tanggal (tahun dan bulan) pada filter di samping."
+            )
+
+            # Riwayat penuh PJP (tanpa filter tanggal) dipakai sebagai pembanding
+            # pertumbuhan, sedangkan batang hanya digambar untuk periode di dalam filter.
+            df_month_full_pjp = df_preprocessed_grouped_month[
+                df_preprocessed_grouped_month['Nama PJP'] == selected_pjp
+            ]
+            period_range = (start_year, start_month_idx + 1, end_year, end_month_idx + 1)
+            periode_label = f"{start_month} {start_year} - {end_month} {end_year}"
+
+            quarter_label_style = st.radio(
+                "Format label kuartal:",
+                options=["TW", "Q"],
+                index=0,
+                horizontal=True,
+                key="profile_combined_quarter_style",
+                format_func=lambda s: "TW (I, II, III, IV)" if s == "TW" else "Q (Q1, Q2, Q3, Q4)",
+            )
+
+            tab_nominal, tab_jumlah = st.tabs([
+                "💰 Nominal (Nilai Transaksi)",
+                "🔢 Jumlah (Frekuensi Transaksi)",
+            ])
+
+            for tab, metric in ((tab_nominal, "Nominal"), (tab_jumlah, "Jumlah")):
+                with tab:
+                    make_combined_stacked_chart_profile(
+                        df_month_full_pjp,
+                        selected_pjp,
+                        periode_label,
+                        metric=metric,
+                        is_month=False,
+                        period_range=period_range,
+                        quarter_label_style=quarter_label_style,
+                        key=f"profile_combined_quarter_{metric.lower()}",
+                    )
+                    make_combined_stacked_chart_profile(
+                        df_month_full_pjp,
+                        selected_pjp,
+                        periode_label,
+                        metric=metric,
+                        is_month=True,
+                        period_range=period_range,
+                        key=f"profile_combined_month_{metric.lower()}",
+                    )
         else:
             st.error("Tidak terdapat Data Nasional dari tahun yang dipilih")
 else:

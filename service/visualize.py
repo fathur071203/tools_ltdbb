@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import calendar
 
 from service.units import pick_rupiah_unit, rupiah_unit_axis_label
+from service.preprocess import BUNDLING_COLUMN, BUNDLING_UNASSIGNED, sort_bundling_labels
 
 
 def _tick_family_for_weight(weight: str | None) -> str:
@@ -1684,10 +1685,18 @@ def make_pie_chart_market_share(df: pd.DataFrame, trx_type: str, key: str ,is_no
     st.plotly_chart(fig, use_container_width=True, key=key)
 
 
-def make_grouped_bar_chart(df, mode, is_month):
-    time_label = 'Quarter'
-    if is_month:
-        time_label = 'Month'
+def make_grouped_bar_chart(df, mode, is_month, time_label=None, title_label=None):
+    """Bar chart Inc/Out/Dom per periode.
+
+    ``time_label`` boleh menunjuk kolom periode gabungan (mis. 'Periode' berisi
+    'January 2024') supaya rentang lintas tahun tidak menumpuk bulan yang sama
+    dari tahun berbeda menjadi satu batang. ``title_label`` hanya mengatur teks
+    judul/label sumbu bila nama kolomnya bukan nama periode yang enak dibaca.
+    """
+    if time_label is None:
+        time_label = 'Month' if is_month else 'Quarter'
+    if title_label is None:
+        title_label = time_label
 
     value_vars = (['Sum of Fin Jumlah Inc', 'Sum of Fin Jumlah Out', 'Sum of Fin Jumlah Dom']
                   if mode == "Jumlah"
@@ -1721,8 +1730,8 @@ def make_grouped_bar_chart(df, mode, is_month):
                  y='Value',
                  color='Financial Metric',
                  barmode='group',
-                 title=f'{label} Income, Outcome, and Domestic Transactions by {time_label}',
-                 labels={'Value': label, time_label: time_label},
+                 title=f'{label} Income, Outcome, and Domestic Transactions by {title_label}',
+                 labels={'Value': label, time_label: title_label},
                  template='plotly_white',
                  color_discrete_map=color_map)
     
@@ -1752,6 +1761,125 @@ def make_grouped_bar_chart(df, mode, is_month):
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+
+# Warna bundling dipetakan sekali supaya satu bundling memakai warna yang sama
+# di donut maupun grafik tren. 'Tanpa Bundling' sengaja abu-abu netral karena
+# bukan kelompok pengawasan, melainkan sisa PJP yang belum masuk referensi.
+BUNDLING_PALETTE = ('#5DADE2', '#E8964F', '#7DCEA0', '#AF7AC5', '#F5B0CB', '#F7DC6F')
+BUNDLING_UNASSIGNED_COLOR = '#B0B7C3'
+
+
+def bundling_color_map(ordered_labels) -> dict:
+    color_map = {}
+    for i, label in enumerate(l for l in ordered_labels if l != BUNDLING_UNASSIGNED):
+        color_map[label] = BUNDLING_PALETTE[i % len(BUNDLING_PALETTE)]
+    if BUNDLING_UNASSIGNED in ordered_labels:
+        color_map[BUNDLING_UNASSIGNED] = BUNDLING_UNASSIGNED_COLOR
+    return color_map
+
+
+def _bundling_layout(fig, legend_y=None):
+    fig.update_layout(
+        title_font=dict(size=20, family='Inter, Arial, sans-serif', color='#1f2937'),
+        font=dict(family='Inter, Arial, sans-serif', size=12),
+        paper_bgcolor='white',
+        plot_bgcolor='white',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02 if legend_y is None else legend_y,
+            xanchor="center",
+            x=0.5,
+            title_text='',
+        ),
+    )
+    return fig
+
+
+def make_bundling_share_chart(df, value_col: str, metric_label: str, key: str | None = None):
+    """Donut porsi tiap bundling terhadap total pada periode terpilih."""
+    data = df[[BUNDLING_COLUMN, value_col]].copy()
+    data[value_col] = pd.to_numeric(data[value_col], errors='coerce').fillna(0)
+    data = data[data[value_col] > 0]
+
+    if data.empty:
+        st.info(f"Tidak ada {metric_label.lower()} yang bisa ditampilkan pada rentang ini.")
+        return
+
+    order = sort_bundling_labels(data[BUNDLING_COLUMN])
+
+    fig = px.pie(data,
+                 names=BUNDLING_COLUMN,
+                 values=value_col,
+                 hole=0.45,
+                 title=f'Porsi {metric_label} per Bundling',
+                 template='plotly_white',
+                 color=BUNDLING_COLUMN,
+                 color_discrete_map=bundling_color_map(order),
+                 category_orders={BUNDLING_COLUMN: order})
+
+    fig.update_traces(
+        sort=False,
+        hovertemplate='%{label}: %{value:,.0f} (%{percent})<extra></extra>',
+        texttemplate='%{label}<br>%{percent}',
+        textposition='inside',
+        textfont=dict(color='#111827', size=13, family='Inter, Arial, sans-serif', weight='bold'),
+        marker=dict(line=dict(color='white', width=3)),
+    )
+    _bundling_layout(fig, legend_y=-0.12)
+    st.plotly_chart(fig, use_container_width=True, key=key)
+
+
+def make_bundling_trend_chart(df, value_col: str, period_col: str, metric_label: str,
+                              is_nominal: bool, key: str | None = None):
+    """Tren per periode dengan satu batang per bundling.
+
+    Nominal diskalakan ke satuan yang terbaca (mis. Rp Triliun); tanpa itu
+    sumbu Y hanya menampilkan notasi eksponen yang tidak informatif.
+    """
+    data = df[[period_col, BUNDLING_COLUMN, value_col]].copy()
+    data[value_col] = pd.to_numeric(data[value_col], errors='coerce').fillna(0)
+
+    if data.empty or not data[value_col].any():
+        st.info(f"Tidak ada {metric_label.lower()} yang bisa ditampilkan pada rentang ini.")
+        return
+
+    if is_nominal:
+        unit = pick_rupiah_unit(data[value_col].abs().max())
+        data[value_col] = data[value_col] / unit.divisor
+        axis_title = rupiah_unit_axis_label(unit)
+        hover_value = '%{y:,.2f} ' + (f'Rp {unit.label}' if unit.label != 'Rp' else 'Rp')
+    else:
+        axis_title = 'Frekuensi'
+        hover_value = '%{y:,.0f}'
+
+    if isinstance(data[period_col].dtype, pd.CategoricalDtype):
+        present = set(data[period_col].dropna())
+        period_order = [c for c in data[period_col].cat.categories if c in present]
+    else:
+        period_order = list(dict.fromkeys(data[period_col]))
+
+    order = sort_bundling_labels(data[BUNDLING_COLUMN])
+
+    fig = px.bar(data,
+                 x=period_col,
+                 y=value_col,
+                 color=BUNDLING_COLUMN,
+                 barmode='group',
+                 title=f'Tren {metric_label} per Bundling',
+                 labels={value_col: axis_title, period_col: 'Periode'},
+                 template='plotly_white',
+                 color_discrete_map=bundling_color_map(order),
+                 category_orders={BUNDLING_COLUMN: order, period_col: period_order})
+
+    fig.update_traces(hovertemplate='%{fullData.name} — %{x}<br>' + hover_value + '<extra></extra>')
+    fig.update_layout(
+        xaxis=dict(showgrid=False, showline=True, linewidth=2, linecolor='#e5e7eb', title_text='Periode'),
+        yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#e5e7eb', title_text=axis_title),
+    )
+    _bundling_layout(fig)
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
 
 def make_combined_bar_line_chart(
@@ -2645,6 +2773,391 @@ def make_combined_bar_line_chart_profile(df: pd.DataFrame, trx_type: str, nama_p
 
     st.plotly_chart(fig, use_container_width=True)
 
+
+# ---------------------------------------------------------------------------
+# Profil PJP - Grafik Gabungan (Incoming + Outgoing + Domestik)
+# ---------------------------------------------------------------------------
+
+# Warna batang disamakan dengan Grafik Gabungan pada halaman Pertumbuhan
+_PROFILE_STACK_SERIES = (
+    ("Inc", "Incoming", "#F5B0CB"),
+    ("Out", "Outgoing", "#F5CBA7"),
+    ("Dom", "Domestik", "#5DADE2"),
+)
+
+_PROFILE_ROMAN_QUARTER = {1: "I", 2: "II", 3: "III", 4: "IV"}
+
+
+def _profile_metric_config(metric: str, max_value=None) -> dict:
+    """Konfigurasi skala/format sumbu untuk metrik 'Jumlah' (frekuensi) atau 'Nominal' (Rp)."""
+    if str(metric).strip().lower().startswith("jum"):
+        return dict(
+            col_prefix="Sum of Fin Jumlah",
+            divisor=1.0,
+            decimals=0,
+            axis_title="Jumlah Transaksi (Frekuensi)",
+            title_word="Jumlah",
+            unit_text="transaksi",
+            unit_is_prefix=False,
+        )
+
+    unit = pick_rupiah_unit(max_value)
+    decimals = 2 if unit.label in {"Miliar", "Triliun"} else 0
+    return dict(
+        col_prefix="Sum of Fin Nilai",
+        divisor=unit.divisor,
+        decimals=decimals,
+        axis_title=rupiah_unit_axis_label(unit),
+        title_word="Nilai",
+        unit_text=("Rp" if unit.label == "Rp" else f"Rp {unit.label}"),
+        unit_is_prefix=(unit.label == "Rp"),
+    )
+
+
+def _profile_value_hover(cfg: dict, name: str) -> str:
+    """Hovertemplate satu seri batang sesuai metrik terpilih."""
+    num = f"%{{y:,.{cfg['decimals']}f}}"
+    if cfg["unit_is_prefix"]:
+        value = f"Rp {num}"
+    elif cfg["unit_text"] == "transaksi":
+        value = f"{num} transaksi"
+    else:
+        value = f"{num} ({cfg['unit_text']})"
+    return f"%{{hovertext}}<br>{name}: {value}<extra></extra>"
+
+
+def _profile_growth_by_lag(df: pd.DataFrame, key_col: str, value_col: str, lag: int) -> pd.Series:
+    """Growth (%) terhadap periode (key_col - lag); aman untuk periode yang bolong."""
+    current = pd.to_numeric(df[value_col], errors="coerce")
+    by_period = dict(zip(df[key_col].tolist(), current.tolist()))
+    previous = pd.to_numeric(
+        df[key_col].map(lambda k: by_period.get(k - lag)), errors="coerce"
+    )
+    growth = (current - previous) / previous * 100.0
+    return growth.where(previous.notna() & (previous != 0)).round(2)
+
+
+def _profile_stack_figure(
+    df_plot: pd.DataFrame,
+    cfg: dict,
+    *,
+    x_values,
+    hover_period: list,
+    x_tick_angle: int,
+    title: str,
+    x_title: str,
+    growth_col: str,
+    growth_label: str,
+    chart_height: int | None = None,
+):
+    """Stacked bar (Inc/Out/Dom) + garis pertumbuhan pada sumbu kanan."""
+    fig = go.Figure()
+
+    for suffix, name, color in _PROFILE_STACK_SERIES:
+        col = f"{cfg['col_prefix']} {suffix}"
+        if col not in df_plot.columns:
+            continue
+        fig.add_trace(go.Bar(
+            x=x_values,
+            y=df_plot[col] / cfg["divisor"],
+            name=name,
+            marker=dict(color=color, line=dict(width=0)),
+            hovertext=hover_period,
+            hovertemplate=_profile_value_hover(cfg, name),
+            yaxis="y1",
+        ))
+
+    growth_values = df_plot[growth_col] if growth_col in df_plot.columns else pd.Series(dtype="float64")
+    has_growth = bool(growth_values.notna().any())
+
+    if has_growth:
+        # Label hanya pada titik terakhir yang tersedia supaya grafik tetap bersih
+        growth_text = ["" for _ in range(len(df_plot))]
+        valid_pos = [i for i, v in enumerate(growth_values.tolist()) if pd.notna(v)]
+        if valid_pos:
+            last_pos = valid_pos[-1]
+            growth_text[last_pos] = f"{float(growth_values.iloc[last_pos]):.1f}%"
+
+        fig.add_trace(go.Scatter(
+            x=x_values,
+            y=growth_values,
+            name=growth_label,
+            yaxis="y2",
+            mode="lines+markers+text",
+            line=dict(color="#1E8449", width=3),
+            marker=dict(size=8, color="#1E8449", line=dict(color="white", width=2)),
+            text=growth_text,
+            textposition="top center",
+            textfont=dict(size=12, color="#1E8449", family="Inter, Arial, sans-serif", weight="bold"),
+            connectgaps=False,
+            hovertext=hover_period,
+            hovertemplate="%{hovertext}<br>" + growth_label + ": %{y:.2f}%<extra></extra>",
+        ))
+
+    layout = dict(
+        title=dict(
+            text=title,
+            font=dict(size=20, family="Inter, Arial, sans-serif", color="#1f2937", weight=700),
+        ),
+        barmode="stack",
+        xaxis=dict(
+            title=dict(text=x_title, font=dict(size=14, family="Inter, Arial, sans-serif"), standoff=15),
+            showgrid=False,
+            showline=True,
+            linewidth=2,
+            linecolor="#d1d5db",
+            tickangle=x_tick_angle,
+            tickfont=dict(size=11, family="Inter, Arial, sans-serif", color="#374151"),
+        ),
+        yaxis=dict(
+            title=dict(text=cfg["axis_title"], font=dict(size=14, family="Inter, Arial, sans-serif"), standoff=15),
+            tickformat=f",.{cfg['decimals']}f",
+            showgrid=True,
+            gridwidth=1,
+            gridcolor="#e5e7eb",
+            zeroline=True,
+            zerolinewidth=2,
+            zerolinecolor="#d1d5db",
+            tickfont=dict(size=11, family="Inter, Arial, sans-serif", color="#374151"),
+        ),
+        template="plotly_white",
+        paper_bgcolor="white",
+        plot_bgcolor="#f9fafb",
+        font=dict(family="Inter, Arial, sans-serif", size=12),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="#e5e7eb",
+            borderwidth=1,
+        ),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, Arial, sans-serif"),
+    )
+
+    if has_growth:
+        layout["yaxis2"] = dict(
+            title=dict(text="Growth (%)", font=dict(size=14, family="Inter, Arial, sans-serif"), standoff=15),
+            overlaying="y",
+            side="right",
+            tickformat=".1f",
+            showgrid=False,
+            tickfont=dict(size=11, family="Inter, Arial, sans-serif", color="#374151"),
+        )
+
+    if chart_height is not None:
+        layout["height"] = int(chart_height)
+
+    fig.update_layout(**layout)
+    return fig
+
+
+def _profile_month_number(value) -> int:
+    """Ubah nama bulan / angka bulan menjadi 1-12 (0 bila tidak dikenali)."""
+    if isinstance(value, str):
+        names = list(calendar.month_name)
+        return names.index(value) if value in names else 0
+    try:
+        num = int(value)
+    except Exception:
+        return 0
+    return num if 1 <= num <= 12 else 0
+
+
+def _profile_prepare_month_history(df_month: pd.DataFrame, col_prefix: str) -> tuple[pd.DataFrame, list[str]]:
+    """Rapikan riwayat bulanan PJP: satu baris per bulan + kolom Total & kunci periode."""
+    value_cols = [
+        f"{col_prefix} {suffix}"
+        for suffix, _, _ in _PROFILE_STACK_SERIES
+        if f"{col_prefix} {suffix}" in df_month.columns
+    ]
+    if not value_cols or "Year" not in df_month.columns or "Month" not in df_month.columns:
+        return pd.DataFrame(), []
+
+    data = df_month[["Year", "Month"] + value_cols].copy()
+    for col in value_cols:
+        data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0)
+
+    data["Year"] = pd.to_numeric(data["Year"], errors="coerce")
+    # astype(object) dulu: kolom Month bertipe category pada data hasil preprocess
+    data["MonthNum"] = pd.to_numeric(
+        data["Month"].astype(object).map(_profile_month_number), errors="coerce"
+    ).fillna(0)
+    data = data[data["Year"].notna() & (data["MonthNum"] > 0)].copy()
+    if data.empty:
+        return pd.DataFrame(), value_cols
+
+    data["Year"] = data["Year"].astype(int)
+    data["MonthNum"] = data["MonthNum"].astype(int)
+    data = data.groupby(["Year", "MonthNum"], as_index=False)[value_cols].sum()
+    data["Total"] = data[value_cols].sum(axis=1)
+    data["_period_key"] = data["Year"] * 12 + data["MonthNum"]
+    data = data.sort_values("_period_key").reset_index(drop=True)
+    return data, value_cols
+
+
+def make_combined_stacked_chart_profile(
+    df_month_full: pd.DataFrame,
+    nama_pjp: str,
+    periode_label: str,
+    *,
+    metric: str = "Nominal",
+    is_month: bool = False,
+    period_range: tuple | None = None,
+    quarter_label_style: str = "TW",
+    chart_height: int | None = None,
+    key: str | None = None,
+):
+    """Grafik gabungan profil PJP: batang bertumpuk Inc+Out+Dom + garis pertumbuhan.
+
+    df_month_full  : riwayat bulanan PJP tanpa filter tanggal (Year, Month, kolom
+                     'Sum of Fin Jumlah/Nilai Inc|Out|Dom'). Riwayat penuh dipakai
+                     supaya pertumbuhan pada periode pertama yang ditampilkan tetap
+                     punya pembanding.
+    period_range   : (tahun_mulai, bulan_mulai, tahun_akhir, bulan_akhir) - bulan 1-12,
+                     mengikuti filter di sidebar. Batang hanya digambar untuk bulan
+                     di dalam rentang ini.
+    is_month       : True -> tren bulanan (MtM), False -> tren per kuartal (YoY).
+    metric         : 'Nominal' (nilai Rp) atau 'Jumlah' (frekuensi transaksi).
+    """
+    cfg = _profile_metric_config(metric)
+    kosong = "Data gabungan tidak tersedia untuk periode yang dipilih."
+
+    if df_month_full is None or len(df_month_full) == 0:
+        st.info(kosong)
+        return
+
+    df_full, value_cols = _profile_prepare_month_history(df_month_full, cfg["col_prefix"])
+    if df_full.empty:
+        st.info(kosong)
+        return
+
+    # Rentang tampilan mengikuti filter (tahun + bulan)
+    if period_range is not None:
+        start_year, start_month, end_year, end_month = period_range
+        start_key = int(start_year) * 12 + int(start_month)
+        end_key = int(end_year) * 12 + int(end_month)
+        df_disp = df_full[
+            (df_full["_period_key"] >= start_key) & (df_full["_period_key"] <= end_key)
+        ].copy()
+    else:
+        df_disp = df_full.copy()
+
+    if df_disp.empty:
+        st.info(kosong)
+        return
+
+    if is_month:
+        df_plot = df_disp.reset_index(drop=True)
+
+        # MtM dihitung dari riwayat penuh supaya bulan pertama pada filter ikut terisi
+        growth_full = _profile_growth_by_lag(df_full, "_period_key", "Total", 1)
+        growth_map = dict(zip(df_full["_period_key"].tolist(), growth_full.tolist()))
+        df_plot["%Growth"] = df_plot["_period_key"].map(growth_map)
+
+        x_values = (
+            df_plot["Year"].astype(str) + "-" + df_plot["MonthNum"].astype(str).str.zfill(2)
+        ).tolist()
+        hover_period = x_values
+        x_tick_angle = -45
+        x_title = "Periode (YYYY-MM)"
+        growth_label = "Growth MtM (%)"
+        judul_periode = "Per Bulan"
+    else:
+        df_disp["Quarter"] = (df_disp["MonthNum"] - 1) // 3 + 1
+        df_plot = df_disp.groupby(["Year", "Quarter"], as_index=False)[value_cols].sum()
+        df_plot["Total"] = df_plot[value_cols].sum(axis=1)
+        df_plot = df_plot.sort_values(["Year", "Quarter"]).reset_index(drop=True)
+
+        # Bulan apa saja yang masuk tiap kuartal (kuartal di tepi filter bisa sebagian)
+        months_per_quarter = (
+            df_disp.groupby(["Year", "Quarter"])["MonthNum"]
+            .apply(lambda s: sorted(set(int(m) for m in s)))
+            .to_dict()
+        )
+
+        # YoY apple-to-apple: bandingkan dengan bulan yang sama pada tahun sebelumnya
+        total_by_month = dict(zip(df_full["_period_key"].tolist(), df_full["Total"].tolist()))
+
+        growth_values = []
+        partial_flags = []
+        for _, row in df_plot.iterrows():
+            year, quarter = int(row["Year"]), int(row["Quarter"])
+            months = months_per_quarter.get((year, quarter), [])
+            partial_flags.append(len(months) < 3)
+
+            prev_total = 0.0
+            prev_found = False
+            for month in months:
+                prev = total_by_month.get((year - 1) * 12 + month)
+                if prev is not None and pd.notna(prev):
+                    prev_total += float(prev)
+                    prev_found = True
+
+            if prev_found and prev_total != 0:
+                growth_values.append(round((float(row["Total"]) - prev_total) / prev_total * 100.0, 2))
+            else:
+                growth_values.append(float("nan"))
+
+        df_plot["%Growth"] = growth_values
+
+        style = str(quarter_label_style or "TW").strip().upper()
+        year_labels = df_plot["Year"].astype(str).tolist()
+        y_nums = df_plot["Year"].tolist()
+        q_nums = df_plot["Quarter"].tolist()
+
+        if style == "TW":
+            quarter_labels = [_PROFILE_ROMAN_QUARTER.get(int(q), str(int(q))) for q in q_nums]
+            hover_period = [
+                f"TW {_PROFILE_ROMAN_QUARTER.get(int(q), str(int(q)))} {int(y)}"
+                for y, q in zip(y_nums, q_nums)
+            ]
+        else:
+            quarter_labels = [f"Q{int(q)}" for q in q_nums]
+            hover_period = [f"Q{int(q)} {int(y)}" for y, q in zip(y_nums, q_nums)]
+
+        # Tandai kuartal yang tidak utuh karena terpotong filter bulan
+        hover_period = [
+            f"{label} (sebagian)" if partial else label
+            for label, partial in zip(hover_period, partial_flags)
+        ]
+
+        # Sumbu X dua tingkat: kuartal (dalam) di atas tahun (luar)
+        x_values = [year_labels, quarter_labels]
+        x_tick_angle = 0
+        x_title = "Periode"
+        growth_label = "Growth YoY (%)"
+        judul_periode = "Per Kuartal"
+
+        if any(partial_flags):
+            jumlah = sum(1 for p in partial_flags if p)
+            st.caption(
+                f"⚠️ {jumlah} kuartal hanya terisi sebagian karena terpotong filter bulan. "
+                "Pertumbuhan YoY dihitung terhadap bulan yang sama pada tahun sebelumnya."
+            )
+
+    # Unit Rupiah dipilih dari tinggi tumpukan (total), bukan per seri
+    cfg = _profile_metric_config(metric, df_plot["Total"].max())
+
+    fig = _profile_stack_figure(
+        df_plot,
+        cfg,
+        x_values=x_values,
+        hover_period=hover_period,
+        x_tick_angle=x_tick_angle,
+        title=(
+            f"Perkembangan {cfg['title_word']} Transaksi Gabungan - "
+            f"{nama_pjp} ({periode_label}) ({judul_periode})"
+        ),
+        x_title=x_title,
+        growth_col="%Growth",
+        growth_label=growth_label,
+        chart_height=chart_height,
+    )
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
 
 # ---------------------------------------------------------------------------

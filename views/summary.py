@@ -44,68 +44,10 @@ def _norm_text(value) -> str:
     return " ".join(str(value).strip().lower().split())
 
 
-def _month_to_int(value) -> int | None:
-    if value is None:
-        return None
-
-    try:
-        if pd.isna(value):
-            return None
-    except Exception:
-        pass
-
-    if isinstance(value, bool):
-        return None
-
-    if isinstance(value, (int, float)):
-        m = int(float(value))
-        return m if 1 <= m <= 12 else None
-
-    s = str(value).strip().lower().replace(".", "")
-    if not s:
-        return None
-    if s.isdigit():
-        m = int(s)
-        return m if 1 <= m <= 12 else None
-
-    try:
-        f = float(s)
-        if f.is_integer():
-            m = int(f)
-            return m if 1 <= m <= 12 else None
-    except Exception:
-        pass
-
-    month_map = {
-        "january": 1, "jan": 1,
-        "february": 2, "feb": 2,
-        "march": 3, "mar": 3,
-        "april": 4, "apr": 4,
-        "may": 5,
-        "june": 6, "jun": 6,
-        "july": 7, "jul": 7,
-        "august": 8, "aug": 8,
-        "september": 9, "sep": 9, "sept": 9,
-        "october": 10, "oct": 10,
-        "november": 11, "nov": 11,
-        "december": 12, "dec": 12,
-        "januari": 1,
-        "februari": 2,
-        "maret": 3,
-        "mei": 5,
-        "juni": 6,
-        "juli": 7,
-        "agustus": 8,
-        "oktober": 10, "okt": 10,
-        "desember": 12, "des": 12,
-    }
-    return month_map.get(s)
-
-
 def _effective_period_date(df: pd.DataFrame) -> pd.Series:
     year = pd.to_numeric(df.get("Year"), errors="coerce")
     if "Month" in df.columns:
-        month_series = df["Month"].map(_month_to_int)
+        month_series = df["Month"].map(month_to_number)
     elif "Quarter" in df.columns:
         q = pd.to_numeric(df["Quarter"], errors="coerce")
         month_series = (q * 3).astype("Int64")
@@ -211,6 +153,59 @@ def _apply_revoked_mode(df: pd.DataFrame, mode: str) -> tuple[pd.DataFrame, pd.S
     if str(mode) == "exclude":
         return df.loc[~mask_rv].copy(), mask_rv
     return df.copy(), mask_rv
+
+
+def _year_index(years: list[int], value, fallback: int) -> int:
+    """Posisi tahun pada daftar selectbox, jatuh ke fallback bila tidak ada."""
+    try:
+        return years.index(int(value))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _range_defaults(df: pd.DataFrame, mode: str, years: list[int]):
+    """Default rentang filter = seluruh periode yang tersedia pada data."""
+    bounds = period_bounds(df, mode)
+    if bounds:
+        return bounds
+    if mode == "year":
+        return (years[0], None), (years[-1], None)
+    return (years[0], 1), (years[-1], 12 if mode == "month" else 4)
+
+
+# Nama kolom tampilan disamakan dengan tabel Market Share di atasnya, supaya
+# istilah yang dibaca pengguna konsisten di seluruh halaman.
+_BUNDLING_RENAME = {
+    "Sum of Total Jumlah": "Total Frekuensi Seluruh Transaksi",
+    "Sum of Total Nom": "Total Nominal Seluruh Transaksi",
+    "Sum of Fin Jumlah Inc": "Total Frekuensi Incoming",
+    "Sum of Fin Jumlah Out": "Total Frekuensi Outgoing",
+    "Sum of Fin Jumlah Dom": "Total Frekuensi Domestik",
+    "Sum of Fin Nilai Inc": "Total Nominal Incoming",
+    "Sum of Fin Nilai Out": "Total Nominal Outgoing",
+    "Sum of Fin Nilai Dom": "Total Nominal Domestik",
+    "Kode": "Sandi PJP",
+}
+
+_BUNDLING_TEXT_COLUMNS = ("Bundling", "Sandi PJP", "Nama PJP")
+
+
+def _bundling_table_format(df: pd.DataFrame) -> dict:
+    """Formatter kolom tabel bundling: persen gaya ID, sisanya ribuan bulat."""
+
+    def _count(x):
+        return '{:,.0f}'.format(x)
+
+    def _percent(x):
+        return format_id_percent(x, decimals=2, show_sign=False,
+                                 none='-', space_before_percent=True)
+
+    return {
+        col: (_percent if col.endswith("(%)") else _count)
+        for col in df.columns
+        if col not in _BUNDLING_TEXT_COLUMNS
+    }
+
 
 # Initial Page Setup
 set_page_visuals("viz")
@@ -346,45 +341,149 @@ if df is not None and df_national is not None:
     df[time_cols] = df[time_cols].astype('int64')
 
     pjp_list = ['All'] + df['Nama PJP'].unique().tolist()
-    years = ['All'] + list(df['Year'].unique())
-    quarters = ['All'] + list(df['Quarter'].unique())
-    months = ['All'] + [calendar.month_name[m] for m in df['Month'].unique()]
+    unique_years = sorted(int(y) for y in df['Year'].unique())
+    month_names = [calendar.month_name[m] for m in range(1, 13)]
+    quarter_labels = [f"Q{q}" for q in range(1, 5)]
 
     with st.sidebar:
         with st.expander("Filter Market Share", True):
             selected_pjp = st.selectbox('Select PJP:', pjp_list)
-            selected_year_pjp = st.selectbox('Select Year:', years, key="key_year_pjp")
-            selected_quarter_pjp = st.selectbox('Select Quarter:', quarters, key="key_quarter_pjp")
-        with st.expander("Filter Transactions", True):
-            time_option = st.selectbox("Choose Time Period:", ("Month", "Quarter"))
-            selected_year = st.selectbox('Select Year:', years, key="key_year_trx")
 
-            if time_option == 'Month':
-                selected_month = st.selectbox('Select Month:', months, key="key_month_trx")
+            ms_start, ms_end = _range_defaults(df, 'quarter', unique_years)
+
+            col_ms_y1, col_ms_q1 = st.columns(2)
+            with col_ms_y1:
+                ms_start_year = st.selectbox(
+                    'Start Year:', unique_years,
+                    index=_year_index(unique_years, ms_start[0], 0),
+                    key="ms_start_year",
+                )
+            with col_ms_q1:
+                ms_start_quarter = st.selectbox(
+                    'Start Quarter:', quarter_labels,
+                    index=int(ms_start[1]) - 1,
+                    key="ms_start_quarter",
+                )
+
+            col_ms_y2, col_ms_q2 = st.columns(2)
+            with col_ms_y2:
+                ms_end_year = st.selectbox(
+                    'End Year:', unique_years,
+                    index=_year_index(unique_years, ms_end[0], len(unique_years) - 1),
+                    key="ms_end_year",
+                )
+            with col_ms_q2:
+                ms_end_quarter = st.selectbox(
+                    'End Quarter:', quarter_labels,
+                    index=int(ms_end[1]) - 1,
+                    key="ms_end_quarter",
+                )
+
+            ms_start_q = quarter_labels.index(ms_start_quarter) + 1
+            ms_end_q = quarter_labels.index(ms_end_quarter) + 1
+            ms_lo, ms_hi = (ms_start_year, ms_start_q), (ms_end_year, ms_end_q)
+            if period_to_ordinal('quarter', *ms_lo) > period_to_ordinal('quarter', *ms_hi):
+                ms_lo, ms_hi = ms_hi, ms_lo
+                st.warning("Kuartal awal lebih akhir dari kuartal akhir; rentang dibalik otomatis.")
+
+            st.caption(
+                "Rentang: "
+                f"{format_period_label('quarter', *ms_lo)} s.d. "
+                f"{format_period_label('quarter', *ms_hi)}"
+            )
+
+        with st.expander("Filter Transactions", True):
+            time_option = st.selectbox("Choose Time Period:", ("Month", "Quarter", "Year"))
+            period_mode = normalize_period_mode(time_option)
+            is_month = period_mode == "month"
+
+            trx_start, trx_end = _range_defaults(df, period_mode, unique_years)
+
+            if period_mode == "year":
+                trx_start_period = trx_end_period = None
+                col_trx_y1, col_trx_y2 = st.columns(2)
+                with col_trx_y1:
+                    trx_start_year = st.selectbox(
+                        'Start Year:', unique_years,
+                        index=_year_index(unique_years, trx_start[0], 0),
+                        key="trx_start_year_year",
+                    )
+                with col_trx_y2:
+                    trx_end_year = st.selectbox(
+                        'End Year:', unique_years,
+                        index=_year_index(unique_years, trx_end[0], len(unique_years) - 1),
+                        key="trx_end_year_year",
+                    )
             else:
-                selected_quarter = st.selectbox('Select Quarter:', quarters, key="key_quarter_trx")
+                period_options = month_names if is_month else quarter_labels
+                period_word = "Month" if is_month else "Quarter"
+
+                col_trx_y1, col_trx_p1 = st.columns(2)
+                with col_trx_y1:
+                    trx_start_year = st.selectbox(
+                        'Start Year:', unique_years,
+                        index=_year_index(unique_years, trx_start[0], 0),
+                        key=f"trx_start_year_{period_mode}",
+                    )
+                with col_trx_p1:
+                    trx_start_label = st.selectbox(
+                        f'Start {period_word}:', period_options,
+                        index=int(trx_start[1]) - 1,
+                        key=f"trx_start_period_{period_mode}",
+                    )
+
+                col_trx_y2, col_trx_p2 = st.columns(2)
+                with col_trx_y2:
+                    trx_end_year = st.selectbox(
+                        'End Year:', unique_years,
+                        index=_year_index(unique_years, trx_end[0], len(unique_years) - 1),
+                        key=f"trx_end_year_{period_mode}",
+                    )
+                with col_trx_p2:
+                    trx_end_label = st.selectbox(
+                        f'End {period_word}:', period_options,
+                        index=int(trx_end[1]) - 1,
+                        key=f"trx_end_period_{period_mode}",
+                    )
+
+                trx_start_period = period_options.index(trx_start_label) + 1
+                trx_end_period = period_options.index(trx_end_label) + 1
+
+            trx_lo = (trx_start_year, trx_start_period)
+            trx_hi = (trx_end_year, trx_end_period)
+            if period_to_ordinal(period_mode, *trx_lo) > period_to_ordinal(period_mode, *trx_hi):
+                trx_lo, trx_hi = trx_hi, trx_lo
+                st.warning("Periode awal lebih akhir dari periode akhir; rentang dibalik otomatis.")
+
+            st.caption(
+                "Rentang: "
+                f"{format_period_label(period_mode, *trx_lo)} s.d. "
+                f"{format_period_label(period_mode, *trx_hi)}"
+            )
 
     df_preprocessed = preprocess_data(df)
     df_preprocessed_time = preprocess_data(df, is_trx=True)
 
-    filtered_df = filter_data(df=df_preprocessed,
+    df_market_share_range = filter_period_range(df_preprocessed, 'quarter',
+                                                ms_start_year, ms_end_year,
+                                                ms_start_q, ms_end_q)
+    filtered_df = filter_data(df=df_market_share_range,
                               selected_pjp=selected_pjp,
-                              selected_quarter=selected_quarter_pjp,
-                              selected_year=selected_year_pjp,
                               group_by_pjp=True)
 
-    if time_option == "Month":
-        filtered_df_time = filter_data(df=df_preprocessed_time,
-                                       selected_year=selected_year,
-                                       selected_month=selected_month)
-        is_month = True
-    else:
-        filtered_df_time = filter_data(df=df_preprocessed_time,
-                                       selected_year=selected_year,
-                                       selected_quarter=selected_quarter)
-        is_month = False
+    filtered_df_time = filter_period_range(df_preprocessed_time, period_mode,
+                                           trx_start_year, trx_end_year,
+                                           trx_start_period, trx_end_period)
 
-    df_sum_time = sum_data_time(filtered_df_time, is_month)
+    if filtered_df.empty:
+        st.warning("Tidak ada data Market Share pada rentang periode yang dipilih. Perlebar rentangnya.")
+        st.stop()
+
+    if filtered_df_time.empty:
+        st.warning("Tidak ada data transaksi pada rentang periode yang dipilih. Perlebar rentangnya.")
+        st.stop()
+
+    df_sum_time = sum_data_time(filtered_df_time, is_month, mode=period_mode)
 
     total_sum_of_nom = filtered_df['Sum of Total Nom'].sum()
     df_with_market_share = calculate_market_share(filtered_df, total_sum_of_nom)
@@ -392,6 +491,12 @@ if df is not None and df_national is not None:
     df_sum_time = df_sum_time[(df_sum_time['Sum of Fin Jumlah Inc'] != 0) & (df_sum_time['Sum of Fin Nilai Inc'] != 0) &
                               (df_sum_time['Sum of Fin Jumlah Out'] != 0) & (df_sum_time['Sum of Fin Nilai Out'] != 0) &
                               (df_sum_time['Sum of Fin Jumlah Dom'] != 0) & (df_sum_time['Sum of Fin Nilai Dom'] != 0)]
+
+    if df_sum_time.empty:
+        st.warning("Tidak ada periode dengan transaksi lengkap pada rentang yang dipilih. Perlebar rentangnya.")
+        st.stop()
+
+    df_sum_time['Periode'] = build_period_label(df_sum_time, period_mode)
 
     grand_total_inc_nominal = int(df_sum_time['Sum of Fin Nilai Inc'].sum())
     grand_total_inc_jumlah = int(df_sum_time['Sum of Fin Jumlah Inc'].sum())
@@ -443,9 +548,13 @@ if df is not None and df_national is not None:
     st.dataframe(df_with_market_share, use_container_width=True)
     col2, col3 = st.columns(2)
     with col2:
-        make_grouped_bar_chart(df_sum_time, "Jumlah", is_month)
+        make_grouped_bar_chart(df_sum_time, "Jumlah", is_month,
+                               time_label='Periode', title_label=time_option)
     with col3:
-        make_grouped_bar_chart(df_sum_time, "Nilai", is_month)
+        make_grouped_bar_chart(df_sum_time, "Nilai", is_month,
+                               time_label='Periode', title_label=time_option)
+
+    df_sum_time = df_sum_time.drop(columns=['Periode'])
 
     df_sum_time.rename(columns={
         "Sum of Total Nom": "Total Nominal Seluruh Transaksi",
@@ -490,5 +599,129 @@ if df is not None and df_national is not None:
         decimal=",",
     )
     st.dataframe(df_grand_totals, use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.subheader("Transaksi per Bundling")
+
+    if not has_bundling(df):
+        st.info(
+            "Kolom 'Bundling' tidak ada atau kosong pada sheet 'Trx_PJPJKT'. "
+            "Unggah file yang sudah memuat kolom Bundling untuk melihat ringkasan ini."
+        )
+    else:
+        st.caption(
+            "Mengikuti rentang Filter Transactions: "
+            f"{format_period_label(period_mode, *trx_lo)} s.d. "
+            f"{format_period_label(period_mode, *trx_hi)}"
+        )
+
+        bundling_metric = st.radio(
+            "Ukuran yang ditampilkan:",
+            ("Nominal", "Frekuensi"),
+            horizontal=True,
+            key="bundling_metric",
+        )
+        is_nominal_bundling = bundling_metric == "Nominal"
+        bundling_value_col = 'Sum of Total Nom' if is_nominal_bundling else 'Sum of Total Jumlah'
+
+        # Dihitung ulang dari baris mentah: kolom Bundling ikut terbuang saat data
+        # diagregasi per PJP untuk bagian atas halaman.
+        df_bundling_rows = filter_period_range(df, period_mode,
+                                               trx_start_year, trx_end_year,
+                                               trx_start_period, trx_end_period)
+        df_bundling_total = aggregate_by_bundling(df_bundling_rows)
+
+        if df_bundling_total.empty:
+            st.warning("Tidak ada data bundling pada rentang periode yang dipilih.")
+        else:
+            df_bundling_period = aggregate_by_bundling(df_bundling_rows, period_mode=period_mode)
+            df_bundling_period['Periode'] = build_period_label(df_bundling_period, period_mode)
+
+            col_b1, col_b2 = st.columns([2, 3])
+            with col_b1:
+                make_bundling_share_chart(df_bundling_total, bundling_value_col,
+                                          bundling_metric, key="bundling_share")
+            with col_b2:
+                make_bundling_trend_chart(df_bundling_period, bundling_value_col, 'Periode',
+                                          bundling_metric, is_nominal_bundling,
+                                          key="bundling_trend")
+
+            df_bundling_summary = add_share_column(df_bundling_total, 'Sum of Total Nom',
+                                                   'Share Nominal (%)')
+            df_bundling_summary = add_share_column(df_bundling_summary, 'Sum of Total Jumlah',
+                                                   'Share Frekuensi (%)')
+            df_bundling_summary['Rata-rata Nominal per Transaksi'] = (
+                df_bundling_summary['Sum of Total Nom']
+                / df_bundling_summary['Sum of Total Jumlah'].replace(0, pd.NA)
+            )
+            df_bundling_summary = (
+                df_bundling_summary
+                .sort_values('Sum of Total Nom', ascending=False, ignore_index=True)
+                .rename(columns=_BUNDLING_RENAME)
+            )
+            df_bundling_summary = df_bundling_summary[[
+                "Bundling", "Jumlah PJP",
+                "Total Frekuensi Seluruh Transaksi", "Total Nominal Seluruh Transaksi",
+                "Share Frekuensi (%)", "Share Nominal (%)", "Rata-rata Nominal per Transaksi",
+                "Total Frekuensi Incoming", "Total Frekuensi Outgoing", "Total Frekuensi Domestik",
+                "Total Nominal Incoming", "Total Nominal Outgoing", "Total Nominal Domestik",
+            ]]
+
+            st.dataframe(
+                df_bundling_summary.style.format(
+                    _bundling_table_format(df_bundling_summary),
+                    thousands=".",
+                    decimal=",",
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            with st.expander("Detail PJP per Bundling", False):
+                df_bundling_pjp = aggregate_by_bundling(df_bundling_rows, by_pjp=True)
+
+                # Porsi dalam bundling dihitung sebelum penyaringan, supaya angkanya
+                # tetap relatif terhadap bundling penuh dan bukan terhadap yang tampil.
+                group_total = df_bundling_pjp.groupby("Bundling")['Sum of Total Nom'].transform('sum')
+                df_bundling_pjp['Share dalam Bundling (%)'] = round_half_up_series(
+                    df_bundling_pjp['Sum of Total Nom'] / group_total.replace(0, pd.NA) * 100, 2
+                )
+                df_bundling_pjp = add_share_column(df_bundling_pjp, 'Sum of Total Nom',
+                                                   'Share Keseluruhan (%)')
+
+                bundling_options = ["Semua"] + sort_bundling_labels(df_bundling_pjp["Bundling"])
+                selected_bundling = st.selectbox("Pilih Bundling:", bundling_options,
+                                                 key="bundling_detail_pick")
+                if selected_bundling != "Semua":
+                    df_bundling_pjp = df_bundling_pjp[df_bundling_pjp["Bundling"] == selected_bundling]
+
+                df_bundling_pjp = (
+                    df_bundling_pjp
+                    .sort_values('Sum of Total Nom', ascending=False, ignore_index=True)
+                    .rename(columns=_BUNDLING_RENAME)
+                )
+                detail_cols = ["Bundling"]
+                if "Sandi PJP" in df_bundling_pjp.columns:
+                    # Sandi sebagai teks: angkanya identitas, bukan nilai yang dijumlahkan.
+                    df_bundling_pjp["Sandi PJP"] = df_bundling_pjp["Sandi PJP"].astype("string")
+                    detail_cols.append("Sandi PJP")
+                detail_cols += [
+                    "Nama PJP",
+                    "Total Frekuensi Seluruh Transaksi", "Total Nominal Seluruh Transaksi",
+                    "Share dalam Bundling (%)", "Share Keseluruhan (%)",
+                    "Total Nominal Incoming", "Total Nominal Outgoing", "Total Nominal Domestik",
+                ]
+                df_bundling_pjp = df_bundling_pjp[detail_cols]
+
+                st.caption(f"{len(df_bundling_pjp)} PJP ditampilkan.")
+                st.dataframe(
+                    df_bundling_pjp.style.format(
+                        _bundling_table_format(df_bundling_pjp),
+                        thousands=".",
+                        decimal=",",
+                    ),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 else:
     st.warning("You Must Upload an Excel File.")
